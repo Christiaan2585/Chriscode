@@ -4,6 +4,7 @@ import { Plus, Search, FileText, Trash2, Download, X, Edit } from "lucide-react"
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
 import Modal from "../components/Modal";
+import SearchableSelect from "../components/SearchableSelect";
 
 const emptyInvoice = { client_id: "", status: "unpaid", notes: "" };
 
@@ -145,7 +146,19 @@ const Invoices = () => {
       const response = await apiClient.delete(`/invoices/${id}`);
       return response.data;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["invoices"] }),
+    // Optimistic delete: remove it from the list the instant the user confirms,
+    // instead of waiting for the round trip - roll back if the server call
+    // actually fails (the toast system surfaces that error separately).
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["invoices"] });
+      const previousInvoices = queryClient.getQueryData(["invoices"]);
+      queryClient.setQueryData(["invoices"], (old) => (old || []).filter((i) => i.id !== id));
+      return { previousInvoices };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousInvoices) queryClient.setQueryData(["invoices"], context.previousInvoices);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["invoices"] }),
   });
 
   const addItem = () => {
@@ -302,14 +315,13 @@ const Invoices = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Client</label>
-              <select
+              <SearchableSelect
                 value={invoice.client_id}
-                onChange={(e) => setInvoice({ ...invoice, client_id: e.target.value })}
-                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-              >
-                <option value="">Select a client…</option>
-                {clients?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+                onChange={(v) => setInvoice({ ...invoice, client_id: v })}
+                options={(clients || []).map((c) => ({ value: c.id, label: c.name, sublabel: c.farm_name }))}
+                placeholder="Select a client…"
+                searchPlaceholder="Search clients…"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
@@ -371,14 +383,13 @@ const Invoices = () => {
             )}
 
             <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <select
+              <SearchableSelect
                 value={newItem.product_id}
-                onChange={(e) => setNewItem({ ...newItem, product_id: e.target.value })}
-                className="p-2 border border-slate-200 rounded-lg text-sm"
-              >
-                <option value="">Select product…</option>
-                {products?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+                onChange={(v) => setNewItem({ ...newItem, product_id: v })}
+                options={(products || []).map((p) => ({ value: p.id, label: p.name }))}
+                placeholder="Select product…"
+                searchPlaceholder="Search products…"
+              />
               <input
                 type="number"
                 placeholder="Qty"

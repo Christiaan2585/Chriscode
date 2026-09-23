@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
-import { Plus, Search, FileText, Trash2, Edit, Save, X } from "lucide-react";
+import { Plus, Search, FileText, Trash2, Edit, Save, X, Download } from "lucide-react";
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
 import Modal from "../components/Modal";
+import SearchableSelect from "../components/SearchableSelect";
 
 const emptyQuote = { client_id: "", status: "Draft" };
 
@@ -150,7 +151,19 @@ const Quotes = () => {
 
   const deleteQuoteMutation = useMutation({
     mutationFn: async (id) => (await apiClient.delete(`/quotes/${id}`)).data,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["quotes"] }),
+    // Optimistic delete: remove it from the list the instant the user confirms,
+    // instead of waiting for the round trip - roll back if the server call
+    // actually fails (the toast system surfaces that error separately).
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["quotes"] });
+      const previousQuotes = queryClient.getQueryData(["quotes"]);
+      queryClient.setQueryData(["quotes"], (old) => (old || []).filter((q) => q.id !== id));
+      return { previousQuotes };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousQuotes) queryClient.setQueryData(["quotes"], context.previousQuotes);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["quotes"] }),
   });
 
   const addItem = () => {
@@ -162,6 +175,22 @@ const Quotes = () => {
   const removeNewItem = (key) => setNewItems(newItems.filter((i) => i._key !== key));
   const removeExistingItem = (id) => setRemovedItemIds([...removedItemIds, id]);
   const restoreExistingItem = (id) => setRemovedItemIds(removedItemIds.filter((i) => i !== id));
+
+  const downloadQuotePdf = async (id) => {
+    const response = await apiClient.get(`/quotes/${id}/pdf`, {
+      responseType: "blob",
+    });
+    const url = window.URL.createObjectURL(
+      new Blob([response.data], { type: "application/pdf" })
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `quote_${id}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
 
   if (isLoading) return <div className="p-8 text-center">Loading quotes...</div>;
 
@@ -218,6 +247,13 @@ const Quotes = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right flex justify-end gap-2">
+                  <button
+                    onClick={() => downloadQuotePdf(q.id)}
+                    className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
+                    title="Download PDF"
+                  >
+                    <Download size={18} />
+                  </button>
                   <button onClick={() => openEditModal(q)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors" title="Edit">
                     <Edit size={18} />
                   </button>
@@ -251,14 +287,13 @@ const Quotes = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Client</label>
-              <select
+              <SearchableSelect
                 value={quote.client_id}
-                onChange={e => setQuote({...quote, client_id: e.target.value})}
-                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-              >
-                <option value="">Select a client…</option>
-                {clients?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+                onChange={(v) => setQuote({ ...quote, client_id: v })}
+                options={(clients || []).map((c) => ({ value: c.id, label: c.name, sublabel: c.farm_name }))}
+                placeholder="Select a client…"
+                searchPlaceholder="Search clients…"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
@@ -279,21 +314,20 @@ const Quotes = () => {
               <FileText size={18} /> Quote Items
             </h4>
             <div className="grid grid-cols-4 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <select
+              <SearchableSelect
                 value={newItem.product_id}
-                onChange={e => {
-                  const product = products?.find(p => p.id === Number(e.target.value));
+                onChange={(v) => {
+                  const product = products?.find(p => p.id === Number(v));
                   setNewItem({
                     ...newItem,
-                    product_id: e.target.value,
+                    product_id: v,
                     unit_price: product ? product.price : newItem.unit_price,
                   });
                 }}
-                className="p-2 border border-slate-200 rounded-lg text-sm"
-              >
-                <option value="">Select product…</option>
-                {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+                options={(products || []).map((p) => ({ value: p.id, label: p.name }))}
+                placeholder="Select product…"
+                searchPlaceholder="Search products…"
+              />
               <input
                 type="number"
                 placeholder="Qty"

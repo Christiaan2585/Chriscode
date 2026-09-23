@@ -8,7 +8,8 @@
     "frontend:dev": "cd frontend && npm run dev",
     "dev": "concurrently \"npm run frontend:dev\" \"npm run electron:dev\"",
     "build": "cd frontend && npm run build",
-    "package": "npm run build && electron-builder build --win"
+    "package": "npm run build && electron-builder build --win",
+    "release": "npm run build && electron-builder build --win --publish always"
   },
   "keywords": [],
   "author": "Sandveld Vee Dienste",
@@ -23,6 +24,7 @@
     "@tanstack/react-query": "^5.50.0",
     "axios": "^1.7.0",
     "electron-is-dev": "^3.0.1",
+    "electron-updater": "^6.8.9",
     "lucide-react": "^0.400.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -44,7 +46,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "${name}-Setup-${version}.${ext}"
     },
     "files": [
       "**/*",
@@ -56,6 +59,11 @@
         "from": "backend/sandveld-backend",
         "to": "backend/sandveld-backend"
       }
-    ]
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "Christiaan2585",
+      "repo": "Chriscode"
+    }
   }
 }

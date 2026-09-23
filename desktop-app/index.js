@@ -5,6 +5,7 @@ const http = require('http');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const isDev = require('electron-is-dev');
+const { autoUpdater } = require('electron-updater');
 
 // Sets the folder name Electron's app.getPath('userData') resolves to
 // (otherwise it falls back to package.json's "name", i.e. the kebab-case
@@ -198,6 +199,10 @@ async function createWindow() {
       contextIsolation: false,
     },
     title: 'Sandveld Vee Dienste',
+    // A packaged build already gets its icon from the exe itself (package.json's
+    // build.win.icon); this is what makes the window/taskbar icon correct when
+    // just running `npm run dev` too, instead of Electron's default icon.
+    icon: path.join(__dirname, 'build', 'icon.ico'),
   });
 
   await startBackend();
@@ -248,6 +253,55 @@ async function createWindow() {
 
   mainWindow.webContents.on('responsive', () => {
     console.log('[renderer] window is responsive again.');
+  });
+
+  setupAutoUpdater();
+}
+
+// Checks GitHub Releases (see package.json's build.publish config) for a
+// newer version, downloads it in the background, and prompts to restart once
+// it's ready. Only meaningful for a packaged install - a dev run has no
+// installed version to update, so app.isPackaged short-circuits it there
+// rather than have electron-updater fail looking for app-update.yml that a
+// dev build never produces.
+function setupAutoUpdater() {
+  if (!app.isPackaged) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    logToBackendFile('[updater] checking for update...');
+  });
+  autoUpdater.on('update-available', (info) => {
+    logToBackendFile(`[updater] update available: v${info.version} - downloading...`);
+  });
+  autoUpdater.on('update-not-available', () => {
+    logToBackendFile('[updater] already on the latest version.');
+  });
+  autoUpdater.on('error', (err) => {
+    logToBackendFile(`[updater] check/download failed: ${err.message}`);
+  });
+  autoUpdater.on('download-progress', (progress) => {
+    logToBackendFile(`[updater] downloading update: ${Math.round(progress.percent)}%`);
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    logToBackendFile(`[updater] update downloaded: v${info.version}`);
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      buttons: ['Restart now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Update ready',
+      message: `Sandveld Vee Dienste ${info.version} has been downloaded.`,
+      detail: 'Restart now to apply it, or it will install automatically the next time you close the app.',
+    }).then((result) => {
+      if (result.response === 0) autoUpdater.quitAndInstall();
+    });
+  });
+
+  autoUpdater.checkForUpdates().catch((err) => {
+    logToBackendFile(`[updater] check failed: ${err.message}`);
   });
 }
 

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Dog, Activity, Scale, Calendar, Plus, Trash2, Check, StickyNote,
   Phone, MessageCircle, Edit, Briefcase, Mail, MapPin, ClipboardList,
-  FileText, ShoppingCart, Download, ChevronRight, Clock, CheckCircle, Ban,
+  FileText, ShoppingCart, Download, ChevronRight, ChevronDown, ChevronUp, Clock, CheckCircle, Ban,
 } from "lucide-react";
 import { clientService, animalService } from "../api/services";
 import apiClient from "../api/client";
@@ -47,6 +47,17 @@ const ClientDetail = () => {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const emptyAppointment = { animal_id: "", date: new Date().toISOString().split("T")[0], time: "09:00", reason: "", status: "scheduled" };
   const [newAppointment, setNewAppointment] = useState(emptyAppointment);
+  const [isProgramModalOpen, setIsProgramModalOpen] = useState(false);
+  const emptyProgramForm = { name: "", goal: "", start_date: "", end_date: "" };
+  const [programForm, setProgramForm] = useState(emptyProgramForm);
+  const [expandedProgramId, setExpandedProgramId] = useState(null);
+  const emptyGroupForm = { animal_type: SPECIES_OPTIONS[0], group_size: "" };
+  const [newGroup, setNewGroup] = useState(emptyGroupForm);
+  // Animal-type/count rows staged in the "New Program" modal itself, before
+  // the program (and therefore a real program_id to attach them to) exists.
+  // Posted as groups right after the program is created - see addProgramMutation.
+  const [draftGroups, setDraftGroups] = useState([]);
+  const [groupDraft, setGroupDraft] = useState(emptyGroupForm);
 
   const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: ["client", id],
@@ -164,6 +175,71 @@ const ClientDetail = () => {
   const deleteInvoiceMutation = useMutation({
     mutationFn: async (invoiceId) => (await apiClient.delete(`/invoices/${invoiceId}`)).data,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["invoices", "client", id] }),
+  });
+
+  const addProgramMutation = useMutation({
+    mutationFn: async (data) => {
+      const created = await apiClient
+        .post("/programs/", {
+          name: data.name,
+          goal: data.goal || null,
+          start_date: data.start_date || null,
+          end_date: data.end_date || null,
+          client_id: Number(id),
+        })
+        .then((r) => r.data);
+
+      for (const group of data.groups) {
+        await apiClient.post(`/programs/${created.id}/groups`, {
+          program_id: created.id,
+          animal_type: group.animal_type,
+          group_size: Number(group.group_size),
+        });
+      }
+      return created;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["programs", "client", id] });
+      setIsProgramModalOpen(false);
+      setProgramForm(emptyProgramForm);
+      setDraftGroups([]);
+      setGroupDraft(emptyGroupForm);
+    },
+  });
+
+  const deleteProgramMutation = useMutation({
+    mutationFn: async (programId) => (await apiClient.delete(`/programs/${programId}`)).data,
+    // Optimistic delete, same pattern as every other list in this page.
+    onMutate: async (programId) => {
+      await queryClient.cancelQueries({ queryKey: ["programs", "client", id] });
+      const previous = queryClient.getQueryData(["programs", "client", id]);
+      queryClient.setQueryData(["programs", "client", id], (old) => (old || []).filter((p) => p.id !== programId));
+      return { previous };
+    },
+    onError: (err, programId, context) => {
+      if (context?.previous) queryClient.setQueryData(["programs", "client", id], context.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["programs", "client", id] }),
+  });
+
+  const addProgramGroupMutation = useMutation({
+    mutationFn: async ({ programId, animal_type, group_size }) =>
+      (
+        await apiClient.post(`/programs/${programId}/groups`, {
+          program_id: programId,
+          animal_type,
+          group_size: Number(group_size),
+        })
+      ).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["programs", "client", id] });
+      setNewGroup(emptyGroupForm);
+    },
+  });
+
+  const deleteProgramGroupMutation = useMutation({
+    mutationFn: async (groupId) => (await apiClient.delete(`/programs/groups/${groupId}`)).data,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["programs", "client", id] }),
   });
 
   const addAppointmentMutation = useMutation({
@@ -401,36 +477,123 @@ const ClientDetail = () => {
 
           {/* Herding Programs */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <h3 className="text-lg font-semibold mb-4 border-b pb-2 flex items-center gap-2">
-              <ClipboardList size={18} className="text-emerald-600" /> Herding Programs
-            </h3>
+            <div className="flex items-center justify-between mb-4 border-b pb-2">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <ClipboardList size={18} className="text-emerald-600" /> Herding Programs
+              </h3>
+              <button
+                onClick={() => { setProgramForm(emptyProgramForm); setDraftGroups([]); setGroupDraft(emptyGroupForm); setIsProgramModalOpen(true); }}
+                className="text-sm bg-emerald-600 text-white px-3 py-1 rounded-md hover:bg-emerald-700 transition-colors"
+              >
+                + New Program
+              </button>
+            </div>
             {(!programs || programs.length === 0) ? (
-              <p className="text-sm text-slate-400">
-                No programs assigned yet. Assign this client's animals to a program from the Herding Programs page.
-              </p>
+              <p className="text-sm text-slate-400">No herding programs for this client yet.</p>
             ) : (
-              <div className="space-y-2">
-                {programs.map((p) => (
-                  <div key={p.id} className="p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-sm">
-                    <div className="font-medium text-slate-700">{p.name}</div>
-                    {p.goal && <div className="text-xs text-slate-500 mt-0.5">{p.goal}</div>}
-                    {(p.start_date || p.end_date) && (
-                      <div className="text-xs text-slate-400 mt-1">
-                        {p.start_date ? new Date(p.start_date).toLocaleDateString() : "—"}
-                        {" → "}
-                        {p.end_date ? new Date(p.end_date).toLocaleDateString() : "—"}
+              <div className="space-y-3">
+                {programs.map((p) => {
+                  const isOpen = expandedProgramId === p.id;
+                  const groups = p.groups || [];
+                  return (
+                    <div key={p.id} className="border border-emerald-100 rounded-lg overflow-hidden">
+                      <div className="p-3 bg-emerald-50">
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <div className="font-medium text-slate-700">{p.name}</div>
+                            {p.goal && <div className="text-xs text-slate-500 mt-0.5">{p.goal}</div>}
+                            {(p.start_date || p.end_date) && (
+                              <div className="text-xs text-slate-400 mt-1">
+                                {p.start_date ? new Date(p.start_date).toLocaleDateString() : "—"}
+                                {" → "}
+                                {p.end_date ? new Date(p.end_date).toLocaleDateString() : "—"}
+                              </div>
+                            )}
+                            {groups.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {groups.map((g) => (
+                                  <span
+                                    key={g.id}
+                                    className="bg-white border border-emerald-200 text-emerald-700 text-xs font-medium px-2 py-0.5 rounded-full"
+                                  >
+                                    {g.animal_type} × {g.group_size}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => setExpandedProgramId(isOpen ? null : p.id)}
+                              className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                              title={isOpen ? "Collapse" : "Manage animal groups"}
+                            >
+                              {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Delete program "${p.name}"? This can't be undone.`)) {
+                                  deleteProgramMutation.mutate(p.id);
+                                }
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
+                              title="Delete program"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {isOpen && (
+                        <div className="p-3 bg-white space-y-2 border-t border-emerald-100">
+                          {groups.length === 0 && <p className="text-xs text-slate-400">No animal groups yet.</p>}
+                          {groups.map((g) => (
+                            <div
+                              key={g.id}
+                              className="flex items-center justify-between text-sm bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5"
+                            >
+                              <span>{g.animal_type} — {g.group_size} animals</span>
+                              <button
+                                onClick={() => deleteProgramGroupMutation.mutate(g.id)}
+                                className="text-slate-400 hover:text-red-600"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          ))}
+                          <div className="flex gap-2 pt-2">
+                            <select
+                              value={newGroup.animal_type}
+                              onChange={(e) => setNewGroup({ ...newGroup, animal_type: e.target.value })}
+                              className="p-2 border border-slate-200 rounded-lg text-sm"
+                            >
+                              {SPECIES_OPTIONS.map((s) => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
+                            <input
+                              type="number"
+                              min="1"
+                              placeholder="Group size"
+                              value={newGroup.group_size}
+                              onChange={(e) => setNewGroup({ ...newGroup, group_size: e.target.value })}
+                              className="flex-1 p-2 border border-slate-200 rounded-lg text-sm"
+                            />
+                            <button
+                              disabled={!newGroup.group_size || addProgramGroupMutation.isPending}
+                              onClick={() => addProgramGroupMutation.mutate({ programId: p.id, ...newGroup })}
+                              className="bg-emerald-600 text-white px-3 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50 whitespace-nowrap"
+                            >
+                              + Add Group
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
-            <Link
-              to="/programs"
-              className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 mt-3 font-medium"
-            >
-              Manage program assignments <ChevronRight size={14} />
-            </Link>
           </div>
         </div>
 
@@ -1012,6 +1175,119 @@ const ClientDetail = () => {
             className="w-full bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50"
           >
             {addAppointmentMutation.isPending ? "Saving..." : "Schedule Visit"}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isProgramModalOpen}
+        onClose={() => { setIsProgramModalOpen(false); setDraftGroups([]); setGroupDraft(emptyGroupForm); }}
+        title={`New Herding Program for ${client.name}`}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Program Name</label>
+            <input
+              type="text"
+              value={programForm.name}
+              onChange={(e) => setProgramForm({ ...programForm, name: e.target.value })}
+              className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+              placeholder="e.g. Winter Vaccination Cycle"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">What is this program for?</label>
+            <input
+              type="text"
+              value={programForm.goal}
+              onChange={(e) => setProgramForm({ ...programForm, goal: e.target.value })}
+              className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+              placeholder="e.g. Deworming before summer"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Start Date</label>
+              <input
+                type="date"
+                value={programForm.start_date}
+                onChange={(e) => setProgramForm({ ...programForm, start_date: e.target.value })}
+                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">End Date</label>
+              <input
+                type="date"
+                value={programForm.end_date}
+                onChange={(e) => setProgramForm({ ...programForm, end_date: e.target.value })}
+                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Animals covered <span className="text-red-500">*</span>
+            </label>
+            <p className="text-xs text-slate-400 mb-2">
+              How many of each animal type does this program treat? At least one is required - you can still add
+              or adjust these later from the program's card.
+            </p>
+            {draftGroups.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {draftGroups.map((g, i) => (
+                  <span
+                    key={i}
+                    className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium pl-2.5 pr-1.5 py-1 rounded-full"
+                  >
+                    {g.animal_type} × {g.group_size}
+                    <button
+                      onClick={() => setDraftGroups(draftGroups.filter((_, idx) => idx !== i))}
+                      className="text-emerald-500 hover:text-red-600"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <select
+                value={groupDraft.animal_type}
+                onChange={(e) => setGroupDraft({ ...groupDraft, animal_type: e.target.value })}
+                className="p-2 border border-slate-200 rounded-lg text-sm"
+              >
+                {SPECIES_OPTIONS.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min="1"
+                placeholder="Count"
+                value={groupDraft.group_size}
+                onChange={(e) => setGroupDraft({ ...groupDraft, group_size: e.target.value })}
+                className="flex-1 p-2 border border-slate-200 rounded-lg text-sm"
+              />
+              <button
+                type="button"
+                disabled={!groupDraft.group_size || Number(groupDraft.group_size) <= 0}
+                onClick={() => {
+                  setDraftGroups([...draftGroups, groupDraft]);
+                  setGroupDraft(emptyGroupForm);
+                }}
+                className="bg-emerald-600 text-white px-3 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50 whitespace-nowrap"
+              >
+                + Add
+              </button>
+            </div>
+          </div>
+          <button
+            disabled={!programForm.name || draftGroups.length === 0 || addProgramMutation.isPending}
+            onClick={() => addProgramMutation.mutate({ ...programForm, groups: draftGroups })}
+            className="w-full bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50"
+          >
+            {addProgramMutation.isPending ? "Saving..." : "Create Program"}
           </button>
         </div>
       </Modal>

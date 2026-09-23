@@ -5,6 +5,7 @@ import { animalService, clientService } from "../api/services";
 import Modal from "../components/Modal";
 import MedicalModal from "../components/MedicalModal";
 import WeightModal from "../components/WeightModal";
+import SearchableSelect from "../components/SearchableSelect";
 
 const SPECIES_OPTIONS = ["Goats", "Sheep", "Cows", "Horses", "Pigs"];
 const AGE_GROUP_OPTIONS = ["Young", "Adult"];
@@ -91,7 +92,19 @@ const Animals = () => {
 
   const deleteMutation = useMutation({
     mutationFn: animalService.delete,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["animals"] }),
+    // Optimistic delete: remove it from the list the instant the user confirms,
+    // instead of waiting for the round trip - roll back if the server call
+    // actually fails (the toast system surfaces that error separately).
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["animals"] });
+      const previousAnimals = queryClient.getQueryData(["animals"]);
+      queryClient.setQueryData(["animals"], (old) => (old || []).filter((a) => a.id !== id));
+      return { previousAnimals };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousAnimals) queryClient.setQueryData(["animals"], context.previousAnimals);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["animals"] }),
   });
 
   const handleSave = () => {
@@ -275,14 +288,13 @@ const Animals = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Owner (Client)</label>
-            <select
+            <SearchableSelect
               value={form.client_id}
-              onChange={e => setForm({...form, client_id: e.target.value})}
-              className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-            >
-              <option value="">Select a client…</option>
-              {clients?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+              onChange={(v) => setForm({ ...form, client_id: v })}
+              options={(clients || []).map((c) => ({ value: c.id, label: c.name, sublabel: c.farm_name }))}
+              placeholder="Select a client…"
+              searchPlaceholder="Search clients…"
+            />
           </div>
           <button
             disabled={!form.name || !form.client_id || addMutation.isPending || updateMutation.isPending}

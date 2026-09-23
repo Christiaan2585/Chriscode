@@ -27,7 +27,19 @@ const MedicalModal = ({ isOpen, onClose, animalId, animalName }) => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id) => (await apiClient.delete(`/medical/${id}`)).data,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["medical", animalId] }),
+    // Optimistic delete: remove it from the list the instant the user confirms,
+    // instead of waiting for the round trip - roll back if the server call
+    // actually fails (the toast system surfaces that error separately).
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["medical", animalId] });
+      const previousRecords = queryClient.getQueryData(["medical", animalId]);
+      queryClient.setQueryData(["medical", animalId], (old) => (old || []).filter((r) => r.id !== id));
+      return { previousRecords };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousRecords) queryClient.setQueryData(["medical", animalId], context.previousRecords);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["medical", animalId] }),
   });
 
   return (

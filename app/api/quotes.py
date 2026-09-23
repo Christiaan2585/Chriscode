@@ -1,9 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from typing import List, Optional
 from app.core.db import get_session
 from app.models.quote import Quote
 from app.models.quote_item import QuoteItem
+from app.models.product import Product
+from app.models.client import Client
+from app.core.pdf import generate_quote_pdf
 
 router = APIRouter(prefix="/quotes", tags=["Quotes"])
 
@@ -53,6 +57,11 @@ def delete_quote(quote_id: int, session: Session = Depends(get_session)):
     quote = session.get(Quote, quote_id)
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found")
+    # Remove line items first so we don't leave orphaned rows behind
+    # (matches how delete_invoice handles InvoiceItem).
+    statement = select(QuoteItem).where(QuoteItem.quote_id == quote_id)
+    for item in session.exec(statement).all():
+        session.delete(item)
     session.delete(quote)
     session.commit()
     return {"ok": True}
@@ -78,3 +87,28 @@ def delete_quote_item(item_id: int, session: Session = Depends(get_session)):
     session.delete(item)
     session.commit()
     return {"ok": True}
+
+@router.get("/{quote_id}/pdf")
+def download_quote_pdf(quote_id: int, session: Session = Depends(get_session)):
+    quote = session.get(Quote, quote_id)
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found")
+
+    client = session.get(Client, quote.client_id)
+
+    statement = select(QuoteItem).where(QuoteItem.quote_id == quote_id)
+    items = session.exec(statement).all()
+
+    # Enrich items with product names for the PDF (quote items already carry
+    # their own unit_price/subtotal, unlike invoice items which look theirs
+    # up from the product - only the display name needs fetching here).
+    enriched_items = []
+    for item in items:
+        prod = session.get(Product, item.product_id)
+        enriched_items.append({**item.dict(), "product_name": prod.name if prod else "Unknown"})
+
+    pdf_buffer = generate_quote_pdf(quote.dict(), enriched_items, client.dict())
+
+    return StreamingResponse(pdf_buffer, media_type="application/pdf", headers={
+        "Content-Disposition": f"attachment; filename=quote_{quote_id}.pdf"
+    })

@@ -4,6 +4,7 @@ import { Plus, Calendar as CalIcon, Clock, User, Dog, CheckCircle } from "lucide
 import apiClient from "../api/client";
 import { clientService, animalService } from "../api/services";
 import Modal from "../components/Modal";
+import SearchableSelect from "../components/SearchableSelect";
 
 const Calendar = () => {
   const queryClient = useQueryClient();
@@ -140,14 +141,13 @@ const Calendar = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Client</label>
-              <select
+              <SearchableSelect
                 value={newApp.client_id}
-                onChange={e => setNewApp({...newApp, client_id: e.target.value, animal_id: ""})}
-                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-              >
-                <option value="">Select a client…</option>
-                {clients?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+                onChange={(v) => setNewApp({ ...newApp, client_id: v, animal_id: "" })}
+                options={(clients || []).map((c) => ({ value: c.id, label: c.name, sublabel: c.farm_name }))}
+                placeholder="Select a client…"
+                searchPlaceholder="Search clients…"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Animal (Optional)</label>

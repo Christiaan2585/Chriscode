@@ -4,6 +4,7 @@ import { Plus, Users, Trash2 } from "lucide-react";
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
 import Modal from "../components/Modal";
+import SearchableSelect from "../components/SearchableSelect";
 
 const Herds = () => {
   const queryClient = useQueryClient();
@@ -41,7 +42,19 @@ const Herds = () => {
       const response = await apiClient.delete(`/herds/${id}`);
       return response.data;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["herds"] }),
+    // Optimistic delete: remove it from the list the instant the user confirms,
+    // instead of waiting for the round trip - roll back if the server call
+    // actually fails (the toast system surfaces that error separately).
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["herds"] });
+      const previousHerds = queryClient.getQueryData(["herds"]);
+      queryClient.setQueryData(["herds"], (old) => (old || []).filter((h) => h.id !== id));
+      return { previousHerds };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousHerds) queryClient.setQueryData(["herds"], context.previousHerds);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["herds"] }),
   });
 
   if (isLoading) return <div className="p-8 text-center">Loading herds...</div>;
@@ -106,14 +119,13 @@ const Herds = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Owner (Client)</label>
-            <select
+            <SearchableSelect
               value={newHerd.client_id}
-              onChange={e => setNewHerd({...newHerd, client_id: e.target.value})}
-              className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-            >
-              <option value="">Select a client…</option>
-              {clients?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+              onChange={(v) => setNewHerd({ ...newHerd, client_id: v })}
+              options={(clients || []).map((c) => ({ value: c.id, label: c.name, sublabel: c.farm_name }))}
+              placeholder="Select a client…"
+              searchPlaceholder="Search clients…"
+            />
           </div>
           <button
             disabled={!newHerd.name || !newHerd.client_id || addMutation.isPending}

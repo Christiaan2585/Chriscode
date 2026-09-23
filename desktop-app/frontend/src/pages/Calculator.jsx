@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Calculator as CalcIcon,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   CheckCircle2,
   ShoppingCart,
   ShieldCheck,
@@ -11,6 +12,7 @@ import {
   ShieldQuestion,
   AlertTriangle,
   RotateCcw,
+  Search,
 } from "lucide-react";
 import apiClient from "../api/client";
 import { useNavigate } from "react-router-dom";
@@ -31,6 +33,98 @@ const BASIS_LABEL = {
   label_only: "No computed rate — dose from label",
   manual: "No dosing data on file — enter manually",
 };
+
+// A plain HTML <select> is a native OS popup - with a product catalogue this
+// long (dozens of products), that popup is exactly the kind of control that
+// intermittently stops responding to the first click inside an Electron
+// window (a well-known Electron/Chromium quirk, worse right after a step
+// transition just re-rendered the page). Rendering our own list here avoids
+// that failure mode entirely, and searching a long list is easier anyway.
+function ProductDropdown({ products, dosingByProduct, species, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClickOutside = (e) => {
+      if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false);
+    };
+    const onEscape = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    document.addEventListener("keydown", onEscape);
+    return () => {
+      document.removeEventListener("mousedown", onClickOutside);
+      document.removeEventListener("keydown", onEscape);
+    };
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? products.filter((p) => p.name.toLowerCase().includes(q)) : products;
+  }, [products, query]);
+
+  const selected = products.find((p) => p.id == value);
+
+  return (
+    <div className="relative" ref={rootRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full p-4 border-2 border-slate-100 rounded-2xl focus:ring-4 focus:ring-emerald-100 outline-none bg-slate-50 transition-all text-lg flex items-center justify-between text-left"
+      >
+        <span className={selected ? "text-slate-800" : "text-slate-400"}>
+          {selected ? selected.name : "-- Choose a Product --"}
+        </span>
+        <ChevronDown size={20} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-2 w-full bg-white border-2 border-slate-100 rounded-2xl shadow-xl overflow-hidden">
+          <div className="p-2 border-b border-slate-100 flex items-center gap-2">
+            <Search size={16} className="text-slate-400 shrink-0" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search products..."
+              className="w-full outline-none text-sm py-1"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {filtered.map((p) => {
+              const hasRule = !!dosingByProduct[p.id]?.[species];
+              const isSelected = p.id == value;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(String(p.id));
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                  className={`w-full text-left px-4 py-3 text-sm flex items-center gap-2 hover:bg-emerald-50 transition-colors ${
+                    isSelected ? "bg-emerald-50 font-semibold text-emerald-800" : "text-slate-700"
+                  }`}
+                >
+                  <span className={hasRule ? "text-emerald-600" : "text-slate-300"}>{hasRule ? "✓" : "—"}</span>
+                  <span className="flex-1">{p.name}</span>
+                  {!hasRule && <span className="text-xs text-slate-400">manual entry</span>}
+                </button>
+              );
+            })}
+            {filtered.length === 0 && (
+              <p className="px-4 py-6 text-center text-sm text-slate-400">No products match "{query}".</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const emptyManual = { dose: "" };
 
@@ -101,7 +195,11 @@ const Calculator = () => {
   const doseUnit = basis === "manual" ? (selectedProduct?.unit || "unit") : (rule?.dose_unit || selectedProduct?.unit || "unit");
 
   const packSize = selectedProduct?.pack_size;
-  const packsNeeded = packSize ? Math.ceil((totalAmount - 1e-9) / packSize) : null;
+  // Math.max(0, ...) matters here, not just for tidiness: when totalAmount is
+  // still 0 (nothing entered yet), (0 - 1e-9) / packSize is a tiny negative
+  // number, and Math.ceil() of that is -0 - which then multiplies through to
+  // an ugly, confusing "R -0.00" total cost before the user has typed anything.
+  const packsNeeded = packSize ? Math.max(0, Math.ceil((totalAmount - 1e-9) / packSize)) : null;
   const totalCost = packsNeeded != null
     ? packsNeeded * (selectedProduct?.price || 0)
     : (selectedProduct?.price || 0) * totalAmount;
@@ -212,23 +310,13 @@ const Calculator = () => {
                 <label className="block text-sm font-medium text-slate-500 mb-2">
                   Which product are you using for {species}?
                 </label>
-                <select
+                <ProductDropdown
+                  products={productsForSpecies}
+                  dosingByProduct={dosingByProduct}
+                  species={species}
                   value={selectedProductId}
-                  onChange={(e) => setSelectedProductId(e.target.value)}
-                  className="w-full p-4 border-2 border-slate-100 rounded-2xl focus:ring-4 focus:ring-emerald-100 outline-none bg-slate-50 transition-all text-lg"
-                >
-                  <option value="">-- Choose a Product --</option>
-                  {productsForSpecies.map((p) => {
-                    const hasRule = !!dosingByProduct[p.id]?.[species];
-                    return (
-                      <option key={p.id} value={p.id}>
-                        {hasRule ? "✓ " : "— "}
-                        {p.name}
-                        {hasRule ? "" : " (no dosing data — manual entry)"}
-                      </option>
-                    );
-                  })}
-                </select>
+                  onChange={setSelectedProductId}
+                />
                 {selectedProduct && !hasComputableRule && (
                   <div className="mt-3 flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-xl p-3">
                     <AlertTriangle size={18} className="shrink-0 mt-0.5" />

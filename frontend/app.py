@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from datetime import datetime
+import base64
 import io
 import json
 import os
@@ -9,6 +10,18 @@ import tomllib
 
 API_BASE_URL = "http://127.0.0.1:8000"
 VERSION_FILE = "version.json"
+LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "logo.png")
+
+# Streamlit only serves files it knows about (uploaded assets, or page_icon
+# itself) - it has no general static file route for arbitrary <img src="...">
+# tags, so the sidebar/login brand mark below has to be inlined as a data URI
+# rather than pointed at a path.
+try:
+    with open(LOGO_PATH, "rb") as f:
+        _LOGO_B64 = base64.b64encode(f.read()).decode("ascii")
+    LOGO_IMG_TAG = f'<img src="data:image/png;base64,{_LOGO_B64}" class="brand-logo-img" alt="" />'
+except FileNotFoundError:
+    LOGO_IMG_TAG = '<div class="brand-logo">🌾</div>'
 
 # Streamlit doesn't expose theme colors as CSS custom properties (var(--...) is not
 # available to injected CSS) - it bakes them into CSS-in-JS internally instead. So any
@@ -21,7 +34,11 @@ except Exception:
     _theme = {}
 PRIMARY_COLOR = _theme.get("primaryColor", "#2E7D32")
 
-st.set_page_config(page_title="Sandveld Vee Dienste", page_icon="🌾", layout="wide")
+st.set_page_config(
+    page_title="Sandveld Vee Dienste",
+    page_icon=LOGO_PATH if os.path.exists(LOGO_PATH) else "🌾",
+    layout="wide",
+)
 
 NAV_ITEMS = [
     ("Analytics & Alerts", "📊"),
@@ -55,6 +72,13 @@ def inject_custom_css():
         .brand-logo {
             font-size: 1.7rem;
             line-height: 1;
+        }
+        .brand-logo-img {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            object-fit: cover;
         }
         .brand-name {
             font-weight: 700;
@@ -192,7 +216,7 @@ def require_login():
 
     st.markdown(
         '<div class="brand-block" style="justify-content:center;margin-top:10vh">'
-        '<div class="brand-logo">🌾</div>'
+        f'{LOGO_IMG_TAG}'
         '<div><div class="brand-name">Sandveld Vee Dienste</div>'
         '<div class="brand-sub">Sign in to continue</div></div>'
         "</div>",
@@ -288,7 +312,7 @@ def page_header(title: str, subtitle: str = None):
 # --- SIDEBAR: BRAND + NAV ---
 st.sidebar.markdown(
     '<div class="brand-block">'
-    '<div class="brand-logo">🌾</div>'
+    f'{LOGO_IMG_TAG}'
     '<div><div class="brand-name">Sandveld Vee Dienste</div>'
     '<div class="brand-sub">Livestock &amp; Client CRM</div></div>'
     '</div>',

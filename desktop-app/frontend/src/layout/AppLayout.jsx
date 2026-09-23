@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Outlet, Link } from "react-router-dom";
-import { LayoutDashboard, Users, Dog, FileText, Settings, Calculator, Calendar, Layers, ShoppingCart, ClipboardList, Package, Lock, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Dog, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, Lock, LogOut } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import logo from "../assets/logo.png";
 
 const AppLayout = () => {
   const { user, lock, forgetDevice } = useAuth();
@@ -17,8 +18,8 @@ const AppLayout = () => {
     <div className="flex h-screen bg-slate-50 text-slate-900 font-sans">
       {/* Sidebar */}
       <aside className="w-64 bg-emerald-900 text-white flex flex-col">
-        <div className="p-6 text-2xl font-bold tracking-tight flex items-center gap-2">
-          <div className="w-8 h-8 bg-emerald-400 rounded-lg"></div>
+        <div className="p-6 text-2xl font-bold tracking-tight flex items-center gap-3">
+          <img src={logo} alt="" className="w-10 h-10 rounded-full shrink-0" />
           Sandveld Vee Dienste
         </div>
         <nav className="flex-1 px-4 space-y-2 mt-4">
@@ -30,12 +31,6 @@ const AppLayout = () => {
           </Link>
           <Link to="/animals" className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-800 transition-colors">
             <Dog size={20} /> Animals
-          </Link>
-          <Link to="/herds" className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-800 transition-colors">
-            <Layers size={20} /> Herds
-          </Link>
-          <Link to="/programs" className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-800 transition-colors">
-            <ClipboardList size={20} /> Herding Programs
           </Link>
           <Link to="/calendar" className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-800 transition-colors">
             <Calendar size={20} /> System Calendar

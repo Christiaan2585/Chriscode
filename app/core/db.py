@@ -34,9 +34,16 @@ def database_file_path() -> str:
         return url[len("sqlite:///"):]
     return url
 
+# echo=True logs (and in a packaged build, also writes to backend.log - see
+# desktop-app/index.js) the full text of every single SQL statement, on every
+# request. That's a real, constant tax on responsiveness - each query pays for
+# string formatting plus synchronous console/file I/O - for no benefit once
+# the app is actually in use rather than being actively developed. Off by
+# default now; set SANDVELD_SQL_ECHO=1 to turn it back on when debugging a
+# query.
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    echo=True,
+    echo=os.getenv("SANDVELD_SQL_ECHO") == "1",
     connect_args={"check_same_thread": False} if "sqlite" in SQLALCHEMY_DATABASE_URL else {}
 )
 

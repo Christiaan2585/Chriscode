@@ -1,12 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Lock, LogIn, ShieldCheck, UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import logo from '../assets/logo.png';
 
 const CARD = 'w-full max-w-sm bg-white rounded-2xl shadow-lg border border-slate-200 p-8';
 const SHELL = 'min-h-screen flex items-center justify-center bg-slate-50 px-4';
 const INPUT = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500';
 const BUTTON = 'w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-700 text-white font-medium py-2.5 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
 const GOOGLE_BUTTON = 'w-full flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white text-slate-700 font-medium py-2.5 hover:bg-slate-50 disabled:opacity-50 transition-colors';
+
+function LogoHeader() {
+  return (
+    <div className="flex justify-center mb-4">
+      <img src={logo} alt="Sandveld Vee Dienste" className="w-20 h-20 rounded-full shadow-md" />
+    </div>
+  );
+}
 
 function ErrorBanner({ error }) {
   if (!error) return null;
@@ -79,7 +88,9 @@ function SetupScreen() {
 
   return (
     <div className={SHELL}>
-      <div className={CARD}>
+      <div className="w-full max-w-sm">
+        <LogoHeader />
+        <div className={CARD}>
         <div className="flex items-center gap-2 mb-1 text-emerald-800">
           <UserPlus size={22} />
           <h1 className="text-xl font-bold">Welcome to Sandveld Vee Dienste</h1>
@@ -105,6 +116,7 @@ function SetupScreen() {
             <UserPlus size={16} /> {busy ? 'Creating account...' : 'Create admin account'}
           </button>
         </form>
+        </div>
       </div>
     </div>
   );
@@ -129,7 +141,9 @@ function LoginScreen() {
 
   return (
     <div className={SHELL}>
-      <div className={CARD}>
+      <div className="w-full max-w-sm">
+        <LogoHeader />
+        <div className={CARD}>
         <div className="flex items-center gap-2 mb-1 text-emerald-800">
           <LogIn size={22} />
           <h1 className="text-xl font-bold">Sign in</h1>
@@ -151,6 +165,7 @@ function LoginScreen() {
             <LogIn size={16} /> {busy ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
+        </div>
       </div>
     </div>
   );
@@ -275,7 +290,9 @@ function SetupPinScreen() {
 
   return (
     <div className={SHELL} onClick={() => inputRef.current?.focus()}>
-      <div className={CARD}>
+      <div className="w-full max-w-sm">
+        <LogoHeader />
+        <div className={CARD}>
         <div className="flex items-center gap-2 mb-1 text-emerald-800">
           <ShieldCheck size={22} />
           <h1 className="text-xl font-bold">Set up a 5-digit PIN</h1>
@@ -290,6 +307,7 @@ function SetupPinScreen() {
         {inputEl}
         <Keypad onDigit={append} onBackspace={backspace} />
         {busy && <p className="text-center text-xs text-slate-400 mt-2">Saving...</p>}
+        </div>
       </div>
     </div>
   );

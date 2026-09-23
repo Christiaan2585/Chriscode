@@ -39,7 +39,19 @@ const Clients = () => {
 
   const deleteMutation = useMutation({
     mutationFn: clientService.delete,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["clients"] }),
+    // Optimistic delete: remove it from the list the instant the user confirms,
+    // instead of waiting for the round trip - roll back if the server call
+    // actually fails (the toast system surfaces that error separately).
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["clients"] });
+      const previousClients = queryClient.getQueryData(["clients"]);
+      queryClient.setQueryData(["clients"], (old) => (old || []).filter((c) => c.id !== id));
+      return { previousClients };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousClients) queryClient.setQueryData(["clients"], context.previousClients);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["clients"] }),
   });
 
   const closeModal = () => {

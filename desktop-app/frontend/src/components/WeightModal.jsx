@@ -31,7 +31,19 @@ const WeightModal = ({ isOpen, onClose, animalId, animalName }) => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id) => (await apiClient.delete(`/weights/${id}`)).data,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["weights", animalId] }),
+    // Optimistic delete: remove it from the list the instant the user confirms,
+    // instead of waiting for the round trip - roll back if the server call
+    // actually fails (the toast system surfaces that error separately).
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["weights", animalId] });
+      const previousLogs = queryClient.getQueryData(["weights", animalId]);
+      queryClient.setQueryData(["weights", animalId], (old) => (old || []).filter((l) => l.id !== id));
+      return { previousLogs };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousLogs) queryClient.setQueryData(["weights", animalId], context.previousLogs);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["weights", animalId] }),
   });
 
   const first = logs?.[0];

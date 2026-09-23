@@ -4,6 +4,7 @@ import { Plus, Search, ShoppingCart, Trash2, Edit } from "lucide-react";
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
 import Modal from "../components/Modal";
+import SearchableSelect from "../components/SearchableSelect";
 
 const emptyOrder = { client_id: "", quote_id: "", total_amount: 0, status: "Pending" };
 
@@ -95,7 +96,19 @@ const Orders = () => {
       const response = await apiClient.delete(`/orders/${id}`);
       return response.data;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["orders"] }),
+    // Optimistic delete: remove it from the list the instant the user confirms,
+    // instead of waiting for the round trip - roll back if the server call
+    // actually fails (the toast system surfaces that error separately).
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["orders"] });
+      const previousOrders = queryClient.getQueryData(["orders"]);
+      queryClient.setQueryData(["orders"], (old) => (old || []).filter((o) => o.id !== id));
+      return { previousOrders };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousOrders) queryClient.setQueryData(["orders"], context.previousOrders);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["orders"] }),
   });
 
   const handleSave = () => {
@@ -201,14 +214,13 @@ const Orders = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Client</label>
-              <select
+              <SearchableSelect
                 value={form.client_id}
-                onChange={e => setForm({...form, client_id: e.target.value})}
-                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-              >
-                <option value="">Select a client…</option>
-                {clients?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+                onChange={(v) => setForm({ ...form, client_id: v })}
+                options={(clients || []).map((c) => ({ value: c.id, label: c.name, sublabel: c.farm_name }))}
+                placeholder="Select a client…"
+                searchPlaceholder="Search clients…"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Quote (Optional)</label>
