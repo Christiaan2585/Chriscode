@@ -1,0 +1,61 @@
+{
+  "name": "sandveld-vee-dienste",
+  "version": "1.0.0",
+  "description": "Professional livestock management and financial CRM for Sandveld Vee Dienste",
+  "main": "index.js",
+  "scripts": {
+    "electron:dev": "electron .",
+    "frontend:dev": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run frontend:dev\" \"npm run electron:dev\"",
+    "build": "cd frontend && npm run build",
+    "package": "npm run build && electron-builder build --win"
+  },
+  "keywords": [],
+  "author": "Sandveld Vee Dienste",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^44.4.1",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.50.0",
+    "axios": "^1.7.0",
+    "electron-is-dev": "^3.0.1",
+    "lucide-react": "^0.400.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^6.26.0"
+  },
+  "build": {
+    "appId": "com.sandveldveedienste.app",
+    "productName": "Sandveld Vee Dienste",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "**/*",
+      "!frontend/node_modules",
+      "!frontend/src"
+    ],
+    "extraResources": [
+      {
+        "from": "backend/sandveld-backend",
+        "to": "backend/sandveld-backend"
+      }
+    ]
+  }
+}

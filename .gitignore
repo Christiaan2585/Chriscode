@@ -1,0 +1,40 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Node
+desktop-app/node_modules/
+desktop-app/frontend/node_modules/
+desktop-app/dist/
+desktop-app/frontend/dist/
+
+# Database - contains real client data, don't commit it. Broader than just
+# the one filename so a manual backup copy (kyron_agri_backup.db, etc. - see
+# the README's advice to back this up before updates) never slips in either.
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Google OAuth client secret - see SETUP_GOOGLE_LOGIN.md. config/google_oauth.example.json
+# stays tracked (it's just a blank template); only the real, filled-in file is excluded.
+config/google_oauth.json
+
+# Streamlit's own convention for local secrets - not present today, but this
+# is the exact filename Streamlit looks for if any get added later.
+.streamlit/secrets.toml
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Local editor/tool config
+.vscode/
+.idea/
+
+# PyInstaller build output for the standalone backend executable - see
+# desktop-app/build_and_package.bat. Rebuilt from source every time, and the
+# built exe is large, so it doesn't belong in git.
+/build/
+desktop-app/backend/

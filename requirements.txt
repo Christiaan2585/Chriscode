@@ -1,0 +1,14 @@
+fastapi
+sqlmodel
+uvicorn
+pydantic
+streamlit
+requests
+pandas
+openpyxl
+reportlab
+python-multipart
+bcrypt
+pyjwt
+email-validator
+pyinstaller
