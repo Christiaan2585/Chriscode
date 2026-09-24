@@ -62,8 +62,8 @@ const AppLayout = () => {
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8">
-          <h1 className="text-lg font-semibold text-slate-700">Management Portal</h1>
-          <div className="hidden md:flex flex-1 justify-center">
+          <h1 className="text-lg font-semibold text-slate-700 shrink-0 whitespace-nowrap">Management Portal</h1>
+          <div className="hidden md:flex flex-1 justify-center min-w-0 overflow-hidden">
             <GrazingHeaderStrip />
           </div>
           <div className="relative">
