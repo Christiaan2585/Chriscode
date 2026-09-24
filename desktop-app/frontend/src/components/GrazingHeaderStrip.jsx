@@ -12,56 +12,27 @@ import React from "react";
 // sprite-sheet running animation uses - combined with a small vertical
 // bounce and a shadow that squashes on each footfall. This reads as an
 // actual run at icon scale in a way continuous rotation never quite did.
+// All styling lives in index.css, not a <style> tag here: the packaged
+// app's CSP (style-src 'self', no 'unsafe-inline') blocks inline <style>
+// elements, which left this whole scene unstyled and frozen in production.
 const GrazingHeaderStrip = () => (
-  <div className="relative h-12 w-full max-w-xs overflow-hidden select-none" aria-hidden="true">
+  <div className="chase-strip relative h-12 w-full max-w-xs overflow-hidden select-none" aria-hidden="true">
     <Pasture />
     <div className="chase-group">
-      <Dog />
-      <Cow />
-      <Sheep />
+      <div className="runner runner-dog"><Dog /></div>
+      <div className="runner runner-cow"><Cow /></div>
+      <div className="runner runner-sheep"><Sheep /></div>
     </div>
-
-    <style>{`
-      .chase-group {
-        position: absolute;
-        bottom: 6px;
-        left: 0;
-        display: flex;
-        align-items: flex-end;
-        gap: 6px;
-        animation: chase-across 13s linear infinite;
-      }
-      @keyframes chase-across {
-        from { transform: translateX(-90px); }
-        to { transform: translateX(340px); }
-      }
-
-      .gallop-body { animation: gallop-bounce 0.3s ease-in-out infinite; }
-      @keyframes gallop-bounce {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-1.6px); }
-      }
-
-      .legs-a, .legs-b { animation: gallop-toggle 0.3s steps(1) infinite; }
-      .legs-b { animation-delay: 0.15s; }
-      @keyframes gallop-toggle {
-        0%, 49.9% { opacity: 1; }
-        50%, 100% { opacity: 0; }
-      }
-
-      .run-shadow { animation: shadow-pulse 0.3s ease-in-out infinite; transform-origin: center; }
-      @keyframes shadow-pulse {
-        0%, 100% { transform: scaleX(1); opacity: 0.3; }
-        50% { transform: scaleX(0.75); opacity: 0.15; }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        .chase-group { animation: none; left: 15%; }
-        .gallop-body, .legs-b, .run-shadow { animation: none; }
-        .legs-a { animation: none; opacity: 1; }
-      }
-    `}</style>
   </div>
+);
+
+// Dust kicked up behind the hind feet. Drawn outside each animal's mirror
+// group so "behind" is always the left side (the direction they came from).
+const Dust = ({ y }) => (
+  <g>
+    <circle className="dust dust-1" cx="4" cy={y} r="1.6" fill="#c8b58a" />
+    <circle className="dust dust-2" cx="2" cy={y - 1} r="1.2" fill="#d6c7a1" />
+  </g>
 );
 
 // A little green pasture strip along the bottom of the header, so the
@@ -88,6 +59,7 @@ const Pasture = () => (
 const Dog = () => (
   <svg width="30" height="24" viewBox="0 0 30 24" fill="none">
     <ellipse className="run-shadow" cx="15" cy="22" rx="10" ry="1.4" fill="#0f172a" opacity="0.25" />
+    <Dust y={21} />
     {/* Mirrored so the head leads on the right, matching the direction of
        travel (the shapes below were drawn head-on-the-left). */}
     <g transform="scale(-1,1) translate(-30,0)">
@@ -124,6 +96,7 @@ const Dog = () => (
 const Cow = () => (
   <svg width="38" height="28" viewBox="0 0 38 28" fill="none">
     <ellipse className="run-shadow" cx="19" cy="26" rx="13" ry="1.6" fill="#0f172a" opacity="0.25" />
+    <Dust y={25} />
     <g className="gallop-body">
       <g className="legs-a" fill="#1e293b">
         <path d="M10 18l-4.6 6.5h2.8L12 19z" />
@@ -166,6 +139,7 @@ const Cow = () => (
 const Sheep = () => (
   <svg width="32" height="24" viewBox="0 0 32 24" fill="none">
     <ellipse className="run-shadow" cx="16" cy="22" rx="11" ry="1.5" fill="#0f172a" opacity="0.25" />
+    <Dust y={21} />
     {/* Mirrored so the head leads on the right, matching the direction of
        travel (the shapes below were drawn head-on-the-left). */}
     <g transform="scale(-1,1) translate(-32,0)">

@@ -53,3 +53,89 @@
 body {
   margin: 0;
 }
+
+/* GrazingHeaderStrip.jsx's chase animation. This has to live in a real,
+   bundled stylesheet rather than a JSX <style> tag - the packaged app's
+   Content-Security-Policy is `style-src 'self'` with no 'unsafe-inline'
+   (see desktop-app/index.js), which silently blocks inline <style>
+   elements entirely. That's exactly why the animation looked "frozen in
+   one spot" with mangled proportions in the packaged app while working
+   fine in dev mode (Vite's dev server serves no CSP at all): every rule
+   below - the flex layout, the absolute positioning, the keyframes -
+   was simply never applied, leaving the raw SVGs in unstyled document
+   flow instead of the intended running scene. */
+.chase-group {
+  position: absolute;
+  bottom: 6px;
+  left: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  animation: chase-across 14s linear infinite;
+}
+@keyframes chase-across {
+  from { transform: translateX(-120px); }
+  to { transform: translateX(340px); }
+}
+
+/* Each runner carries its own stride speed (--stride), so the heavy cow
+   lopes, the sheep scampers and the collie's legs are a blur. */
+.runner { --stride: 0.3s; }
+.runner-dog { --stride: 0.22s; animation: dog-lunge 3.4s ease-in-out infinite; }
+.runner-cow { --stride: 0.38s; }
+.runner-sheep { --stride: 0.27s; animation: sheep-spurt 2.9s ease-in-out infinite; }
+
+/* The collie closes on the cow's heels, then drops back to hold the line -
+   how a working dog actually pressures stock instead of trailing at a
+   fixed distance. The sheep bolts ahead and gets reeled back in. */
+@keyframes dog-lunge {
+  0%, 100% { transform: translateX(0); }
+  45% { transform: translateX(9px); }
+  60% { transform: translateX(7px); }
+}
+@keyframes sheep-spurt {
+  0%, 100% { transform: translateX(0); }
+  35% { transform: translateX(7px); }
+  55% { transform: translateX(8px); }
+}
+
+/* SVG elements default to transform-origin 0 0 of the whole viewport;
+   fill-box makes rotate/scale pivot around each shape's own centre. */
+.gallop-body, .run-shadow, .dust { transform-box: fill-box; transform-origin: center; }
+
+/* Bounce plus a forward/back pitch each stride - the body rocking over
+   the front legs then the hind legs is what sells a gallop over a hop. */
+.gallop-body { animation: gallop-bounce var(--stride) ease-in-out infinite; }
+@keyframes gallop-bounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-1.8px) rotate(-3deg); }
+  50% { transform: translateY(-0.6px) rotate(0deg); }
+  75% { transform: translateY(-1.2px) rotate(2.5deg); }
+}
+
+.legs-a, .legs-b { animation: gallop-toggle var(--stride) steps(1) infinite; }
+.legs-b { animation-delay: calc(var(--stride) / -2); }
+@keyframes gallop-toggle {
+  0%, 49.9% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.run-shadow { animation: shadow-pulse var(--stride) ease-in-out infinite; }
+@keyframes shadow-pulse {
+  0%, 100% { transform: scaleX(1); opacity: 0.3; }
+  25% { transform: scaleX(0.75); opacity: 0.15; }
+}
+
+/* Dust kicked up behind the hind feet, drifting back and fading. */
+.dust { opacity: 0; animation: dust-puff calc(var(--stride) * 2.4) ease-out infinite; }
+.dust-2 { animation-delay: calc(var(--stride) * -1.2); }
+@keyframes dust-puff {
+  0% { opacity: 0.7; transform: translate(0, 0) scale(0.5); }
+  100% { opacity: 0; transform: translate(-5px, -2.5px) scale(1.6); }
+}
+
+/* A frozen mid-gallop pose just looks broken, so with reduced motion the
+   scene is left out entirely rather than paused. */
+@media (prefers-reduced-motion: reduce) {
+  .chase-strip { display: none; }
+}
