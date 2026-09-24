@@ -2,12 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
 from app.core.db import get_session
+from app.core.dates import coerce_datetime
 from app.models.weight import WeightLog
 
 router = APIRouter(prefix="/weights", tags=["Weight Tracking"])
 
 @router.post("/", response_model=WeightLog)
 def add_weight(log: WeightLog, session: Session = Depends(get_session)):
+    log.date = coerce_datetime(log.date)
     session.add(log)
     session.commit()
     session.refresh(log)

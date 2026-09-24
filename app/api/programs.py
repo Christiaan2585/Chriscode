@@ -5,6 +5,7 @@ from typing import List, Optional
 import io
 import pandas as pd
 from app.core.db import get_session
+from app.core.dates import coerce_datetime
 from app.models.client import Client
 from app.models.program import HerdingProgram, ProgramAssignment, AnimalGroup
 
@@ -12,6 +13,8 @@ router = APIRouter(prefix="/programs", tags=["Herding Programs"])
 
 @router.post("/", response_model=HerdingProgram)
 def create_program(program: HerdingProgram, session: Session = Depends(get_session)):
+    program.start_date = coerce_datetime(program.start_date)
+    program.end_date = coerce_datetime(program.end_date)
     session.add(program)
     session.commit()
     session.refresh(program)

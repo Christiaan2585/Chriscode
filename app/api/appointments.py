@@ -2,12 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
 from app.core.db import get_session
+from app.core.dates import coerce_datetime
 from app.models.appointment import Appointment
 
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
 @router.post("/", response_model=Appointment)
 def create_appointment(appointment: Appointment, session: Session = Depends(get_session)):
+    appointment.date = coerce_datetime(appointment.date)
     session.add(appointment)
     session.commit()
     session.refresh(appointment)
@@ -34,6 +36,8 @@ def update_appointment(app_id: int, appointment_data: Appointment, session: Sess
     db_app = session.get(Appointment, app_id)
     if not db_app:
         raise HTTPException(status_code=404, detail="Appointment not found")
+
+    appointment_data.date = coerce_datetime(appointment_data.date)
 
     # Exclude "id" and "created_at": id is unset on a normal edit payload (it
     # would otherwise null the primary key), and created_at should stay as

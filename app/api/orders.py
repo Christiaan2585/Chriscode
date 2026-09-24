@@ -2,12 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
 from app.core.db import get_session
+from app.core.dates import coerce_datetime
 from app.models.order import Order
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
 @router.post("/", response_model=Order)
 def create_order(order: Order, session: Session = Depends(get_session)):
+    order.date = coerce_datetime(order.date)
     session.add(order)
     session.commit()
     session.refresh(order)
@@ -34,6 +36,8 @@ def update_order(order_id: int, order_data: Order, session: Session = Depends(ge
     db_order = session.get(Order, order_id)
     if not db_order:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    order_data.date = coerce_datetime(order_data.date)
 
     # Excluding "id" matters: order_data.id is unset on a normal edit payload
     # (the id lives in the URL, not the body), so Pydantic fills it with its

@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from typing import List
 from app.core.db import get_session
+from app.core.dates import coerce_datetime
 from app.models.invoice import Invoice, InvoiceItem
 from app.models.product import Product
 from app.core.pdf import generate_invoice_pdf
@@ -11,6 +12,7 @@ router = APIRouter(prefix="/invoices", tags=["Invoices"])
 
 @router.post("/", response_model=Invoice)
 def create_invoice(invoice: Invoice, session: Session = Depends(get_session)):
+    invoice.date = coerce_datetime(invoice.date)
     session.add(invoice)
     session.commit()
     session.refresh(invoice)
@@ -30,6 +32,8 @@ def update_invoice(invoice_id: int, invoice_data: Invoice, session: Session = De
     db_invoice = session.get(Invoice, invoice_id)
     if not db_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
+
+    invoice_data.date = coerce_datetime(invoice_data.date)
 
     # Exclude "id": unset on a normal edit payload, so applying it via setattr
     # would null out the primary key and break the update.

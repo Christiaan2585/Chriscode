@@ -2,12 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
 from app.core.db import get_session
+from app.core.dates import coerce_datetime
 from app.models.medical import MedicalRecord
 
 router = APIRouter(prefix="/medical", tags=["Medical Records"])
 
 @router.post("/", response_model=MedicalRecord)
 def create_record(record: MedicalRecord, session: Session = Depends(get_session)):
+    record.date = coerce_datetime(record.date)
     session.add(record)
     session.commit()
     session.refresh(record)

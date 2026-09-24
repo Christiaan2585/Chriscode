@@ -2,12 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List, Optional
 from app.core.db import get_session
+from app.core.dates import coerce_datetime
 from app.models.animal import Animal
 
 router = APIRouter(prefix="/animals", tags=["Animals"])
 
 @router.post("/", response_model=Animal)
 def create_animal(animal: Animal, session: Session = Depends(get_session)):
+    animal.birth_date = coerce_datetime(animal.birth_date)
     session.add(animal)
     session.commit()
     session.refresh(animal)
@@ -45,6 +47,8 @@ def update_animal(animal_id: int, animal_data: Animal, session: Session = Depend
     db_animal = session.get(Animal, animal_id)
     if not db_animal:
         raise HTTPException(status_code=404, detail="Animal not found")
+
+    animal_data.birth_date = coerce_datetime(animal_data.birth_date)
 
     # Exclude "id" and "created_at": id is unset on a normal edit payload (it
     # would otherwise null the primary key), and created_at should stay as

@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from typing import List, Optional
 from app.core.db import get_session
+from app.core.dates import coerce_datetime
 from app.models.quote import Quote
 from app.models.quote_item import QuoteItem
 from app.models.product import Product
@@ -13,6 +14,7 @@ router = APIRouter(prefix="/quotes", tags=["Quotes"])
 
 @router.post("/", response_model=Quote)
 def create_quote(quote: Quote, session: Session = Depends(get_session)):
+    quote.date = coerce_datetime(quote.date)
     session.add(quote)
     session.commit()
     session.refresh(quote)
@@ -39,6 +41,8 @@ def update_quote(quote_id: int, quote_data: Quote, session: Session = Depends(ge
     db_quote = session.get(Quote, quote_id)
     if not db_quote:
         raise HTTPException(status_code=404, detail="Quote not found")
+
+    quote_data.date = coerce_datetime(quote_data.date)
 
     # Excluding "id" matters: quote_data.id is unset on a normal edit payload
     # (the id lives in the URL, not the body), so Pydantic fills it with its
