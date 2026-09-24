@@ -6,8 +6,9 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.core.db import create_db_and_tables, database_file_path
+from app.core.backup import start_scheduler
 from app.core.security import get_current_user
-from app.api import auth, clients, animals, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing
+from app.api import auth, clients, animals, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -77,10 +78,12 @@ app.include_router(appointments.router, dependencies=_protected)
 app.include_router(quotes.router, dependencies=_protected)
 app.include_router(orders.router, dependencies=_protected)
 app.include_router(dosing.router, dependencies=_protected)
+app.include_router(backups.router, dependencies=_protected)
 
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
+    start_scheduler(database_file_path())
 
 @app.get("/")
 def read_root():

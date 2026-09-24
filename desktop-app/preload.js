@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
   getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
+  chooseFolder: () => ipcRenderer.invoke('choose-folder'),
+  openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
   onUpdateStatus: (callback) => {
     const listener = (_event, status) => callback(status);
     ipcRenderer.on('update-status', listener);

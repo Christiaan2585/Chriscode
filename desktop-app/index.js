@@ -379,6 +379,25 @@ ipcMain.handle('quit-and-install', async () => {
 
 ipcMain.handle('get-update-status', () => updateStatus);
 
+// Settings -> Backups: pick an extra backup folder (OneDrive, USB drive...)
+// and open the backups folder in Explorer.
+ipcMain.handle('choose-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose a folder for backup copies',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
+// Directories only: shell.openPath on a *file* launches it with its default
+// program, which a compromised renderer must never be able to trigger.
+ipcMain.handle('open-folder', async (_event, folderPath) => {
+  if (typeof folderPath !== 'string' || !fs.existsSync(folderPath) || !fs.statSync(folderPath).isDirectory()) {
+    return 'Folder not found';
+  }
+  return shell.openPath(folderPath);
+});
+
 // Google's OAuth flow for a "Desktop app" client wants the authorization
 // code to land on a loopback redirect (http://127.0.0.1:<port>) rather than
 // a custom URL scheme, per Google's own recommendation for installed apps.

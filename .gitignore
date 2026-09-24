@@ -16,6 +16,11 @@ desktop-app/frontend/dist/
 *.db-journal
 *.db-shm
 *.db-wal
+# Automatic backups (app/core/backup.py) - in dev mode they land in ./backups
+/backups/
+*.db.partial
+# Per-install backup settings (extra backup folder path)
+config/backup_settings.json
 
 # Google OAuth client secret - see SETUP_GOOGLE_LOGIN.md. config/google_oauth.example.json
 # stays tracked (it's just a blank template); only the real, filled-in file is excluded.

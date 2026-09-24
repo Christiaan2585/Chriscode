@@ -14,6 +14,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   pip install -r requirements.txt
   ```
 
+### Tests
+- `venv\Scripts\python.exe -m unittest discover tests` - stdlib `unittest`, no extra dependencies (pytest isn't installed). Currently covers the backup logic.
+
 ### Running Components Individually
 - **Backend API**:
   ```bash
@@ -104,12 +107,13 @@ Clients don't reinstall by hand for every new version - the packaged app checks 
 - **Client/Animal Management**: Tracks livestock health history and client contact details.
 - **Invoicing**: Handles product price imports via Excel and generates professional PDFs.
 - **Data import**: Settings page has an "Import from Excel / CSV" section (`ImportModal.jsx`, reused across all three) for Products (`POST /products/import`), Clients (`POST /clients/import`) and Herding Programs (`POST /programs/import`, groups rows by Client+Program Name so one row per animal type becomes one program with multiple `AnimalGroup`s - the client must already exist, this endpoint never creates one). All three do per-row error handling so one bad row can't abort the batch.
+- **Backups** (`app/core/backup.py`, `app/api/backups.py`, Settings -> Data & Backups): a background thread started in `main.py`'s startup backs the database up once a day while the app is open (immediately on launch if the newest backup is over 24h old), using SQLite's online-backup API so it's safe while the database is in use. Snapshots go to `<data dir>/backups/` (dev mode: `./backups/`, gitignored), with an optional extra copy in `<chosen folder>/Sandveld Vee Dienste Backups/` - meant for a OneDrive/Google Drive folder or USB drive so data survives the PC itself. The last 30 are kept; pruning only ever touches files named `kyron_agri-YYYYMMDD-HHMMSS.db`, so a user's own files in the chosen folder are safe. An unreachable extra folder (USB unplugged) never blocks the local backup - it's surfaced as a warning in Settings instead. Changing the folder is admin-only; the folder picker is Electron's native dialog via `preload.js`'s `chooseFolder`, with a text-box fallback outside Electron.
 - **Dosage Calculator**: Species-aware dosing calculator (`app/models/product_dosing.py`, `app/api/dosing.py`, `Calculator.jsx`). Each product/species combination has a dosing rule (per-kg bodyweight, per-head fixed dose, per-quarter intramammary tube, or label-only/manual) with a confidence rating (high/medium/low/unverified) so low-confidence data is never presented with false authority. Staff can correct a rate after checking the physical label via `PUT /dosing/{id}`.
 
 **The toast error-notification system was dead code until 2026-09-24**: `ToastContext.jsx` had a whole comment describing `api/client.js`'s response interceptor calling `showToast()` on every failed request via a `setErrorNotifier` bridge - but that function never existed, and `ToastProvider` was never mounted anywhere in `App.jsx`. Every failed save/update/delete in the entire app - not just herding programs, literally everything, since almost no page had its own `onError` handler either - was failing completely silently: no error, no toast, the modal just stays open with the entered data lost. This is why "click Save, nothing happens" could occur with zero visible cause. Now actually wired: `api/client.js` exports `setErrorNotifier`, `ToastContext.jsx`'s new `ToastErrorBridge` registers it from inside `<ToastProvider>`, and `App.jsx` mounts both. `showToast` also dedupes identical concurrent errors (e.g. a page's several queries all failing the same way) via a ref-backed lookup rather than reading React state directly, since several `showToast` calls in the same tick would otherwise all see the same pre-render state and stack up duplicates. If a save ever silently does nothing again, check this wiring first before assuming it's a new bug.
 
 ## Known limitations (as of 2026-09-24)
-- No automated database backups - `kyron_agri.db` should be copied manually before updates (the Settings page shows exactly where it lives).
+- Backups have no one-click restore yet - restoring means closing the app and copying a backup over `kyron_agri.db` by hand (the Settings -> Data & Backups section explains this).
 - Business settings shown in the Settings page (VAT, currency, date format) are display-only, not yet editable.
 - The cross-PC installer (see "Packaging & cross-PC distribution" above) has been built and statically checked but not yet run end-to-end on real hardware - the first live build/install should be treated as a test, with a troubleshooting path already documented above for the most likely failure mode (a missing PyInstaller `--collect-all` entry).
 - Herding-program import (`POST /programs/import`) doesn't dedupe against an already-existing program of the same name for the same client - re-importing the same file creates a second copy rather than merging into the first.
