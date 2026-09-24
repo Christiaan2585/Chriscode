@@ -4,8 +4,20 @@ const fs = require('fs');
 const http = require('http');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
-const isDev = require('electron-is-dev');
 const { autoUpdater } = require('electron-updater');
+
+// Not using the `electron-is-dev` package: its current release is ESM-only
+// (`export default`), and requiring an ESM package from CommonJS like this
+// doesn't unwrap the default export - `require('electron-is-dev')` returns
+// the whole module namespace object ({ __esModule: true, default: false }),
+// which is a truthy OBJECT, not the boolean it looks like. That silently
+// made `isDev` true in EVERY build, packaged or not - so the packaged app
+// was always trying to load the dev server at http://localhost:5173 instead
+// of its own bundled files, showing a blank window on any machine that
+// didn't happen to have `npm run dev` running. `app.isPackaged` is exactly
+// what that package computes internally anyway when no env var override is
+// set, so using it directly here is both simpler and actually correct.
+const isDev = !app.isPackaged;
 
 // Sets the folder name Electron's app.getPath('userData') resolves to
 // (otherwise it falls back to package.json's "name", i.e. the kebab-case
@@ -418,8 +430,53 @@ function registerPermissionHandler() {
   });
 }
 
+// Electron flags having no Content-Security-Policy as an "Insecure
+// Content-Security-Policy" warning in the DevTools console. That warning is
+// dev-mode-only noise here for a real reason, not something to silence: Vite
+// + @vitejs/plugin-react's Fast Refresh injects an actual inline <script>
+// into index.html in dev mode (there's no way around that, it's how HMR
+// wires itself up), which a strict script-src would break. The production
+// build has no such thing - `npm run build`'s output is plain external
+// <script src>/<link> tags with zero inline script or style anywhere in this
+// app (verified: no `style={{...}}` usage, no CSS-in-JS) - so the packaged
+// app can and does run under a real, strict CSP with no 'unsafe-inline'
+// exceptions at all. app.isPackaged is what keeps dev mode unaffected.
+function registerContentSecurityPolicy() {
+  if (!app.isPackaged) return;
+
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self'",
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    // Both localhost and 127.0.0.1 for the backend: CSP treats them as
+    // different origins even though they're the same machine, and
+    // api/client.js's baseURL uses "localhost" - only allowing 127.0.0.1
+    // here silently blocked every API call (caught by actually launching
+    // the packaged build and watching it fail to reach the backend, not by
+    // reading the code). The open-meteo ones are the Weather widget's
+    // forecast/geocoding lookups (see WeatherWidget.jsx).
+    "connect-src 'self' http://127.0.0.1:8000 http://localhost:8000 https://api.open-meteo.com https://geocoding-api.open-meteo.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-src 'none'",
+    "form-action 'self'",
+  ].join('; ');
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [csp],
+      },
+    });
+  });
+}
+
 app.whenReady().then(() => {
   registerPermissionHandler();
+  registerContentSecurityPolicy();
   createWindow();
 });
 

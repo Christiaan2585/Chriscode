@@ -23,7 +23,6 @@
   "dependencies": {
     "@tanstack/react-query": "^5.50.0",
     "axios": "^1.7.0",
-    "electron-is-dev": "^3.0.1",
     "electron-updater": "^6.8.9",
     "lucide-react": "^0.400.0",
     "react": "^19.0.0",
