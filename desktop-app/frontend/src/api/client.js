@@ -14,6 +14,7 @@ const apiClient = axios.create({
 // AuthContext) lets you skip straight past the full password/Google form.
 let currentAccessToken = null;
 let onUnauthorized = null;
+let notifyError = null;
 
 export function setAccessToken(token) {
   currentAccessToken = token;
@@ -21,6 +22,17 @@ export function setAccessToken(token) {
 
 export function setUnauthorizedHandler(handler) {
   onUnauthorized = handler;
+}
+
+// Called once from a bridge component inside <ToastProvider> (see
+// ToastContext.jsx) so every API call gets automatic, visible error
+// reporting with zero changes needed on the page that made the call -
+// this is the wiring ToastContext.jsx's own comment always described but
+// that never actually existed anywhere, which is why every failed
+// save/update/delete across the whole app used to fail completely
+// silently (no error, no toast, modal just stays open).
+export function setErrorNotifier(handler) {
+  notifyError = handler;
 }
 
 apiClient.interceptors.request.use((config) => {
@@ -35,6 +47,13 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401 && onUnauthorized) {
       onUnauthorized();
+    } else if (notifyError) {
+      const message =
+        error.response?.data?.detail ||
+        (error.request && !error.response
+          ? "Could not reach the backend. Is it running?"
+          : "Something went wrong. Please try again.");
+      notifyError(typeof message === "string" ? message : "Something went wrong. Please try again.");
     }
     return Promise.reject(error);
   }

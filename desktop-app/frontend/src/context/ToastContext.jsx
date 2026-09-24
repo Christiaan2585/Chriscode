@@ -1,14 +1,16 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle, Info, X } from "lucide-react";
+import { setErrorNotifier } from "../api/client";
 
 // A tiny, dependency-free toast system. Its whole purpose is to fix the
 // single biggest UX gap in this app: almost every failed save/update/delete
 // used to just stop its spinner and go quiet, with nothing on screen telling
 // the user it didn't work. Rather than hand-adding an onError handler to
 // every mutation on every page, api/client.js's response interceptor calls
-// showToast(...) directly (see setErrorNotifier below) - so this one file
-// gives every existing and future API call automatic, visible error
-// reporting, with zero changes needed on the page that made the call.
+// showToast(...) directly via the ToastErrorBridge below (mounted once in
+// App.jsx, inside this provider) - so this one file gives every existing
+// and future API call automatic, visible error reporting, with zero changes
+// needed on the page that made the call.
 
 const ToastContext = createContext(null);
 
@@ -29,9 +31,19 @@ let idCounter = 0;
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
   const timers = useRef({});
+  // Several requests failing at once (e.g. a page's several queries all
+  // hitting the same "backend unreachable" error) fire showToast several
+  // times in the same tick, before React re-renders with the new `toasts`
+  // state - reading `toasts` from the closure in that window would still
+  // see the old (empty) array for every call, so dedup has to go through a
+  // ref (updated synchronously) instead of React state.
+  const activeIds = useRef(new Map());
 
   const dismiss = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
+    for (const [key, activeId] of activeIds.current) {
+      if (activeId === id) activeIds.current.delete(key);
+    }
     if (timers.current[id]) {
       clearTimeout(timers.current[id]);
       delete timers.current[id];
@@ -40,8 +52,14 @@ export const ToastProvider = ({ children }) => {
 
   const showToast = useCallback(
     (message, type = "error", durationMs = 6000) => {
-      const id = ++idCounter;
-      setToasts((prev) => [...prev, { id, message, type }]);
+      const key = `${type}:${message}`;
+      const existingId = activeIds.current.get(key);
+      const id = existingId ?? ++idCounter;
+      if (existingId == null) {
+        activeIds.current.set(key, id);
+        setToasts((prev) => [...prev, { id, message, type }]);
+      }
+      clearTimeout(timers.current[id]);
       timers.current[id] = setTimeout(() => dismiss(id), durationMs);
       return id;
     },
@@ -90,4 +108,17 @@ export const useToast = () => {
     throw new Error("useToast must be used inside a ToastProvider");
   }
   return ctx;
+};
+
+// Mounted once, inside <ToastProvider>, in App.jsx. Registers this
+// provider's showToast as api/client.js's global error notifier so every
+// failed API call anywhere in the app shows a toast automatically.
+// Renders nothing.
+export const ToastErrorBridge = () => {
+  const { showToast } = useToast();
+  useEffect(() => {
+    setErrorNotifier(showToast);
+    return () => setErrorNotifier(null);
+  }, [showToast]);
+  return null;
 };
