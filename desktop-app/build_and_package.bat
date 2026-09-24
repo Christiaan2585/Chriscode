@@ -98,7 +98,7 @@ if errorlevel 1 (
 call deactivate
 popd
 
-if not exist "desktop-app\backend\sandveld-backend\sandveld-backend.exe" (
+if not exist "backend\sandveld-backend\sandveld-backend.exe" (
     echo ERROR: PyInstaller did not produce the expected executable at
     echo desktop-app\backend\sandveld-backend\sandveld-backend.exe
     goto :error
