@@ -8,7 +8,11 @@ from app.core import backup
 from app.core.db import database_file_path
 from app.core.security import require_admin
 
-router = APIRouter(prefix="/backups", tags=["Backups"])
+# Admin-only as a whole, not just the settings endpoint: backups are pruned
+# to the newest N, so anyone able to trigger them repeatedly could push out
+# every older restore point (e.g. delete records, then evict the backups
+# taken before the deletion).
+router = APIRouter(prefix="/backups", tags=["Backups"], dependencies=[Depends(require_admin)])
 
 
 class BackupSettings(BaseModel):
@@ -48,7 +52,7 @@ def run_backup_now():
 
 
 @router.put("/settings")
-def update_backup_settings(payload: BackupSettings, _admin=Depends(require_admin)):
+def update_backup_settings(payload: BackupSettings):
     folder = (payload.extra_folder or "").strip() or None
     if folder and (not os.path.isabs(folder) or not os.path.isdir(folder)):
         raise HTTPException(status_code=400, detail=f"Folder not found: {folder}")

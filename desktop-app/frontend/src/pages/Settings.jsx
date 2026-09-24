@@ -401,9 +401,11 @@ const BackupSettings = ({ databasePath }) => {
   const [folderInput, setFolderInput] = useState("");
   const [message, setMessage] = useState(null);
 
+  const isAdmin = !!user?.is_admin;
   const { data: status, isLoading } = useQuery({
     queryKey: ["backups"],
     queryFn: async () => (await apiClient.get("/backups/")).data,
+    enabled: isAdmin,
   });
 
   const runNow = useMutation({
@@ -446,7 +448,9 @@ const BackupSettings = ({ databasePath }) => {
         </p>
       )}
 
-      {isLoading || !status ? (
+      {!isAdmin ? (
+        <p className="text-sm text-slate-500">Your data is backed up automatically every day. Backups are managed by an admin.</p>
+      ) : isLoading || !status ? (
         <p className="text-sm text-slate-400">Checking backups...</p>
       ) : (
         <>
@@ -507,36 +511,32 @@ const BackupSettings = ({ databasePath }) => {
                     <FolderOpen size={16} />
                   </button>
                 )}
-                {user?.is_admin && (
-                  <button type="button" onClick={() => saveFolder.mutate(null)}
-                    className="text-xs text-slate-400 hover:text-red-500 shrink-0">
-                    Remove
-                  </button>
-                )}
+                <button type="button" onClick={() => saveFolder.mutate(null)}
+                  className="text-xs text-slate-400 hover:text-red-500 shrink-0">
+                  Remove
+                </button>
               </div>
             ) : (
               <p className="text-xs text-amber-700">Not set - backups are only on this computer.</p>
             )}
-            {user?.is_admin && (
-              canChooseFolder() ? (
-                <button type="button" onClick={pickFolder} disabled={saveFolder.isPending}
+            {canChooseFolder() ? (
+              <button type="button" onClick={pickFolder} disabled={saveFolder.isPending}
+                className="rounded-lg border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-50 disabled:opacity-50">
+                {status.settings.extra_folder ? "Change folder..." : "Choose folder..."}
+              </button>
+            ) : (
+              <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (folderInput.trim()) saveFolder.mutate(folderInput.trim()); }}>
+                <input
+                  className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="e.g. C:\Users\you\OneDrive"
+                  value={folderInput}
+                  onChange={(e) => setFolderInput(e.target.value)}
+                />
+                <button type="submit" disabled={saveFolder.isPending}
                   className="rounded-lg border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-50 disabled:opacity-50">
-                  {status.settings.extra_folder ? "Change folder..." : "Choose folder..."}
+                  Save
                 </button>
-              ) : (
-                <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (folderInput.trim()) saveFolder.mutate(folderInput.trim()); }}>
-                  <input
-                    className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    placeholder="e.g. C:\Users\you\OneDrive"
-                    value={folderInput}
-                    onChange={(e) => setFolderInput(e.target.value)}
-                  />
-                  <button type="submit" disabled={saveFolder.isPending}
-                    className="rounded-lg border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-50 disabled:opacity-50">
-                    Save
-                  </button>
-                </form>
-              )
+              </form>
             )}
           </div>
 
