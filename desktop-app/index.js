@@ -277,6 +277,29 @@ async function createWindow() {
 // installed version to update, so app.isPackaged short-circuits it there
 // rather than have electron-updater fail looking for app-update.yml that a
 // dev build never produces.
+//
+// Runs automatically on launch and every few hours after that (so an
+// install that's left open for days still catches new releases), but is
+// also exposed to the renderer (see the IPC handlers below and
+// Settings.jsx's "Software Update" section) as a manual "Check for
+// Updates" button - the previous version of this only logged to
+// backend.log and showed one native dialog once a download finished, which
+// meant there was no way to ask "is there an update?" on demand, and no
+// on-screen feedback at all while a check/download was in progress.
+const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
+
+// Current status, pushed to the renderer on every change and also readable
+// on demand (get-update-status) for a Settings page that mounts after the
+// last change already happened.
+let updateStatus = { state: 'idle' };
+
+function setUpdateStatus(next) {
+  updateStatus = next;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update-status', updateStatus);
+  }
+}
+
 function setupAutoUpdater() {
   if (!app.isPackaged) return;
 
@@ -285,21 +308,27 @@ function setupAutoUpdater() {
 
   autoUpdater.on('checking-for-update', () => {
     logToBackendFile('[updater] checking for update...');
+    setUpdateStatus({ state: 'checking' });
   });
   autoUpdater.on('update-available', (info) => {
     logToBackendFile(`[updater] update available: v${info.version} - downloading...`);
+    setUpdateStatus({ state: 'downloading', version: info.version, percent: 0 });
   });
   autoUpdater.on('update-not-available', () => {
     logToBackendFile('[updater] already on the latest version.');
+    setUpdateStatus({ state: 'up-to-date' });
   });
   autoUpdater.on('error', (err) => {
     logToBackendFile(`[updater] check/download failed: ${err.message}`);
+    setUpdateStatus({ state: 'error', message: err.message });
   });
   autoUpdater.on('download-progress', (progress) => {
     logToBackendFile(`[updater] downloading update: ${Math.round(progress.percent)}%`);
+    setUpdateStatus({ ...updateStatus, state: 'downloading', percent: Math.round(progress.percent) });
   });
   autoUpdater.on('update-downloaded', (info) => {
     logToBackendFile(`[updater] update downloaded: v${info.version}`);
+    setUpdateStatus({ state: 'downloaded', version: info.version });
     dialog.showMessageBox(mainWindow, {
       type: 'info',
       buttons: ['Restart now', 'Later'],
@@ -313,14 +342,42 @@ function setupAutoUpdater() {
     });
   });
 
-  autoUpdater.checkForUpdates().catch((err) => {
-    logToBackendFile(`[updater] check failed: ${err.message}`);
-  });
+  const runCheck = () => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      logToBackendFile(`[updater] check failed: ${err.message}`);
+      setUpdateStatus({ state: 'error', message: err.message });
+    });
+  };
+
+  runCheck();
+  setInterval(runCheck, UPDATE_CHECK_INTERVAL_MS);
 }
 
 function base64url(buffer) {
   return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
+
+// Renderer-triggered counterparts to the automatic checks in
+// setupAutoUpdater() - see Settings.jsx's "Software Update" section. All
+// three no-op with an explanatory status in dev mode (app.isPackaged is
+// false, so setupAutoUpdater() itself never ran and updateStatus is still
+// its default {state: 'idle'}) rather than throwing, since a dev run has no
+// installed version to update in the first place.
+ipcMain.handle('check-for-updates', async () => {
+  if (!app.isPackaged) {
+    setUpdateStatus({ state: 'error', message: 'Updates are only available in the installed app, not in development mode.' });
+    return;
+  }
+  autoUpdater.checkForUpdates().catch((err) => {
+    setUpdateStatus({ state: 'error', message: err.message });
+  });
+});
+
+ipcMain.handle('quit-and-install', async () => {
+  if (updateStatus.state === 'downloaded') autoUpdater.quitAndInstall();
+});
+
+ipcMain.handle('get-update-status', () => updateStatus);
 
 // Google's OAuth flow for a "Desktop app" client wants the authorization
 // code to land on a loopback redirect (http://127.0.0.1:<port>) rather than
