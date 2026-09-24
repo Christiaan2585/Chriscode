@@ -95,8 +95,8 @@ export function AuthProvider({ children }) {
 
   const googleSignIn = withErrorHandling(async () => {
     if (!googleClientId) throw new Error('Google sign-in is not configured yet.');
-    const { code, codeVerifier, redirectUri } = await signInWithGoogle(googleClientId);
-    const result = await authService.googleCallback(code, codeVerifier, redirectUri);
+    const { code, codeVerifier, redirectUri, nonce } = await signInWithGoogle(googleClientId);
+    const result = await authService.googleCallback(code, codeVerifier, redirectUri, nonce);
     persistSession(result);
   });
 

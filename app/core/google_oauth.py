@@ -41,11 +41,16 @@ def is_google_login_enabled() -> bool:
     return bool(config.get("client_id") and config.get("client_secret"))
 
 
-def exchange_code_for_profile(code: str, code_verifier: str, redirect_uri: str) -> dict:
+def exchange_code_for_profile(code: str, code_verifier: str, redirect_uri: str, expected_nonce: str) -> dict:
     """Exchanges an OAuth authorization code for the signed-in Google
     account's id_token, then verifies that id_token with Google directly
     (rather than trusting whatever the client hands us) and returns the
-    profile fields we care about."""
+    profile fields we care about.
+
+    expected_nonce must match the nonce claim Google embeds in the id_token -
+    that nonce was generated fresh for this one sign-in attempt (see
+    desktop-app/index.js), so this check is what stops a captured id_token
+    from an earlier sign-in being replayed into a new session."""
     config = _read_config()
     client_id = config.get("client_id")
     client_secret = config.get("client_secret")
@@ -79,6 +84,8 @@ def exchange_code_for_profile(code: str, code_verifier: str, redirect_uri: str) 
         raise RuntimeError("Google sign-in verification failed (client mismatch)")
     if info.get("email_verified") not in ("true", True):
         raise RuntimeError("This Google account's email is not verified")
+    if info.get("nonce") != expected_nonce:
+        raise RuntimeError("Google sign-in failed a security check (nonce mismatch) - please try again")
 
     return {
         "sub": info["sub"],

@@ -69,6 +69,10 @@ class GoogleCallbackRequest(BaseModel):
     code: str
     code_verifier: str
     redirect_uri: str
+    # Generated per sign-in attempt in desktop-app/index.js and embedded by
+    # Google into the id_token it issues - checked in exchange_code_for_profile
+    # so a captured id_token from an earlier sign-in can't be replayed here.
+    nonce: str
 
 
 class PinSetupRequest(BaseModel):
@@ -152,7 +156,7 @@ def login(payload: LoginRequest, session: Session = Depends(get_session)):
 @router.post("/google/callback", response_model=AuthResult)
 def google_callback(payload: GoogleCallbackRequest, session: Session = Depends(get_session)):
     try:
-        profile = exchange_code_for_profile(payload.code, payload.code_verifier, payload.redirect_uri)
+        profile = exchange_code_for_profile(payload.code, payload.code_verifier, payload.redirect_uri, payload.nonce)
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 

@@ -1,3 +1,9 @@
+# Every route below requires a signed-in user. That's not visible in this
+# file: app/main.py applies it once for the whole router via
+# app.include_router(clients.router, dependencies=[Depends(get_current_user)]),
+# rather than repeating the same Depends() on every endpoint here. A scanner
+# (or reviewer) reading only this file will see no auth and should check
+# app/main.py before concluding these routes are open.
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlmodel import Session, select
 from typing import List, Optional

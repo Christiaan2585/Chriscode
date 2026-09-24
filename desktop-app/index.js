@@ -195,8 +195,9 @@ async function createWindow() {
     height: 840,
     show: false,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.js'),
     },
     title: 'Sandveld Vee Dienste',
     // A packaged build already gets its icon from the exe itself (package.json's
@@ -325,6 +326,15 @@ ipcMain.handle('google-oauth-login', async (_event, { clientId }) => {
 
   const codeVerifier = base64url(crypto.randomBytes(32));
   const codeChallenge = base64url(crypto.createHash('sha256').update(codeVerifier).digest());
+  // state: standard OAuth CSRF protection - binds the callback we accept to
+  // the specific flow we just started, so a request landing on the loopback
+  // server can't be mistaken for a real response from Google unless it
+  // carries this value back. nonce: OIDC replay protection - Google embeds
+  // it in the id_token itself, and the backend checks it matches after the
+  // token exchange (see app/core/google_oauth.py) so a captured id_token
+  // from a past sign-in can't be replayed into a fresh one.
+  const state = base64url(crypto.randomBytes(16));
+  const nonce = base64url(crypto.randomBytes(16));
 
   const server = http.createServer();
   await new Promise((resolve, reject) => {
@@ -342,6 +352,8 @@ ipcMain.handle('google-oauth-login', async (_event, { clientId }) => {
   authUrl.searchParams.set('code_challenge', codeChallenge);
   authUrl.searchParams.set('code_challenge_method', 'S256');
   authUrl.searchParams.set('prompt', 'select_account');
+  authUrl.searchParams.set('state', state);
+  authUrl.searchParams.set('nonce', nonce);
 
   const code = await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -352,12 +364,14 @@ ipcMain.handle('google-oauth-login', async (_event, { clientId }) => {
     server.on('request', (req, res) => {
       const reqUrl = new URL(req.url, redirectUri);
       const receivedCode = reqUrl.searchParams.get('code');
+      const receivedState = reqUrl.searchParams.get('state');
       const error = reqUrl.searchParams.get('error');
+      const stateOk = receivedState === state;
 
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(
         '<html><body style="font-family:sans-serif;padding:2rem;text-align:center">' +
-        (error
+        (error || !stateOk
           ? '<h2>Sign-in cancelled</h2><p>You can close this tab and return to Sandveld Vee Dienste.</p>'
           : '<h2>Signed in</h2><p>You can close this tab and return to Sandveld Vee Dienste.</p>') +
         '</body></html>'
@@ -367,6 +381,7 @@ ipcMain.handle('google-oauth-login', async (_event, { clientId }) => {
       server.close();
 
       if (error) reject(new Error(`Google sign-in was cancelled (${error})`));
+      else if (!stateOk) reject(new Error('Google sign-in failed a security check (state mismatch) - please try again.'));
       else if (!receivedCode) reject(new Error('Google did not return a sign-in code.'));
       else resolve(receivedCode);
     });
@@ -374,7 +389,7 @@ ipcMain.handle('google-oauth-login', async (_event, { clientId }) => {
     shell.openExternal(authUrl.toString());
   });
 
-  return { code, codeVerifier, redirectUri };
+  return { code, codeVerifier, redirectUri, nonce };
 });
 
 // Electron's DEFAULT behaviour with no handler set here is to SILENTLY

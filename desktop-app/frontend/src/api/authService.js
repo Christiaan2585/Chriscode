@@ -4,8 +4,8 @@ export const authService = {
   status: async () => (await apiClient.get('/auth/status')).data,
   setupFirstAccount: async (data) => (await apiClient.post('/auth/setup', data)).data,
   login: async (email, password) => (await apiClient.post('/auth/login', { email, password })).data,
-  googleCallback: async (code, codeVerifier, redirectUri) =>
-    (await apiClient.post('/auth/google/callback', { code, code_verifier: codeVerifier, redirect_uri: redirectUri })).data,
+  googleCallback: async (code, codeVerifier, redirectUri, nonce) =>
+    (await apiClient.post('/auth/google/callback', { code, code_verifier: codeVerifier, redirect_uri: redirectUri, nonce })).data,
   setupPin: async (pin) => (await apiClient.post('/auth/pin/setup', { pin })).data,
   verifyPin: async (rememberToken, pin) =>
     (await apiClient.post('/auth/pin/verify', { remember_token: rememberToken, pin })).data,
