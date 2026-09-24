@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core import backup
-from app.core.db import database_file_path
+from app.core.db import create_db_and_tables, database_file_path, engine
 from app.core.security import require_admin
 
 # Admin-only as a whole, not just the settings endpoint: backups are pruned
@@ -48,6 +48,24 @@ def run_backup_now():
         backup.backup_now(database_file_path())
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Backup failed: {exc}")
+    return _status()
+
+
+class RestoreRequest(BaseModel):
+    name: str
+
+
+@router.post("/restore")
+def restore_backup(payload: RestoreRequest):
+    try:
+        backup.restore(database_file_path(), payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    # Pooled connections may hold cached schema from before the swap, and
+    # an older backup can predate columns this version expects - drop the
+    # pool and re-run the schema sync against the restored data.
+    engine.dispose()
+    create_db_and_tables()
     return _status()
 
 

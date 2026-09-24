@@ -6,9 +6,9 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.core.db import create_db_and_tables, database_file_path
-from app.core.backup import start_scheduler
+from app.core.backup import backup_on_version_change, start_scheduler
 from app.core.security import get_current_user
-from app.api import auth, clients, animals, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups
+from app.api import auth, clients, animals, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups, exports
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -79,9 +79,27 @@ app.include_router(quotes.router, dependencies=_protected)
 app.include_router(orders.router, dependencies=_protected)
 app.include_router(dosing.router, dependencies=_protected)
 app.include_router(backups.router, dependencies=_protected)
+app.include_router(exports.router, dependencies=_protected)
+
+def _version_info() -> dict:
+    # Bundled into the packaged backend by build_and_package.bat's
+    # --add-data; without that every installed copy reported "0.0.0".
+    version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "version.json")
+    try:
+        with open(version_file, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
 
 @app.on_event("startup")
 def on_startup():
+    # Before create_db_and_tables(): the first run of a new version must
+    # snapshot the data before its schema sync touches it.
+    try:
+        backup_on_version_change(database_file_path(), _version_info().get("version", "0.0.0"))
+    except Exception:
+        logger.exception("Pre-update backup failed")
     create_db_and_tables()
     start_scheduler(database_file_path())
 
@@ -91,12 +109,7 @@ def read_root():
 
 @app.get("/version")
 def read_version():
-    version_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "version.json")
-    try:
-        with open(version_file, "r") as f:
-            data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        data = {}
+    data = _version_info()
     return {
         "app_name": "Sandveld Vee Dienste",
         "version": data.get("version", "0.0.0"),

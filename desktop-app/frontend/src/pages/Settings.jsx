@@ -427,6 +427,36 @@ const BackupSettings = ({ databasePath }) => {
     },
   });
 
+  const restore = useMutation({
+    mutationFn: async (name) => (await apiClient.post("/backups/restore", { name })).data,
+    // Everything cached in the app (and possibly the signed-in account
+    // itself) now reflects the restored data, so start fresh.
+    onSuccess: () => window.location.reload(),
+  });
+
+  const confirmRestore = (b) => {
+    const ok = window.confirm(
+      `Restore the backup from ${formatWhen(b.created_at)}?\n\n` +
+      "Everything entered after that time will be replaced. A copy of your current data is saved first, " +
+      "so you can undo this by restoring that copy.\n\nThe app will reload and you may need to sign in again."
+    );
+    if (ok) restore.mutate(b.name);
+  };
+
+  const exportData = useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.get("/exports/workbook", { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `sandveld-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    },
+  });
+
   const pickFolder = async () => {
     const folder = await chooseFolder();
     if (folder) saveFolder.mutate(folder);
@@ -545,18 +575,31 @@ const BackupSettings = ({ databasePath }) => {
               <summary className="cursor-pointer text-slate-600">Recent backups ({status.backups.length})</summary>
               <ul className="mt-2 space-y-1 text-xs text-slate-500">
                 {status.backups.slice(0, 10).map((b) => (
-                  <li key={b.name} className="flex justify-between gap-4">
+                  <li key={b.name} className="flex items-center justify-between gap-4">
                     <span>{formatWhen(b.created_at)}</span>
-                    <span>{formatSize(b.size)}</span>
+                    <span className="flex items-center gap-3">
+                      {formatSize(b.size)}
+                      <button type="button" onClick={() => confirmRestore(b)} disabled={restore.isPending}
+                        className="text-emerald-700 hover:underline disabled:opacity-50">
+                        Restore
+                      </button>
+                    </span>
                   </li>
                 ))}
               </ul>
-              <p className="mt-3 text-xs text-slate-400">
-                To restore: close the app, copy the backup you want over the data file shown above and rename it to{" "}
-                <code>kyron_agri.db</code>, then reopen the app.
-              </p>
             </details>
           )}
+
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-4">
+            <p className="text-xs text-slate-400">
+              Everything except logins, in one Excel file - for your accountant or your own records.
+            </p>
+            <button type="button" onClick={() => exportData.mutate()} disabled={exportData.isPending}
+              className="shrink-0 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-50 disabled:opacity-50">
+              {exportData.isPending ? "Exporting..." : "Export to Excel"}
+            </button>
+          </div>
+          {restore.isPending && <p className="text-xs text-slate-500">Restoring...</p>}
         </>
       )}
     </div>

@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { applyTheme, getTheme } from './utils/theme'
+
+// Before the first render, so screens never flash the wrong theme.
+applyTheme(getTheme())
 
 // Error boundaries only catch errors thrown while React is rendering.
 // Errors thrown inside event handlers, timers, or unhandled promise

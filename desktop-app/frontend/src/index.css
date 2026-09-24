@@ -54,6 +54,93 @@ body {
   margin: 0;
 }
 
+/* ---------------------------------------------------------------------
+   Dark theme (the default - toggled from the header, see utils/theme.js).
+
+   Every page is built from Tailwind's slate/white/emerald utilities, and
+   Tailwind v4 compiles those to CSS variables (bg-white -> var(--color-
+   white)). So instead of adding dark: variants to every page, dark mode
+   remaps the variables here: the slate scale is inverted (light greys
+   become dark surfaces, dark text becomes light), the pale 50/100 tints
+   become translucent washes, and the few things a variable swap can't
+   express (bg-white vs the white text on buttons, green/red text shades
+   that are too dark on navy) get explicit rules below. New pages built
+   from the same utilities get dark mode for free.
+   --------------------------------------------------------------------- */
+html.theme-dark {
+  color-scheme: dark;
+  --dk-bg: #0e1320;
+  --dk-sidebar: #111827;
+  --dk-card: #171e2e;
+  --dk-line: #262f45;
+  background: var(--dk-bg);
+  color: #c5cbda;
+
+  --color-slate-50: #1c2436;
+  --color-slate-100: #222b40;
+  --color-slate-200: #2a3349;
+  --color-slate-300: #384260;
+  --color-slate-400: #7d879f;
+  --color-slate-500: #959eb5;
+  --color-slate-600: #abb3c7;
+  --color-slate-700: #c7cddb;
+  --color-slate-800: #e4e8f0;
+  --color-slate-900: #f3f5f9;
+
+  --color-emerald-50: rgb(16 185 129 / 0.10);
+  --color-emerald-100: rgb(16 185 129 / 0.16);
+  --color-red-50: rgb(239 68 68 / 0.10);
+  --color-red-100: rgb(239 68 68 / 0.16);
+  --color-red-200: rgb(239 68 68 / 0.32);
+  --color-amber-50: rgb(245 158 11 / 0.10);
+  --color-amber-100: rgb(245 158 11 / 0.16);
+  --color-amber-200: rgb(245 158 11 / 0.32);
+  --color-blue-100: rgb(59 130 246 / 0.16);
+}
+
+/* Page background darker than the cards on it (slate-50 alone can't do
+   both jobs - it's also the subtle panel colour inside cards). */
+.theme-dark .app-bg { background-color: var(--dk-bg); }
+.theme-dark .bg-white { background-color: var(--dk-card); }
+.theme-dark .bg-slate-900\/50 { background-color: rgb(2 6 14 / 0.7); }
+
+/* Hover states on elements that are also bg-white need to outrank the
+   bg-white rule above. */
+.theme-dark .hover\:bg-slate-50:hover { background-color: var(--color-slate-50); }
+.theme-dark .hover\:bg-slate-100:hover { background-color: var(--color-slate-100); }
+.theme-dark .hover\:bg-slate-200:hover { background-color: var(--color-slate-200); }
+.theme-dark .hover\:bg-emerald-50:hover,
+.theme-dark .hover\:bg-emerald-50\/40:hover { background-color: rgb(16 185 129 / 0.10); }
+
+/* Coloured text tuned for light backgrounds - lifted to stay readable. */
+.theme-dark .text-emerald-600, .theme-dark .text-emerald-700,
+.theme-dark .hover\:text-emerald-600:hover, .theme-dark .hover\:text-emerald-700:hover { color: #34d399; }
+.theme-dark .text-emerald-800 { color: #6ee7b7; }
+.theme-dark .text-red-600, .theme-dark .text-red-700,
+.theme-dark .hover\:text-red-600:hover { color: #f87171; }
+.theme-dark .text-amber-600, .theme-dark .text-amber-700 { color: #fbbf24; }
+.theme-dark .text-blue-600, .theme-dark .text-blue-700,
+.theme-dark .hover\:text-blue-600:hover { color: #60a5fa; }
+.theme-dark .text-purple-600, .theme-dark .hover\:text-purple-600:hover { color: #c084fc; }
+.theme-dark .bg-emerald-200, .theme-dark .hover\:bg-emerald-200:hover { background-color: rgb(16 185 129 / 0.28); }
+.theme-dark .border-emerald-200 { border-color: rgb(16 185 129 / 0.35); }
+
+/* Sidebar: navy instead of green, with the current page as a pill. */
+.theme-dark .app-sidebar { background-color: var(--dk-sidebar); border-right: 1px solid var(--dk-line); }
+.theme-dark .app-sidebar .border-emerald-800 { border-color: var(--dk-line); }
+.theme-dark .app-sidebar .hover\:bg-emerald-800:hover { background-color: rgb(255 255 255 / 0.05); }
+.theme-dark .app-sidebar .nav-label { color: #6b7590; }
+.theme-dark .app-sidebar .nav-active { background-color: rgb(16 185 129 / 0.15); color: #34d399; }
+
+/* Recharts sets colours as SVG attributes and inline styles. */
+.theme-dark .recharts-cartesian-grid line { stroke: var(--dk-line); }
+.theme-dark .recharts-cartesian-axis-tick-value { fill: #7d879f; }
+.theme-dark .recharts-default-tooltip {
+  background-color: var(--dk-card) !important;
+  border-color: var(--dk-line) !important;
+  color: #e4e8f0;
+}
+
 /* GrazingHeaderStrip.jsx's chase animation. This has to live in a real,
    bundled stylesheet rather than a JSX <style> tag - the packaged app's
    Content-Security-Policy is `style-src 'self'` with no 'unsafe-inline'

@@ -111,6 +111,54 @@ class BackupTests(unittest.TestCase):
         self.assertIsNone(result["extra"])
         self.assertIn("not found", result["extra_error"])
 
+    # --- backup before a new version first touches the database -----------
+
+    def test_version_change_backs_up_before_the_new_version_runs(self):
+        state = os.path.join(self.root, "backup_state.json")
+        first = backup.backup_if_version_changed(self.db, "1.0.1", self.backups, state)
+        self.assertIsNotNone(first)  # existing data, no record of a version: back it up
+        self.assertIsNone(backup.backup_if_version_changed(self.db, "1.0.1", self.backups, state))
+        second = backup.backup_if_version_changed(self.db, "1.0.2", self.backups, state,
+                                                  now=datetime(2030, 1, 1, 0, 0, 0))
+        self.assertIsNotNone(second)
+        self.assertEqual(_names(second), ["alpha", "beta"])
+
+    def test_fresh_install_records_version_without_backing_up(self):
+        state = os.path.join(self.root, "backup_state.json")
+        missing_db = os.path.join(self.root, "not-created-yet.db")
+        self.assertIsNone(backup.backup_if_version_changed(missing_db, "1.0.2", self.backups, state))
+        self.assertEqual(backup.list_backups(self.backups), [])
+        self.assertIsNone(backup.backup_if_version_changed(self.db, "1.0.2", self.backups, state))
+
+    # --- restore ------------------------------------------------------------
+
+    def test_restore_replaces_live_data_and_keeps_a_safety_copy_first(self):
+        old = backup.create_backup(self.db, self.backups, now=datetime(2026, 9, 1, 12, 0, 0))
+        conn = sqlite3.connect(self.db)
+        conn.execute("DELETE FROM client")
+        conn.execute("INSERT INTO client (name) VALUES ('after-mistake')")
+        conn.commit()
+        conn.close()
+
+        safety = backup.restore_backup(self.db, self.backups, os.path.basename(old))
+
+        self.assertEqual(_names(self.db), ["alpha", "beta"])
+        self.assertEqual(_names(safety), ["after-mistake"])  # the restore itself is undoable
+
+    def test_restore_rejects_names_outside_the_backup_folder(self):
+        for bad in ("../kyron_agri.db", "kyron_agri.db", "..\\kyron_agri-20260901-120000.db", "evil.exe"):
+            with self.assertRaises(ValueError):
+                backup.restore_backup(self.db, self.backups, bad)
+
+    def test_restore_refuses_a_corrupt_backup_and_leaves_live_data_alone(self):
+        os.makedirs(self.backups)
+        corrupt = os.path.join(self.backups, "kyron_agri-20260901-120000.db")
+        with open(corrupt, "wb") as f:
+            f.write(b"this is not a database")
+        with self.assertRaises(ValueError):
+            backup.restore_backup(self.db, self.backups, os.path.basename(corrupt))
+        self.assertEqual(_names(self.db), ["alpha", "beta"])
+
     def test_settings_default_when_missing_and_round_trip(self):
         path = os.path.join(self.root, "backup_settings.json")
         self.assertEqual(backup.load_settings(path), {"extra_folder": None, "keep": 30})

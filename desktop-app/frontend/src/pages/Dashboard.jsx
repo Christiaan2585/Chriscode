@@ -1,7 +1,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TrendingUp, Users, Dog, AlertCircle, CalendarClock, LineChart as LineChartIcon } from "lucide-react";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import apiClient from "../api/client";
 
 const Dashboard = () => {
@@ -91,8 +91,14 @@ const Dashboard = () => {
           <p className="text-sm text-slate-400">No paid invoices yet — this chart fills in as invoices get marked paid.</p>
         ) : (
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={salesChartQuery.data} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <AreaChart data={salesChartQuery.data} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
+              <defs>
+                <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#64748b" }} />
               <YAxis
                 tick={{ fontSize: 12, fill: "#64748b" }}
@@ -100,8 +106,8 @@ const Dashboard = () => {
                 width={56}
               />
               <Tooltip formatter={(value) => [fmtCurrency(value), "Revenue"]} />
-              <Line type="monotone" dataKey="revenue" stroke="#059669" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-            </LineChart>
+              <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} fill="url(#salesFill)" dot={false} activeDot={{ r: 5 }} />
+            </AreaChart>
           </ResponsiveContainer>
         )}
       </div>

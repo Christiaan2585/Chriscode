@@ -17,6 +17,7 @@ import sqlite3
 import threading
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger("uvicorn.error")
@@ -35,11 +36,44 @@ def default_backup_dir() -> str:
     return os.path.join(data_dir, "backups")
 
 
-def settings_path() -> str:
+def _config_file(name: str) -> str:
     data_dir = os.getenv("SANDVELD_DATA_DIR")
     if data_dir:
-        return os.path.join(data_dir, "backup_settings.json")
-    return os.path.join(_PROJECT_ROOT, "config", "backup_settings.json")
+        return os.path.join(data_dir, name)
+    return os.path.join(_PROJECT_ROOT, "config", name)
+
+
+def settings_path() -> str:
+    return _config_file("backup_settings.json")
+
+
+def state_path() -> str:
+    return _config_file("backup_state.json")
+
+
+def _read_json(path: str) -> dict:
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _write_json(path: str, data: dict) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def _is_readable_database(path: str) -> bool:
+    try:
+        conn = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True)
+        try:
+            return conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        finally:
+            conn.close()
+    except sqlite3.DatabaseError:
+        return False
 
 
 def _atomic_write(write_to_path, target: str) -> None:
@@ -109,11 +143,7 @@ def is_backup_due(last: Optional[datetime], now: datetime, interval: timedelta =
 
 def load_settings(path: str) -> dict:
     settings = {"extra_folder": None, "keep": DEFAULT_KEEP}
-    try:
-        with open(path, "r") as f:
-            stored = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return settings
+    stored = _read_json(path)
     settings["extra_folder"] = stored.get("extra_folder") or None
     try:
         settings["keep"] = max(1, int(stored.get("keep", DEFAULT_KEEP)))
@@ -123,10 +153,8 @@ def load_settings(path: str) -> dict:
 
 
 def save_settings(path: str, settings: dict) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
-        json.dump({"extra_folder": settings.get("extra_folder") or None,
-                   "keep": settings.get("keep", DEFAULT_KEEP)}, f, indent=2)
+    _write_json(path, {"extra_folder": settings.get("extra_folder") or None,
+                       "keep": settings.get("keep", DEFAULT_KEEP)})
 
 
 def run_backup(db_path: str, primary_dir: str, extra_folder: Optional[str] = None,
@@ -151,6 +179,47 @@ def run_backup(db_path: str, primary_dir: str, extra_folder: Optional[str] = Non
     return {"primary": primary, "extra": extra, "extra_error": extra_error}
 
 
+def backup_if_version_changed(db_path: str, version: str, primary_dir: str, state_file: str,
+                              extra_folder: Optional[str] = None, keep: int = DEFAULT_KEEP,
+                              now: Optional[datetime] = None) -> Optional[str]:
+    """Snapshot the database the first time a new app version starts,
+    BEFORE it runs its schema sync against the data - so if an update ever
+    mangles something, the exact pre-update state is one restore away.
+    A brand-new install (no database yet) just records its version."""
+    if _read_json(state_file).get("last_version") == version:
+        return None
+    result = None
+    if os.path.isfile(db_path):
+        result = run_backup(db_path, primary_dir, extra_folder, keep, now=now)["primary"]
+    _write_json(state_file, {"last_version": version})
+    return result
+
+
+def restore_backup(db_path: str, backup_dir: str, name: str, now: Optional[datetime] = None) -> str:
+    """Replace the live database's contents with a backup's. Snapshots the
+    current state first, so the restore itself can be undone. Returns the
+    path of that safety snapshot."""
+    # The strict name pattern (no separators possible) is what keeps this
+    # confined to the backup folder - "../" or absolute paths can't match.
+    if not _NAME_RE.match(name):
+        raise ValueError("That isn't a backup file.")
+    path = os.path.join(backup_dir, name)
+    if not os.path.isfile(path):
+        raise ValueError("That backup no longer exists.")
+    if not _is_readable_database(path):
+        raise ValueError("That backup file is damaged and can't be restored.")
+
+    safety = create_backup(db_path, backup_dir, now=now)
+    src = sqlite3.connect(path)
+    dst = sqlite3.connect(db_path)
+    try:
+        src.backup(dst)
+    finally:
+        dst.close()
+        src.close()
+    return safety
+
+
 # --- Scheduling -----------------------------------------------------------
 
 _lock = threading.Lock()
@@ -172,6 +241,18 @@ def backup_now(db_path: str) -> dict:
         last_error = None
         last_extra_error = result["extra_error"]
         return result
+
+
+def backup_on_version_change(db_path: str, version: str) -> Optional[str]:
+    settings = load_settings(settings_path())
+    with _lock:
+        return backup_if_version_changed(db_path, version, default_backup_dir(), state_path(),
+                                         settings["extra_folder"], settings["keep"])
+
+
+def restore(db_path: str, name: str) -> str:
+    with _lock:
+        return restore_backup(db_path, default_backup_dir(), name)
 
 
 def start_scheduler(db_path: str, check_every_seconds: int = 3600) -> None:

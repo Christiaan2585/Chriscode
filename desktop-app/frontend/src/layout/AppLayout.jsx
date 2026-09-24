@@ -1,9 +1,26 @@
 import React, { useState } from "react";
-import { Outlet, Link } from "react-router-dom";
+import { Outlet, NavLink } from "react-router-dom";
 import { LayoutDashboard, Users, Dog, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, Lock, LogOut } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logo.png";
 import GrazingHeaderStrip from "../components/GrazingHeaderStrip";
+import GlobalSearch from "../components/GlobalSearch";
+import ThemeToggle from "../components/ThemeToggle";
+
+const NAV = [
+  { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
+  { to: "/clients", label: "Clients", Icon: Users },
+  { to: "/animals", label: "Animals", Icon: Dog },
+  { to: "/calendar", label: "System Calendar", Icon: Calendar },
+  { to: "/quotes", label: "Quotes", Icon: FileText },
+  { to: "/orders", label: "Orders", Icon: ShoppingCart },
+  { to: "/products", label: "Products", Icon: Package },
+  { to: "/calculator", label: "Product Calc", Icon: Calculator },
+  { to: "/invoices", label: "Invoices", Icon: FileText },
+];
+
+const navClass = ({ isActive }) =>
+  `flex items-center gap-3 p-3 rounded-lg transition-colors ${isActive ? "nav-active bg-emerald-800" : "hover:bg-emerald-800"}`;
 
 const AppLayout = () => {
   const { user, lock, forgetDevice } = useAuth();
@@ -16,57 +33,39 @@ const AppLayout = () => {
     .toUpperCase();
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 font-sans">
+    <div className="app-bg flex h-screen bg-slate-50 text-slate-900 font-sans">
       {/* Sidebar */}
-      <aside className="w-64 bg-emerald-900 text-white flex flex-col">
+      <aside className="app-sidebar w-64 bg-emerald-900 text-white flex flex-col">
         <div className="p-6 text-2xl font-bold tracking-tight flex items-center gap-3">
           <img src={logo} alt="" className="w-10 h-10 rounded-full shrink-0" />
           Sandveld Vee Dienste
         </div>
-        <nav className="flex-1 px-4 space-y-2 mt-4">
-          <Link to="/" className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-800 transition-colors">
-            <LayoutDashboard size={20} /> Dashboard
-          </Link>
-          <Link to="/clients" className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-800 transition-colors">
-            <Users size={20} /> Clients
-          </Link>
-          <Link to="/animals" className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-800 transition-colors">
-            <Dog size={20} /> Animals
-          </Link>
-          <Link to="/calendar" className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-800 transition-colors">
-            <Calendar size={20} /> System Calendar
-          </Link>
-          <Link to="/quotes" className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-800 transition-colors">
-            <FileText size={20} /> Quotes
-          </Link>
-          <Link to="/orders" className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-800 transition-colors">
-            <ShoppingCart size={20} /> Orders
-          </Link>
-          <Link to="/products" className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-800 transition-colors">
-            <Package size={20} /> Products
-          </Link>
-          <Link to="/calculator" className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-800 transition-colors">
-            <Calculator size={20} /> Product Calc
-          </Link>
-          <Link to="/invoices" className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-800 transition-colors">
-            <FileText size={20} /> Invoices
-          </Link>
+        <p className="nav-label px-7 mt-2 text-xs font-medium uppercase tracking-wider text-emerald-300/70">Menu</p>
+        <nav className="flex-1 px-4 space-y-1 mt-2">
+          {NAV.map(({ to, label, Icon, end }) => (
+            <NavLink key={to} to={to} end={end} className={navClass}>
+              <Icon size={20} /> {label}
+            </NavLink>
+          ))}
         </nav>
         <div className="p-4 border-t border-emerald-800">
-          <Link to="/settings" className="flex items-center gap-3 p-3 rounded-lg hover:bg-emerald-800 transition-colors">
+          <NavLink to="/settings" className={navClass}>
             <Settings size={20} /> Settings
-          </Link>
+          </NavLink>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between gap-6 px-8">
           <h1 className="text-lg font-semibold text-slate-700 shrink-0 whitespace-nowrap">Management Portal</h1>
-          <div className="hidden md:flex flex-1 justify-center min-w-0 overflow-hidden">
+          <GlobalSearch />
+          <div className="hidden lg:flex flex-1 justify-center min-w-0 overflow-hidden">
             <GrazingHeaderStrip />
           </div>
-          <div className="relative">
+          <div className="flex-1 lg:hidden" />
+          <ThemeToggle />
+          <div className="relative shrink-0">
             <button
               type="button"
               className="flex items-center gap-2"

@@ -66,6 +66,9 @@ REM implementations, which fail SILENTLY at import time otherwise (the exe
 REM starts, then immediately errors out or hangs). --exclude-module drops the
 REM Streamlit-only dependencies (the secondary frontend/app.py dashboard) that
 REM the packaged FastAPI backend never imports, to keep the bundle smaller.
+REM --add-data version.json: GET /version (and the pre-update backup that
+REM keys off it) read this file; without it every install reported "0.0.0".
+REM Absolute path because --specpath makes relative paths resolve from build\.
 call pyinstaller --noconfirm --clean --onedir --name sandveld-backend ^
     --distpath desktop-app\backend --workpath build\pyinstaller-work --specpath build ^
     --collect-all uvicorn ^
@@ -88,6 +91,7 @@ call pyinstaller --noconfirm --clean --onedir --name sandveld-backend ^
     --exclude-module pyarrow ^
     --exclude-module pydeck ^
     --exclude-module matplotlib ^
+    --add-data "%CD%\version.json;." ^
     backend_entry.py
 if errorlevel 1 (
     call deactivate
