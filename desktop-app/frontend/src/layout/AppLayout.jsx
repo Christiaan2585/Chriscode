@@ -3,6 +3,7 @@ import { Outlet, Link } from "react-router-dom";
 import { LayoutDashboard, Users, Dog, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, Lock, LogOut } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logo.png";
+import GrazingHeaderStrip from "../components/GrazingHeaderStrip";
 
 const AppLayout = () => {
   const { user, lock, forgetDevice } = useAuth();
@@ -62,6 +63,9 @@ const AppLayout = () => {
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8">
           <h1 className="text-lg font-semibold text-slate-700">Management Portal</h1>
+          <div className="hidden md:flex flex-1 justify-center">
+            <GrazingHeaderStrip />
+          </div>
           <div className="relative">
             <button
               type="button"

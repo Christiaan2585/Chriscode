@@ -1,6 +1,6 @@
 {
   "name": "sandveld-vee-dienste",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Professional livestock management and financial CRM for Sandveld Vee Dienste",
   "main": "index.js",
   "scripts": {
