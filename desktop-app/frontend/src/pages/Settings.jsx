@@ -1,9 +1,82 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Info, Landmark, Database, ShieldCheck, Users as UsersIcon, UserPlus, Trash2 } from "lucide-react";
+import { Info, Landmark, Database, ShieldCheck, Users as UsersIcon, UserPlus, Trash2, UploadCloud, Package, Users, ClipboardList } from "lucide-react";
 import apiClient from "../api/client";
 import { authService } from "../api/authService";
 import { useAuth } from "../context/AuthContext";
+import ImportModal from "../components/ImportModal";
+
+const IMPORT_TYPES = {
+  products: {
+    label: "Products",
+    icon: Package,
+    endpoint: "/products/import",
+    columnHint: "Supplier price-list columns: Product name, Product code, Unit pack size, Units per carton, Unit Price (cost), Selling Price Excl VAT, Selling Price Incl VAT.",
+    invalidateKeys: [["products"]],
+    createdLabel: "created",
+    updatedLabel: "updated",
+  },
+  clients: {
+    label: "Clients",
+    icon: Users,
+    endpoint: "/clients/import",
+    columnHint: "Recognises common column names like Name, Email, Phone, Address, Farm Name - in any order.",
+    invalidateKeys: [["clients"]],
+    createdLabel: "created",
+    updatedLabel: "updated",
+  },
+  programs: {
+    label: "Herding Programs",
+    icon: ClipboardList,
+    endpoint: "/programs/import",
+    columnHint: "One row per animal type: Client (name or email), Program Name, Animal Type, Count. Goal/Start Date/End Date are optional. The client must already exist.",
+    invalidateKeys: [["programs"]],
+    createdLabel: "programs created",
+    updatedLabel: "animal groups added",
+  },
+};
+
+const DataImportSettings = () => {
+  const [openImport, setOpenImport] = useState(null);
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+      <h3 className="flex items-center gap-2 font-semibold text-slate-800">
+        <UploadCloud size={18} /> Import from Excel / CSV
+      </h3>
+      <p className="text-sm text-slate-500">
+        Bulk-load existing spreadsheets instead of typing everything in by hand.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {Object.entries(IMPORT_TYPES).map(([key, cfg]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setOpenImport(key)}
+            className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:border-emerald-400 hover:bg-emerald-50/40 transition-colors"
+          >
+            <cfg.icon size={16} className="text-emerald-600" />
+            {cfg.label}
+          </button>
+        ))}
+      </div>
+
+      {Object.entries(IMPORT_TYPES).map(([key, cfg]) => (
+        <ImportModal
+          key={key}
+          isOpen={openImport === key}
+          onClose={() => setOpenImport(null)}
+          title={`Import ${cfg.label}`}
+          endpoint={cfg.endpoint}
+          columnHint={cfg.columnHint}
+          invalidateKeys={cfg.invalidateKeys}
+          createdLabel={cfg.createdLabel}
+          updatedLabel={cfg.updatedLabel}
+        />
+      ))}
+    </div>
+  );
+};
 
 const SecuritySettings = () => {
   const { user, refreshMe } = useAuth();
@@ -203,6 +276,8 @@ const Settings = () => {
       </div>
 
       <SecuritySettings />
+
+      <DataImportSettings />
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-3">
         <h3 className="flex items-center gap-2 font-semibold text-slate-800">

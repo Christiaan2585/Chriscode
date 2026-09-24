@@ -1,6 +1,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, Users, Dog, AlertCircle, CalendarClock } from "lucide-react";
+import { TrendingUp, Users, Dog, AlertCircle, CalendarClock, LineChart as LineChartIcon } from "lucide-react";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import apiClient from "../api/client";
 
 const Dashboard = () => {
@@ -24,8 +25,12 @@ const Dashboard = () => {
     queryKey: ["appointments"],
     queryFn: async () => (await apiClient.get("/appointments/")).data,
   });
+  const salesChartQuery = useQuery({
+    queryKey: ["analytics", "revenue-by-month"],
+    queryFn: async () => (await apiClient.get("/analytics/revenue-by-month", { params: { months: 12 } })).data,
+  });
 
-  const queries = [clientsQuery, animalsQuery, revenueQuery, overdueQuery, appointmentsQuery];
+  const queries = [clientsQuery, animalsQuery, revenueQuery, overdueQuery, appointmentsQuery, salesChartQuery];
   const isLoading = queries.some((q) => q.isLoading);
   const isBackendUp = !queries.some((q) => q.isError);
 
@@ -74,6 +79,31 @@ const Dashboard = () => {
           label="Overdue Treatments"
           value={isLoading ? "…" : overdueQuery.data?.length ?? 0}
         />
+      </div>
+
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-slate-800">
+          <LineChartIcon size={18} className="text-purple-600" /> Sales — Last 12 Months
+        </h3>
+        {salesChartQuery.isLoading ? (
+          <p className="text-sm text-slate-400">Loading…</p>
+        ) : !salesChartQuery.data?.some((m) => m.revenue > 0) ? (
+          <p className="text-sm text-slate-400">No paid invoices yet — this chart fills in as invoices get marked paid.</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={salesChartQuery.data} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#64748b" }} />
+              <YAxis
+                tick={{ fontSize: 12, fill: "#64748b" }}
+                tickFormatter={(v) => `R${v >= 1000 ? `${Math.round(v / 1000)}k` : v}`}
+                width={56}
+              />
+              <Tooltip formatter={(value) => [fmtCurrency(value), "Revenue"]} />
+              <Line type="monotone" dataKey="revenue" stroke="#059669" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
