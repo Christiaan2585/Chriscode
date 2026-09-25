@@ -8,8 +8,8 @@
     "frontend:dev": "cd frontend && npm run dev",
     "dev": "concurrently \"npm run frontend:dev\" \"npm run electron:dev\"",
     "build": "cd frontend && npm run build",
-    "package": "npm run build && electron-builder build --win",
-    "release": "npm run build && electron-builder build --win --publish always"
+    "package": "npm run build && node scripts/build-installer.js",
+    "release": "npm run build && node scripts/build-installer.js --publish"
   },
   "keywords": [],
   "author": "Sandveld Vee Dienste",
@@ -51,7 +51,8 @@
     "files": [
       "**/*",
       "!frontend/node_modules",
-      "!frontend/src"
+      "!frontend/src",
+      "!scripts"
     ],
     "extraResources": [
       {
