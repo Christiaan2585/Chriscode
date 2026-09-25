@@ -1,0 +1,94 @@
+SANDVELD VEE DIENSTE - END USER LICENCE AGREEMENT AND PRIVACY NOTICE
+
+Version 1.0, effective 25 September 2026
+Copyright (c) 2026 Sandveld Vee Dienste. All rights reserved.
+
+Please read this agreement before installing or using the Sandveld Vee Dienste software (the "Software"). By clicking "I Agree", installing, or using the Software, you (the person or business installing or using it, "you") accept this agreement. If you do not accept it, do not install or use the Software.
+
+1. OWNERSHIP
+
+1.1 The Software, including its source code, design, screens, logo, documentation and updates, is owned by Sandveld Vee Dienste ("we", "us") and is protected by the Copyright Act 98 of 1978 and other intellectual property laws.
+
+1.2 The Software is licensed to you, not sold. Apart from the licence in section 2, no rights are granted to you, whether expressly or by implication. The fact that the Software's source code can be viewed online does not grant any licence to use, copy or change it.
+
+2. LICENCE
+
+2.1 We grant you a non-exclusive, non-transferable, revocable licence to install and use the Software on computers you own or control, for your own internal business purposes of managing livestock, clients, treatments, stock and invoicing.
+
+2.2 Your employees and contractors may use the Software on your behalf. You are responsible for their use of it and for keeping their login details secure.
+
+3. RESTRICTIONS
+
+You may not, and may not allow anyone else to:
+(a) copy the Software, except as needed to install it and to keep reasonable backups;
+(b) modify, adapt, translate, decompile or reverse engineer the Software, except to the extent the law expressly allows despite this restriction;
+(c) sell, rent, lend, sublicense, distribute or otherwise make the Software available to anyone else;
+(d) remove or change any copyright, trademark or other notice in the Software;
+(e) use the Software for any unlawful purpose or in breach of anyone else's rights.
+
+4. YOUR DATA
+
+4.1 You own all information you enter into the Software ("Your Data"), including client, animal, treatment, product and invoice records.
+
+4.2 Your Data is stored in a database file on your own computer. Settings shows where it is. We do not receive, store or have access to Your Data.
+
+4.3 You are responsible for Your Data, including keeping backups. The Software can make automatic backups, restore them and export your data to Excel, but you should also keep a copy somewhere other than the computer the Software runs on.
+
+4.4 Where Your Data includes personal information about other people (for example your clients' names and contact details), you are the responsible party for that information under the Protection of Personal Information Act 4 of 2013 (POPIA). You must have a lawful reason to process it, keep it secure, and deal with requests from the people it concerns. Authorised users must keep client information confidential.
+
+5. PRIVACY - WHAT THE SOFTWARE SENDS OVER THE INTERNET
+
+The Software works mainly offline on your computer and contains no analytics, advertising or tracking. It connects to the following services only for the purposes described:
+
+(a) Weather (Open-Meteo, open-meteo.com): to show a forecast, the Software sends Open-Meteo the approximate map coordinates of the chosen location, or the town name you search for. If you allow it, Windows location services work out this computer's location. The chosen location is saved on this computer only.
+(b) Software updates (GitHub, github.com): the Software checks GitHub for new versions and downloads them from there. No business data is sent.
+(c) Google sign-in (only if switched on): if you choose "Sign in with Google", Google handles the sign-in and the Software receives your name and email address from Google.
+(d) WhatsApp and phone links: when you click a client's WhatsApp or phone link, the number (and any pre-filled message) is passed to WhatsApp or your phone app. Nothing is sent unless you click.
+
+Like any internet request, these services can see this computer's IP address. Their own terms and privacy policies apply to what they receive.
+
+6. IMPORTANT DISCLAIMERS
+
+6.1 Dosage calculator: dosage figures are an aid only. Some are marked as low-confidence or unverified. Before treating any animal, always check the dose against the registered product label or package insert and follow a veterinarian's instructions. You remain fully responsible for every treatment decision.
+
+6.2 Weather and livestock alerts: forecasts come from a third party and may be wrong, late or unavailable. Do not rely on them alone for animal welfare or safety decisions.
+
+6.3 Invoices, VAT and financial figures: check invoices, quotes, VAT calculations and reports before relying on them or sending them to anyone. The Software does not give tax, accounting or legal advice.
+
+7. WARRANTY
+
+The Software is provided "as is" and "as available". To the fullest extent allowed by law, we give no warranty that it will be error-free, uninterrupted or fit for a particular purpose. Nothing in this agreement limits any right you have under the Consumer Protection Act 68 of 2008 or any other law that cannot lawfully be excluded.
+
+8. LIMITATION OF LIABILITY
+
+8.1 To the fullest extent allowed by law, we are not liable for any indirect, special or consequential loss, or for loss of profit, business, data or goodwill, arising from the use of or inability to use the Software.
+
+8.2 To the fullest extent allowed by law, our total liability under or in connection with this agreement is limited to the amount you paid us for the Software in the 12 months before the claim arose, or R1 000 if you paid nothing.
+
+8.3 Nothing in this agreement limits liability for fraud, gross negligence or wilful misconduct, or any liability that cannot lawfully be limited.
+
+9. UPDATES
+
+The Software may download and install updates automatically. This agreement applies to all updates unless an update comes with a different agreement. The Software backs up your database before a new version first runs.
+
+10. TERMINATION
+
+10.1 This licence ends automatically if you breach this agreement. We may also end it by written notice.
+
+10.2 When the licence ends you must stop using the Software and uninstall it. Your Data remains yours: you may keep the database file and any backups or exports.
+
+11. GENERAL
+
+11.1 This agreement is governed by the laws of the Republic of South Africa, and the courts of South Africa have jurisdiction.
+
+11.2 Accepting this agreement electronically is valid and binding under the Electronic Communications and Transactions Act 25 of 2002.
+
+11.3 This agreement is the entire agreement between you and us about the Software. If any part of it is unenforceable, the rest remains in force. If we do not enforce a right, we have not waived it.
+
+11.4 We may update this agreement. The current version is included with the Software and can be read in Settings. Continuing to use the Software after an update means you accept the updated agreement.
+
+11.5 The Software includes open-source components (such as Electron, React and FastAPI) that are licensed under their own terms. Nothing in this agreement limits your rights under those licences.
+
+12. CONTACT
+
+Questions about this agreement, or privacy requests: Sandveld Vee Dienste, [CONTACT EMAIL].

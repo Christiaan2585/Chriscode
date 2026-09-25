@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Info, Landmark, Database, ShieldCheck, Users as UsersIcon, UserPlus, Trash2, UploadCloud, Package, Users, ClipboardList, RefreshCw, CheckCircle2, DownloadCloud, AlertTriangle, FolderOpen } from "lucide-react";
+import { Info, Landmark, Database, ShieldCheck, Users as UsersIcon, UserPlus, Trash2, UploadCloud, Package, Users, ClipboardList, RefreshCw, CheckCircle2, DownloadCloud, AlertTriangle, FolderOpen, Scale } from "lucide-react";
 import apiClient from "../api/client";
 import { authService } from "../api/authService";
 import { useAuth } from "../context/AuthContext";
 import ImportModal from "../components/ImportModal";
 import { isUpdaterAvailable, checkForUpdates, quitAndInstall, getUpdateStatus, onUpdateStatus } from "../utils/updater";
 import { canChooseFolder, canOpenFolder, chooseFolder, openFolder } from "../utils/desktop";
+import licenceText from "../legal/EULA.txt?raw";
 
 const SoftwareUpdateSettings = ({ currentVersion }) => {
   const [status, setStatus] = useState({ state: "idle" });
@@ -123,6 +124,32 @@ const IMPORT_TYPES = {
     createdLabel: "programs created",
     updatedLabel: "animal groups added or changed",
   },
+};
+
+const LegalSettings = () => {
+  const [showLicence, setShowLicence] = useState(false);
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-3">
+      <h3 className="flex items-center gap-2 font-semibold text-slate-800">
+        <Scale size={18} /> Legal
+      </h3>
+      <p className="text-sm text-slate-600">Copyright &copy; 2026 Sandveld Vee Dienste. All rights reserved.</p>
+      <button
+        type="button"
+        onClick={() => setShowLicence((shown) => !shown)}
+        aria-expanded={showLicence}
+        className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-emerald-400 hover:bg-emerald-50/40 transition-colors"
+      >
+        {showLicence ? "Hide" : "Read"} the licence agreement and privacy notice
+      </button>
+      {showLicence && (
+        <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-4 font-sans text-xs leading-relaxed text-slate-600">
+          {licenceText}
+        </pre>
+      )}
+    </div>
+  );
 };
 
 const DataImportSettings = () => {
@@ -386,6 +413,8 @@ const Settings = () => {
       </div>
 
       <BackupSettings databasePath={version?.database_path} />
+
+      <LegalSettings />
     </div>
   );
 };

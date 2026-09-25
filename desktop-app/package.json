@@ -13,7 +13,7 @@
   },
   "keywords": [],
   "author": "Sandveld Vee Dienste",
-  "license": "ISC",
+  "license": "UNLICENSED",
   "type": "commonjs",
   "devDependencies": {
     "concurrently": "^8.2.2",
@@ -46,7 +46,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "artifactName": "${name}-Setup-${version}.${ext}"
+      "artifactName": "${name}-Setup-${version}.${ext}",
+      "license": "frontend/src/legal/EULA.txt"
     },
     "files": [
       "**/*",
@@ -64,6 +65,7 @@
       "provider": "github",
       "owner": "Christiaan2585",
       "repo": "Chriscode"
-    }
+    },
+    "copyright": "Copyright (c) 2026 Sandveld Vee Dienste. All rights reserved."
   }
 }
