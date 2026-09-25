@@ -1,6 +1,6 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 from typing import List, Optional
 import io
 import pandas as pd
@@ -165,14 +165,18 @@ async def import_programs(file: UploadFile = File(...), session: Session = Depen
     exact, case-insensitive name or email - this endpoint never creates a
     client, since a program needs a real client to belong to), a Program
     Name, an Animal Type and a Count. Goal/Start Date/End Date are optional
-    and only need to appear once per program (the first non-blank value for
-    that program wins).
+    and read from each program's first row; a blank cell keeps what the
+    program already has.
+
+    Programs merge rather than duplicate: a row matches the client's existing
+    program of the same name (case-insensitive, oldest first if there are
+    already copies), and an animal type the program already has gets the
+    file's count instead of a second group. So re-importing a file is safe,
+    and an edited file updates the counts. Groups not in the file are left
+    alone - an import never deletes anything.
 
     Every row is handled independently so one bad row can't abort the whole
-    import. Re-importing the same file creates a second copy of each
-    program rather than merging into the one from the first import - there
-    is no "already imported" tracking (v1 limitation, same as this app's
-    other importers don't yet dedupe across separate import runs)."""
+    import."""
     if not file.filename.endswith((".xlsx", ".xls", ".csv")):
         raise HTTPException(status_code=400, detail="File must be an Excel (.xlsx/.xls) or .csv file")
 
@@ -196,11 +200,15 @@ async def import_programs(file: UploadFile = File(...), session: Session = Depen
             ),
         )
 
-    created_programs, created_groups, skipped = 0, 0, 0
+    created_programs, skipped = 0, 0
     errors = []
-    # Groups rows into one HerdingProgram per (client_id, program name) seen
-    # so far in this import, rather than one row = one program.
+    # (client_id, lowercased program name) -> HerdingProgram, so every row of
+    # one program in this file lands on the same program.
     programs_by_key: dict = {}
+    # (program_id, lowercased animal type) -> (AnimalGroup, size before this
+    # import, or None if new). A type seen before this import is replaced by
+    # the file's count; repeats within the file add up.
+    groups_touched: dict = {}
 
     for excel_row_num, row_dict in enumerate(df.to_dict(orient="records"), start=2):
         try:
@@ -232,27 +240,46 @@ async def import_programs(file: UploadFile = File(...), session: Session = Depen
             key = (client.id, program_name.lower())
             program = programs_by_key.get(key)
             if program is None:
-                program = HerdingProgram(
-                    name=program_name,
-                    client_id=client.id,
-                    goal=_clean(row_dict.get(column_map.get("goal"))) if "goal" in column_map else None,
-                    start_date=_parse_date(row_dict.get(column_map.get("start_date"))) if "start_date" in column_map else None,
-                    end_date=_parse_date(row_dict.get(column_map.get("end_date"))) if "end_date" in column_map else None,
-                )
+                program = session.exec(
+                    select(HerdingProgram)
+                    .where(HerdingProgram.client_id == client.id,
+                           func.lower(HerdingProgram.name) == program_name.lower())
+                    .order_by(HerdingProgram.id)
+                ).first()
+                if program is None:
+                    program = HerdingProgram(name=program_name, client_id=client.id)
+                    created_programs += 1
+                goal = _clean(row_dict.get(column_map["goal"])) if "goal" in column_map else None
+                start = _parse_date(row_dict.get(column_map["start_date"])) if "start_date" in column_map else None
+                end = _parse_date(row_dict.get(column_map["end_date"])) if "end_date" in column_map else None
+                program.goal = goal or program.goal
+                program.start_date = start or program.start_date
+                program.end_date = end or program.end_date
                 session.add(program)
                 session.flush()  # assigns program.id without ending the transaction
                 programs_by_key[key] = program
-                created_programs += 1
 
-            session.add(AnimalGroup(program_id=program.id, animal_type=animal_type, group_size=count))
-            created_groups += 1
+            group_key = (program.id, animal_type.lower())
+            if group_key in groups_touched:
+                groups_touched[group_key][0].group_size += count
+            else:
+                group = session.exec(
+                    select(AnimalGroup).where(AnimalGroup.program_id == program.id,
+                                              func.lower(AnimalGroup.animal_type) == animal_type.lower())
+                ).first()
+                previous_size = group.group_size if group else None
+                if group is None:
+                    group = AnimalGroup(program_id=program.id, animal_type=animal_type)
+                group.group_size = count
+                session.add(group)
+                groups_touched[group_key] = (group, previous_size)
         except Exception as exc:
             errors.append({"row": excel_row_num, "error": str(exc)})
 
     session.commit()
     return {
         "created": created_programs,
-        "updated": created_groups,
+        "updated": sum(1 for group, before in groups_touched.values() if group.group_size != before),
         "skipped_blank": skipped,
         "columns_matched": column_map,
         "errors": errors,

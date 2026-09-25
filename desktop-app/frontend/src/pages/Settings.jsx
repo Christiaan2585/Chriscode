@@ -121,7 +121,7 @@ const IMPORT_TYPES = {
     columnHint: "One row per animal type: Client (name or email), Program Name, Animal Type, Count. Goal/Start Date/End Date are optional. The client must already exist.",
     invalidateKeys: [["programs"]],
     createdLabel: "programs created",
-    updatedLabel: "animal groups added",
+    updatedLabel: "animal groups added or changed",
   },
 };
 
