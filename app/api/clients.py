@@ -10,6 +10,7 @@ from typing import List, Optional
 import io
 import pandas as pd
 from app.core.db import get_session
+from app.core import cascade
 from app.models.client import Client
 
 router = APIRouter(prefix="/clients", tags=["Clients"])
@@ -67,7 +68,10 @@ def delete_client(client_id: int, session: Session = Depends(get_session)):
     client = session.get(Client, client_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    session.delete(client)
+    try:
+        cascade.delete_client(session, client)
+    except cascade.InUseError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     session.commit()
     return {"ok": True}
 

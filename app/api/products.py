@@ -5,6 +5,7 @@ import re
 import io
 from openpyxl import load_workbook
 from app.core.db import get_session
+from app.core import cascade
 from app.models.product import Product
 
 router = APIRouter(prefix="/products", tags=["Products"])
@@ -43,7 +44,10 @@ def delete_product(product_id: int, session: Session = Depends(get_session)):
     product = session.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    session.delete(product)
+    try:
+        cascade.delete_product(session, product)
+    except cascade.InUseError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     session.commit()
     return {"ok": True}
 

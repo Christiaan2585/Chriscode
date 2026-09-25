@@ -3,12 +3,14 @@ from sqlmodel import Session, select
 from typing import List
 from datetime import datetime, timedelta
 from app.core.db import get_session
+from app.core.dates import coerce_datetime
 from app.models.schedule import HealthSchedule
 
 router = APIRouter(prefix="/schedules", tags=["Health Schedules"])
 
 @router.post("/", response_model=HealthSchedule)
 def create_schedule(schedule: HealthSchedule, session: Session = Depends(get_session)):
+    schedule.last_date = coerce_datetime(schedule.last_date)
     session.add(schedule)
     session.commit()
     session.refresh(schedule)

@@ -48,9 +48,15 @@ async def catch_unhandled_exceptions(request: Request, call_next):
         return JSONResponse(status_code=500, content={"detail": f"Server error: {exc}"})
 
 
+# Only the dev frontend (Vite) is a browser origin that legitimately calls
+# this API. The packaged app loads from file:// and Electron sends no Origin
+# header for those requests (verified), and the Streamlit dashboard calls
+# from Python - neither is subject to CORS. With "*", any website open in
+# the user's normal browser could script requests at this localhost API
+# (e.g. hammer /auth/login, or claim /auth/setup on a fresh install).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

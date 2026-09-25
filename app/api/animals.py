@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List, Optional
 from app.core.db import get_session
+from app.core import cascade
 from app.core.dates import coerce_datetime
 from app.models.animal import Animal
 
@@ -66,6 +67,6 @@ def delete_animal(animal_id: int, session: Session = Depends(get_session)):
     animal = session.get(Animal, animal_id)
     if not animal:
         raise HTTPException(status_code=404, detail="Animal not found")
-    session.delete(animal)
+    cascade.delete_animal(session, animal)
     session.commit()
     return {"ok": True}

@@ -15,8 +15,8 @@ def _add_months(date: datetime, months: int) -> datetime:
 
 @router.get("/revenue", response_model=Dict)
 def get_revenue_stats(session: Session = Depends(get_session)):
-    # Total revenue
-    statement = select(func.sum(Invoice.total_amount))
+    # Total revenue - a cancelled invoice was never revenue.
+    statement = select(func.sum(Invoice.total_amount)).where(Invoice.status != "cancelled")
     total = session.exec(statement).first() or 0.0
 
     # Unpaid revenue

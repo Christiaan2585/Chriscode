@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
 from app.core.db import get_session
+from app.core import cascade
 from app.models.herd import Herd
 
 router = APIRouter(prefix="/herds", tags=["Herds"])
@@ -45,6 +46,6 @@ def delete_herd(herd_id: int, session: Session = Depends(get_session)):
     herd = session.get(Herd, herd_id)
     if not herd:
         raise HTTPException(status_code=404, detail="Herd not found")
-    session.delete(herd)
+    cascade.delete_herd(session, herd)
     session.commit()
     return {"ok": True}
