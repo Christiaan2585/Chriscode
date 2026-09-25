@@ -484,7 +484,7 @@ ipcMain.handle('google-oauth-login', async (_event, { clientId }) => {
 // GRANT every permission request (geolocation included) with no dialog at
 // all - the opposite of a normal browser. The weather widget needs a real,
 // one-time "Allow location access?" prompt (asked once, then remembered by
-// the renderer - see WeatherWidget.jsx), so that prompt has to be shown
+// the renderer - see frontend/src/pages/Weather.jsx), so that prompt has to be shown
 // explicitly here. Every other permission type (camera, microphone,
 // notifications, etc.) is denied by default - this app doesn't use them.
 function registerPermissionHandler() {
@@ -498,7 +498,7 @@ function registerPermissionHandler() {
         title: 'Location access',
         message: "Allow Sandveld Vee Dienste to use this computer's location for local weather?",
         detail: 'Used only to show the weather forecast for your area. You can change this ' +
-          'later from the Weather widget on the Dashboard ("Change location").',
+          'later on the Weather page ("Change location").',
       }).then((result) => callback(result.response === 0));
       return;
     }
@@ -513,8 +513,9 @@ function registerPermissionHandler() {
 // into index.html in dev mode (there's no way around that, it's how HMR
 // wires itself up), which a strict script-src would break. The production
 // build has no such thing - `npm run build`'s output is plain external
-// <script src>/<link> tags with zero inline script or style anywhere in this
-// app (verified: no `style={{...}}` usage, no CSS-in-JS) - so the packaged
+// <script src>/<link> tags with zero inline script or <style> elements
+// (React `style={{...}}` props are fine: React applies them through the
+// CSSOM, which style-src doesn't restrict) - so the packaged
 // app can and does run under a real, strict CSP with no 'unsafe-inline'
 // exceptions at all. app.isPackaged is what keeps dev mode unaffected.
 function registerContentSecurityPolicy() {
@@ -532,7 +533,7 @@ function registerContentSecurityPolicy() {
     // here silently blocked every API call (caught by actually launching
     // the packaged build and watching it fail to reach the backend, not by
     // reading the code). The open-meteo ones are the Weather widget's
-    // forecast/geocoding lookups (see WeatherWidget.jsx).
+    // forecast/geocoding lookups (see frontend/src/pages/Weather.jsx).
     "connect-src 'self' http://127.0.0.1:8000 http://localhost:8000 https://api.open-meteo.com https://geocoding-api.open-meteo.com",
     "object-src 'none'",
     "base-uri 'self'",
