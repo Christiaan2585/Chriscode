@@ -43,3 +43,6 @@ Thumbs.db
 # built exe is large, so it doesn't belong in git.
 /build/
 desktop-app/backend/
+
+# Real Sage exports used to build the importer - client data, never commit
+sage-samples/

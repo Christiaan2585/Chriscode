@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Dog, Activity, Scale, Calendar, Plus, Trash2, Check, StickyNote,
   Phone, MessageCircle, Edit, Briefcase, Mail, MapPin, ClipboardList,
-  FileText, ShoppingCart, Download, ChevronRight, ChevronDown, ChevronUp, Clock, CheckCircle, Ban,
+  FileText, ShoppingCart, Download, Eye, ChevronRight, ChevronDown, ChevronUp, Clock, CheckCircle, Ban,
 } from "lucide-react";
 import { clientService, animalService } from "../api/services";
 import apiClient from "../api/client";
@@ -12,27 +12,20 @@ import { toTelLink, toWhatsAppLink } from "../utils/contact";
 import Modal from "../components/Modal";
 import MedicalModal from "../components/MedicalModal";
 import WeightModal from "../components/WeightModal";
+import DocumentPreview from "../components/DocumentPreview";
+import { DocumentHover } from "../components/PreviewCards";
+import { downloadDocumentPdf } from "../utils/documents";
+import { money, statusStyle } from "../utils/format";
 
 const SPECIES_OPTIONS = ["Goats", "Sheep", "Cows", "Horses", "Pigs"];
 // Youngest first, so the animal registry reads "young to old".
 const AGE_GROUP_ORDER = ["Young", "Adult"];
 
-const STATUS_STYLES = {
-  Draft: "bg-slate-100 text-slate-700",
-  Sent: "bg-blue-100 text-blue-700",
-  Accepted: "bg-emerald-100 text-emerald-700",
-  Pending: "bg-amber-100 text-amber-700",
-  Paid: "bg-emerald-100 text-emerald-700",
-  Shipped: "bg-blue-100 text-blue-700",
-  unpaid: "bg-amber-100 text-amber-700",
-  cancelled: "bg-red-100 text-red-700",
-};
-const statusStyle = (s) => STATUS_STYLES[s] || "bg-slate-100 text-slate-700";
-const money = (n) => `R ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const ClientDetail = () => {
   const { id } = useParams();
   const queryClient = useQueryClient();
+  const [preview, setPreview] = useState(null);
 
   const [isAnimalModalOpen, setIsAnimalModalOpen] = useState(false);
   const [newAnimal, setNewAnimal] = useState({ name: "", species: SPECIES_OPTIONS[0], breed: "" });
@@ -270,18 +263,6 @@ const ClientDetail = () => {
     mutationFn: async (appointmentId) => (await apiClient.delete(`/appointments/${appointmentId}`)).data,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments", "client", id] }),
   });
-
-  const downloadInvoicePdf = async (invoiceId) => {
-    const response = await apiClient.get(`/invoices/${invoiceId}/pdf`, { responseType: "blob" });
-    const url = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `invoice_${invoiceId}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  };
 
   if (clientLoading) return <div className="p-8 text-center">Loading client details...</div>;
   if (!client) return <div className="p-8 text-center">Client not found.</div>;
@@ -819,7 +800,7 @@ const ClientDetail = () => {
                   .map((q) => (
                     <div key={q.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-lg text-sm">
                       <div>
-                        <div className="font-medium text-slate-700">Quote #{q.id} — {money(q.total_amount)}</div>
+                        <DocumentHover kind="quote" doc={q} className="font-medium text-slate-700">Quote #{q.id} — {money(q.total_amount)}</DocumentHover>
                         <div className="text-xs text-slate-400">{new Date(q.date).toLocaleDateString()}</div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -832,6 +813,20 @@ const ClientDetail = () => {
                           <option value="Sent">Sent</option>
                           <option value="Accepted">Accepted</option>
                         </select>
+                        <button
+                          onClick={() => setPreview({ kind: "quote", id: q.id })}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                          title="Preview"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button
+                          onClick={() => downloadDocumentPdf("quote", q.id)}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                          title="Download PDF"
+                        >
+                          <Download size={16} />
+                        </button>
                         <button
                           onClick={() => {
                             if (window.confirm(`Delete quote #${q.id}? This can't be undone.`)) {
@@ -919,7 +914,7 @@ const ClientDetail = () => {
                   .map((inv) => (
                     <div key={inv.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-lg text-sm">
                       <div>
-                        <div className="font-medium text-slate-700">Invoice #{inv.id} — {money(inv.total_amount)}</div>
+                        <DocumentHover kind="invoice" doc={inv} className="font-medium text-slate-700">Invoice #{inv.id} — {money(inv.total_amount)}</DocumentHover>
                         <div className="text-xs text-slate-400">{new Date(inv.date).toLocaleDateString()}</div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -933,7 +928,14 @@ const ClientDetail = () => {
                           <option value="cancelled">Cancelled</option>
                         </select>
                         <button
-                          onClick={() => downloadInvoicePdf(inv.id)}
+                          onClick={() => setPreview({ kind: "invoice", id: inv.id })}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                          title="Preview"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button
+                          onClick={() => downloadDocumentPdf("invoice", inv.id)}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
                           title="Download PDF"
                         >
@@ -1308,6 +1310,8 @@ const ClientDetail = () => {
           animalName={weightTarget.name}
         />
       )}
+
+      <DocumentPreview doc={preview} onClose={() => setPreview(null)} />
     </div>
   );
 };

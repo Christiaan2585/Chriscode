@@ -5,13 +5,16 @@
 # (or reviewer) reading only this file will see no auth and should check
 # app/main.py before concluding these routes are open.
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 from typing import List, Optional
 import io
 import pandas as pd
 from app.core.db import get_session
 from app.core import cascade
+from app.models.animal import Animal
 from app.models.client import Client
+from app.models.invoice import Invoice
+from app.models.quote import Quote
 
 router = APIRouter(prefix="/clients", tags=["Clients"])
 
@@ -44,6 +47,31 @@ def read_client(client_id: int, session: Session = Depends(get_session)):
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     return client
+
+@router.get("/{client_id}/summary")
+def read_client_summary(client_id: int, session: Session = Depends(get_session)):
+    """The numbers behind the client hover card, in one request."""
+    if not session.get(Client, client_id):
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    animal_count = session.exec(
+        select(func.count()).select_from(Animal).where(Animal.client_id == client_id)
+    ).one()
+    invoices = session.exec(
+        select(Invoice).where(Invoice.client_id == client_id, Invoice.status != "cancelled")
+    ).all()
+    unpaid = [i for i in invoices if i.status == "unpaid"]
+    open_quote_count = session.exec(
+        select(func.count()).select_from(Quote)
+        .where(Quote.client_id == client_id, Quote.status.in_(["Draft", "Sent"]))
+    ).one()
+    return {
+        "animal_count": animal_count,
+        "unpaid_invoice_count": len(unpaid),
+        "outstanding": round(sum(i.total_amount for i in unpaid), 2),
+        "last_invoice_date": max((i.date for i in invoices), default=None),
+        "open_quote_count": open_quote_count,
+    }
 
 @router.put("/{client_id}", response_model=Client)
 def update_client(client_id: int, client_data: Client, session: Session = Depends(get_session)):

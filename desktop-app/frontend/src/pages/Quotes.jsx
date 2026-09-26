@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
-import { Plus, Search, FileText, Trash2, Edit, Save, X, Download } from "lucide-react";
+import { Plus, Search, FileText, Trash2, Edit, Save, X, Download, Eye } from "lucide-react";
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
 import Modal from "../components/Modal";
 import SearchableSelect from "../components/SearchableSelect";
+import DocumentPreview from "../components/DocumentPreview";
+import { ClientHover, DocumentHover } from "../components/PreviewCards";
+import { downloadDocumentPdf } from "../utils/documents";
 
 const emptyQuote = { client_id: "", status: "Draft" };
 
@@ -176,21 +179,7 @@ const Quotes = () => {
   const removeExistingItem = (id) => setRemovedItemIds([...removedItemIds, id]);
   const restoreExistingItem = (id) => setRemovedItemIds(removedItemIds.filter((i) => i !== id));
 
-  const downloadQuotePdf = async (id) => {
-    const response = await apiClient.get(`/quotes/${id}/pdf`, {
-      responseType: "blob",
-    });
-    const url = window.URL.createObjectURL(
-      new Blob([response.data], { type: "application/pdf" })
-    );
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `quote_${id}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  };
+  const [preview, setPreview] = useState(null);
 
   if (isLoading) return <div className="p-8 text-center">Loading quotes...</div>;
 
@@ -235,8 +224,12 @@ const Quotes = () => {
           <tbody className="divide-y divide-slate-100">
             {filteredQuotes.map(q => (
               <tr key={q.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4 text-slate-600">{new Date(q.date).toLocaleDateString()}</td>
-                <td className="px-6 py-4 text-slate-600">{clientName(q.client_id)}</td>
+                <td className="px-6 py-4 text-slate-600">
+                  <DocumentHover kind="quote" doc={q} clientName={clientName(q.client_id)}>{new Date(q.date).toLocaleDateString()}</DocumentHover>
+                </td>
+                <td className="px-6 py-4 text-slate-600">
+                  <ClientHover client={clients?.find((c) => c.id === q.client_id)}>{clientName(q.client_id)}</ClientHover>
+                </td>
                 <td className="px-6 py-4 font-medium text-slate-800">R {q.total_amount.toLocaleString()}</td>
                 <td className="px-6 py-4">
                   <span className={`px-2 py-1 rounded-full text-xs font-bold ${
@@ -248,7 +241,14 @@ const Quotes = () => {
                 </td>
                 <td className="px-6 py-4 text-right flex justify-end gap-2">
                   <button
-                    onClick={() => downloadQuotePdf(q.id)}
+                    onClick={() => setPreview({ kind: "quote", id: q.id })}
+                    className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
+                    title="Preview"
+                  >
+                    <Eye size={18} />
+                  </button>
+                  <button
+                    onClick={() => downloadDocumentPdf("quote", q.id)}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
                     title="Download PDF"
                   >
@@ -406,6 +406,8 @@ const Quotes = () => {
           </div>
         </div>
       </Modal>
+
+      <DocumentPreview doc={preview} onClose={() => setPreview(null)} />
     </div>
   );
 };

@@ -1,10 +1,13 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, FileText, Trash2, Download, X, Edit } from "lucide-react";
+import { Plus, Search, FileText, Trash2, Download, X, Edit, Eye } from "lucide-react";
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
 import Modal from "../components/Modal";
 import SearchableSelect from "../components/SearchableSelect";
+import DocumentPreview from "../components/DocumentPreview";
+import { ClientHover, DocumentHover } from "../components/PreviewCards";
+import { downloadDocumentPdf } from "../utils/documents";
 
 const emptyInvoice = { client_id: "", status: "unpaid", notes: "" };
 
@@ -18,6 +21,7 @@ const Invoices = () => {
   const [removedItemIds, setRemovedItemIds] = useState([]);
   const [newItem, setNewItem] = useState({ product_id: "", quantity: 1 });
   const [search, setSearch] = useState("");
+  const [preview, setPreview] = useState(null);
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["invoices"],
@@ -179,22 +183,6 @@ const Invoices = () => {
     setRemovedItemIds(removedItemIds.filter((id) => id !== itemId));
   };
 
-  const downloadInvoicePdf = async (id) => {
-    const response = await apiClient.get(`/invoices/${id}/pdf`, {
-      responseType: "blob",
-    });
-    const url = window.URL.createObjectURL(
-      new Blob([response.data], { type: "application/pdf" })
-    );
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `invoice_${id}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  };
-
   const handleSave = () => {
     saveInvoiceMutation.mutate({
       invoiceData: invoice,
@@ -253,9 +241,13 @@ const Invoices = () => {
           <tbody className="divide-y divide-slate-100">
             {filteredInvoices.map((inv) => (
               <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4 text-slate-600 font-medium">#{inv.id}</td>
+                <td className="px-6 py-4 text-slate-600 font-medium">
+                  <DocumentHover kind="invoice" doc={inv} clientName={clientName(inv.client_id)}>#{inv.id}</DocumentHover>
+                </td>
                 <td className="px-6 py-4 text-slate-600">{new Date(inv.date).toLocaleDateString()}</td>
-                <td className="px-6 py-4 text-slate-600">{clientName(inv.client_id)}</td>
+                <td className="px-6 py-4 text-slate-600">
+                  <ClientHover client={clients?.find((c) => c.id === inv.client_id)}>{clientName(inv.client_id)}</ClientHover>
+                </td>
                 <td className="px-6 py-4 font-medium text-slate-800">R {inv.total_amount.toLocaleString()}</td>
                 <td className="px-6 py-4">
                   <span
@@ -272,7 +264,14 @@ const Invoices = () => {
                 </td>
                 <td className="px-6 py-4 text-right flex justify-end gap-2">
                   <button
-                    onClick={() => downloadInvoicePdf(inv.id)}
+                    onClick={() => setPreview({ kind: "invoice", id: inv.id })}
+                    className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
+                    title="Preview"
+                  >
+                    <Eye size={18} />
+                  </button>
+                  <button
+                    onClick={() => downloadDocumentPdf("invoice", inv.id)}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
                     title="Download PDF"
                   >
@@ -437,6 +436,8 @@ const Invoices = () => {
           </div>
         </div>
       </Modal>
+
+      <DocumentPreview doc={preview} onClose={() => setPreview(null)} />
     </div>
   );
 };

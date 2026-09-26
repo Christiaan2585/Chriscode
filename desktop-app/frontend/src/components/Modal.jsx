@@ -1,16 +1,19 @@
 import React from "react";
 import { X } from "lucide-react";
 
-const Modal = ({ isOpen, onClose, title, children }) => {
+const WIDTHS = { md: "max-w-lg", xl: "max-w-5xl" };
+
+const Modal = ({ isOpen, onClose, title, children, size = "md" }) => {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm transition-opacity">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
+      <div className={`bg-white rounded-2xl shadow-2xl w-full ${WIDTHS[size]} overflow-hidden transform transition-all`}>
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
           <h3 className="text-xl font-semibold text-slate-800">{title}</h3>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
           >
             <X size={20} />

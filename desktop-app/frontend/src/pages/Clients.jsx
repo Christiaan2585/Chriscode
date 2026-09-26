@@ -5,6 +5,7 @@ import { Plus, Search, User, Trash2, Edit, Phone, MessageCircle } from "lucide-r
 import { clientService } from "../api/services";
 import { toTelLink, toWhatsAppLink } from "../utils/contact";
 import Modal from "../components/Modal";
+import { ClientHover } from "../components/PreviewCards";
 
 const emptyClient = { name: "", email: "", phone: "", address: "", farm_name: "" };
 
@@ -151,7 +152,7 @@ const Clients = () => {
                     <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 shrink-0">
                       <User size={16} />
                     </div>
-                    <span className="font-medium text-slate-700">{client.name}</span>
+                    <ClientHover client={client} className="font-medium text-slate-700">{client.name}</ClientHover>
                   </td>
                   <td className="px-6 py-4 text-slate-600">{client.farm_name || "—"}</td>
                   <td className="px-6 py-4 text-slate-600">

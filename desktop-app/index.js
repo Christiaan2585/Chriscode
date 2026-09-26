@@ -537,11 +537,21 @@ function registerContentSecurityPolicy() {
     "connect-src 'self' http://127.0.0.1:8000 http://localhost:8000 https://api.open-meteo.com https://geocoding-api.open-meteo.com",
     "object-src 'none'",
     "base-uri 'self'",
-    "frame-src 'none'",
+    // Invoice/quote previews (components/DocumentPreview.jsx) show the PDF
+    // from a blob: URL the app itself creates, in Electron's PDF viewer.
+    "frame-src blob:",
     "form-action 'self'",
   ].join('; ');
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    // Electron's PDF viewer is itself a chrome-extension:// page with its own
+    // scripts and styles; our policy on it leaves an empty grey viewer
+    // (verified with a probe). It's Electron's code, not ours, so leave it
+    // on its own policy.
+    if (details.url.startsWith('chrome-extension://')) {
+      callback({});
+      return;
+    }
     callback({
       responseHeaders: {
         ...details.responseHeaders,
