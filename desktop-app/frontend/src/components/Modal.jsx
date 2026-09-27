@@ -1,7 +1,7 @@
 import React from "react";
 import { X } from "lucide-react";
 
-const WIDTHS = { md: "max-w-lg", xl: "max-w-5xl" };
+const WIDTHS = { md: "max-w-lg", lg: "max-w-3xl", xl: "max-w-5xl" };
 
 const Modal = ({ isOpen, onClose, title, children, size = "md" }) => {
   if (!isOpen) return null;

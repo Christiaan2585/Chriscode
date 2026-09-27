@@ -7,6 +7,8 @@ class Client(SQLModel, table=True):
     name: str
     email: Optional[str] = None
     phone: Optional[str] = None
-    address: Optional[str] = None
+    address: Optional[str] = None  # physical address
+    postal_address: Optional[str] = None
+    vat_number: Optional[str] = None
     farm_name: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)

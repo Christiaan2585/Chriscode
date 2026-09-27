@@ -8,9 +8,13 @@ import Modal from "../components/Modal";
 import SearchableSelect from "../components/SearchableSelect";
 import DocumentPreview from "../components/DocumentPreview";
 import { ClientHover, DocumentHover } from "../components/PreviewCards";
-import { downloadDocumentPdf } from "../utils/documents";
+import { downloadDocumentPdf, lineTotal } from "../utils/documents";
+import { newestFirst } from "../utils/format";
 
-const emptyQuote = { client_id: "", status: "Draft" };
+const emptyQuote = { client_id: "", status: "Draft", reference: "", expiry_date: "", notes: "" };
+const emptyLine = { product_id: "", quantity: 1, unit_price: 0, discount_percent: "" };
+const toDateInput = (d) => (d ? String(d).slice(0, 10) : "");
+const offNote = (item) => (Number(item.discount_percent) ? `, ${item.discount_percent}% off` : "");
 
 const Quotes = () => {
   const queryClient = useQueryClient();
@@ -25,7 +29,7 @@ const Quotes = () => {
   const [removedItemIds, setRemovedItemIds] = useState([]);
   // Items added in this session that don't exist on the server yet.
   const [newItems, setNewItems] = useState([]);
-  const [newItem, setNewItem] = useState({ product_id: "", quantity: 1, unit_price: 0 });
+  const [newItem, setNewItem] = useState(emptyLine);
 
   const { data: quotes, isLoading } = useQuery({
     queryKey: ["quotes"],
@@ -50,9 +54,10 @@ const Quotes = () => {
     return (
       clientName(q.client_id).toLowerCase().includes(query) ||
       q.status?.toLowerCase().includes(query) ||
-      String(q.id).includes(query)
+      String(q.id).includes(query) ||
+      q.number?.toLowerCase().includes(query)
     );
-  });
+  }).sort(newestFirst);
 
   // Arriving from the Calculator's "Create Quote" button: open the builder
   // pre-loaded with the line item it worked out, instead of an empty form.
@@ -73,7 +78,7 @@ const Quotes = () => {
   const currentTotal = () => {
     const kept = existingItems.filter((i) => !removedItemIds.includes(i.id));
     const all = [...kept, ...newItems];
-    return all.reduce((sum, i) => sum + Number(i.quantity) * Number(i.unit_price), 0);
+    return all.reduce((sum, i) => sum + lineTotal(i.quantity, i.unit_price, i.discount_percent), 0);
   };
 
   const closeModal = () => {
@@ -83,7 +88,7 @@ const Quotes = () => {
     setExistingItems([]);
     setRemovedItemIds([]);
     setNewItems([]);
-    setNewItem({ product_id: "", quantity: 1, unit_price: 0 });
+    setNewItem(emptyLine);
   };
 
   const openAddModal = () => {
@@ -97,7 +102,13 @@ const Quotes = () => {
 
   const openEditModal = async (q) => {
     setEditingId(q.id);
-    setQuote({ client_id: q.client_id, status: q.status });
+    setQuote({
+      client_id: q.client_id,
+      status: q.status,
+      reference: q.reference || "",
+      expiry_date: toDateInput(q.expiry_date),
+      notes: q.notes || "",
+    });
     setNewItems([]);
     setRemovedItemIds([]);
     const items = (await apiClient.get(`/quotes/${q.id}/items`)).data;
@@ -107,13 +118,14 @@ const Quotes = () => {
 
   const saveQuoteMutation = useMutation({
     mutationFn: async () => {
-      const total = currentTotal();
       if (editingId) {
         await apiClient.put(`/quotes/${editingId}`, {
           client_id: Number(quote.client_id),
           status: quote.status,
+          reference: quote.reference || null,
+          expiry_date: quote.expiry_date || null,
+          notes: quote.notes || null,
           date: quotes.find((q) => q.id === editingId)?.date,
-          total_amount: total,
         });
         for (const itemId of removedItemIds) {
           await apiClient.delete(`/quotes/items/${itemId}`);
@@ -123,7 +135,8 @@ const Quotes = () => {
             product_id: Number(item.product_id),
             quantity: item.quantity,
             unit_price: item.unit_price,
-            subtotal: item.quantity * item.unit_price,
+            discount_percent: Number(item.discount_percent) || 0,
+            subtotal: 0, // calculated server-side
           });
         }
         return editingId;
@@ -133,7 +146,9 @@ const Quotes = () => {
         await apiClient.post("/quotes/", {
           client_id: Number(quote.client_id),
           status: quote.status,
-          total_amount: total,
+          reference: quote.reference || null,
+          expiry_date: quote.expiry_date || null,
+          notes: quote.notes || null,
         })
       ).data;
       for (const item of newItems) {
@@ -141,7 +156,8 @@ const Quotes = () => {
           product_id: Number(item.product_id),
           quantity: item.quantity,
           unit_price: item.unit_price,
-          subtotal: item.quantity * item.unit_price,
+          discount_percent: Number(item.discount_percent) || 0,
+          subtotal: 0, // calculated server-side
         });
       }
       return savedQuote.id;
@@ -172,7 +188,7 @@ const Quotes = () => {
   const addItem = () => {
     if (!newItem.product_id) return;
     setNewItems([...newItems, { ...newItem, _key: Date.now() }]);
-    setNewItem({ product_id: "", quantity: 1, unit_price: 0 });
+    setNewItem(emptyLine);
   };
 
   const removeNewItem = (key) => setNewItems(newItems.filter((i) => i._key !== key));
@@ -214,8 +230,9 @@ const Quotes = () => {
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
             <tr>
+              <th className="px-6 py-3 font-medium">Quote</th>
               <th className="px-6 py-3 font-medium">Date</th>
-              <th className="px-6 py-3 font-medium">Client ID</th>
+              <th className="px-6 py-3 font-medium">Client</th>
               <th className="px-6 py-3 font-medium">Total Amount</th>
               <th className="px-6 py-3 font-medium">Status</th>
               <th className="px-6 py-3 font-medium text-right">Actions</th>
@@ -225,8 +242,9 @@ const Quotes = () => {
             {filteredQuotes.map(q => (
               <tr key={q.id} className="hover:bg-slate-50 transition-colors">
                 <td className="px-6 py-4 text-slate-600">
-                  <DocumentHover kind="quote" doc={q} clientName={clientName(q.client_id)}>{new Date(q.date).toLocaleDateString()}</DocumentHover>
+                  <DocumentHover kind="quote" doc={q} clientName={clientName(q.client_id)}>{q.number || `#${q.id}`}</DocumentHover>
                 </td>
+                <td className="px-6 py-4 text-slate-600">{new Date(q.date).toLocaleDateString()}</td>
                 <td className="px-6 py-4 text-slate-600">
                   <ClientHover client={clients?.find((c) => c.id === q.client_id)}>{clientName(q.client_id)}</ClientHover>
                 </td>
@@ -241,14 +259,14 @@ const Quotes = () => {
                 </td>
                 <td className="px-6 py-4 text-right flex justify-end gap-2">
                   <button
-                    onClick={() => setPreview({ kind: "quote", id: q.id })}
+                    onClick={() => setPreview({ kind: "quote", id: q.id, title: q.number })}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
                     title="Preview"
                   >
                     <Eye size={18} />
                   </button>
                   <button
-                    onClick={() => downloadDocumentPdf("quote", q.id)}
+                    onClick={() => downloadDocumentPdf("quote", q.id, q.number)}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
                     title="Download PDF"
                   >
@@ -273,7 +291,7 @@ const Quotes = () => {
             ))}
             {filteredQuotes.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
                   {quotes?.length ? "No quotes match your search." : "No quotes yet. Create your first one above."}
                 </td>
               </tr>
@@ -282,7 +300,7 @@ const Quotes = () => {
         </table>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={closeModal} title={editingId ? `Edit Quote #${editingId}` : "Quote Builder"}>
+      <Modal isOpen={isModalOpen} onClose={closeModal} size="lg" title={editingId ? `Edit Quote ${quotes?.find((q) => q.id === editingId)?.number || `#${editingId}`}` : "Quote Builder"}>
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -309,11 +327,28 @@ const Quotes = () => {
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Reference</label>
+              <input value={quote.reference} onChange={(e) => setQuote({ ...quote, reference: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Valid until</label>
+              <input type="date" value={quote.expiry_date} onChange={(e) => setQuote({ ...quote, expiry_date: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
+              {!quote.expiry_date && <p className="mt-1 text-xs text-slate-500">Blank = quote validity from Settings</p>}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+            <textarea value={quote.notes} onChange={(e) => setQuote({ ...quote, notes: e.target.value })} rows={2} className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
+          </div>
+
           <div className="space-y-4">
             <h4 className="font-semibold text-slate-800 flex items-center gap-2">
               <FileText size={18} /> Quote Items
             </h4>
-            <div className="grid grid-cols-4 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_6rem_4.5rem_2.75rem] gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
               <SearchableSelect
                 value={newItem.product_id}
                 onChange={(v) => {
@@ -341,9 +376,23 @@ const Quotes = () => {
                 value={newItem.unit_price}
                 onChange={e => setNewItem({...newItem, unit_price: Number(e.target.value)})}
                 className="p-2 border border-slate-200 rounded-lg text-sm"
+                aria-label="Unit price"
+              />
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                placeholder="Disc %"
+                value={newItem.discount_percent}
+                onChange={e => setNewItem({...newItem, discount_percent: e.target.value})}
+                className="p-2 border border-slate-200 rounded-lg text-sm"
+                aria-label="Discount percent"
               />
               <button
                 onClick={addItem}
+                aria-label="Add line"
+                title="Add line"
                 className="bg-emerald-600 text-white rounded-lg p-2 hover:bg-emerald-700 transition-colors"
               >
                 <Plus size={18} className="mx-auto" />
@@ -358,10 +407,10 @@ const Quotes = () => {
                     className={`flex items-center justify-between p-2 border rounded-lg text-sm ${isRemoved ? "bg-red-50 border-red-100 opacity-60" : "bg-white border-slate-100"}`}
                   >
                     <span className={isRemoved ? "line-through" : ""}>
-                      {productName(item.product_id)} × {item.quantity} @ R{item.unit_price}
+                      {productName(item.product_id)} × {item.quantity} @ R{item.unit_price}{offNote(item)}
                     </span>
                     <div className="flex items-center gap-3">
-                      <span className="font-bold">R {(item.quantity * item.unit_price).toLocaleString()}</span>
+                      <span className="font-bold">R {lineTotal(item.quantity, item.unit_price, item.discount_percent).toLocaleString()}</span>
                       {isRemoved ? (
                         <button onClick={() => restoreExistingItem(item.id)} className="text-emerald-500 hover:text-emerald-700 text-xs font-medium">
                           Undo
@@ -377,9 +426,9 @@ const Quotes = () => {
               })}
               {newItems.map((item) => (
                 <div key={item._key} className="flex items-center justify-between p-2 bg-emerald-50 border border-emerald-100 rounded-lg text-sm">
-                  <span>{productName(item.product_id)} × {item.quantity} @ R{item.unit_price} <em className="text-emerald-600 not-italic text-xs">(new)</em></span>
+                  <span>{productName(item.product_id)} × {item.quantity} @ R{item.unit_price}{offNote(item)} <em className="text-emerald-600 not-italic text-xs">(new)</em></span>
                   <div className="flex items-center gap-3">
-                    <span className="font-bold">R {(item.quantity * item.unit_price).toLocaleString()}</span>
+                    <span className="font-bold">R {lineTotal(item.quantity, item.unit_price, item.discount_percent).toLocaleString()}</span>
                     <button onClick={() => removeNewItem(item._key)} className="text-red-400 hover:text-red-600">
                       <X size={16} />
                     </button>

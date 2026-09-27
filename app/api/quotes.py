@@ -1,20 +1,30 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
-from typing import List, Optional
+from typing import List
+from datetime import datetime
 from app.core.db import get_session
 from app.core.dates import coerce_datetime
 from app.models.quote import Quote
 from app.models.quote_item import QuoteItem
-from app.models.product import Product
 from app.models.client import Client
 from app.core.pdf import generate_quote_pdf
+from app.api.business import default_expiry_date, document_lines, get_business, next_document_number, price_line, totals_for
 
 router = APIRouter(prefix="/quotes", tags=["Quotes"])
 
+
+def _recalculate_total(session: Session, quote: Quote) -> None:
+    items = session.exec(select(QuoteItem).where(QuoteItem.quote_id == quote.id)).all()
+    quote.total_amount = totals_for(items)["grand_total"]
+    session.add(quote)
+
 @router.post("/", response_model=Quote)
 def create_quote(quote: Quote, session: Session = Depends(get_session)):
-    quote.date = coerce_datetime(quote.date)
+    quote.date = coerce_datetime(quote.date) or datetime.utcnow()
+    quote.expiry_date = coerce_datetime(quote.expiry_date) or default_expiry_date(session, quote.date)
+    quote.number = next_document_number(session, Quote)  # only ever assigned here - never taken from the request
+    quote.total_amount = 0.0  # set from the lines as they're added
     session.add(quote)
     session.commit()
     session.refresh(quote)
@@ -42,14 +52,15 @@ def update_quote(quote_id: int, quote_data: Quote, session: Session = Depends(ge
     if not db_quote:
         raise HTTPException(status_code=404, detail="Quote not found")
 
-    quote_data.date = coerce_datetime(quote_data.date)
-
-    # Excluding "id" matters: quote_data.id is unset on a normal edit payload
-    # (the id lives in the URL, not the body), so Pydantic fills it with its
-    # default of None - applying it via setattr would null out the primary
-    # key on every edit and break the update.
-    for key, value in quote_data.dict(exclude={"id"}).items():
+    # Only the fields actually sent (see update_invoice). "id" matters too:
+    # it's unset on an edit payload and would null out the primary key.
+    changes = quote_data.model_dump(exclude_unset=True, exclude={"id", "number", "total_amount", "items"})
+    for key in ("date", "expiry_date"):
+        if key in changes:
+            changes[key] = coerce_datetime(changes[key])
+    for key, value in changes.items():
         setattr(db_quote, key, value)
+    _recalculate_total(session, db_quote)
 
     session.add(db_quote)
     session.commit()
@@ -72,8 +83,14 @@ def delete_quote(quote_id: int, session: Session = Depends(get_session)):
 
 @router.post("/{quote_id}/items", response_model=QuoteItem)
 def add_quote_item(quote_id: int, item: QuoteItem, session: Session = Depends(get_session)):
+    quote = session.get(Quote, quote_id)
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found")
     item.quote_id = quote_id
+    price_line(session, item)
     session.add(item)
+    session.flush()
+    _recalculate_total(session, quote)
     session.commit()
     session.refresh(item)
     return item
@@ -88,7 +105,11 @@ def delete_quote_item(item_id: int, session: Session = Depends(get_session)):
     item = session.get(QuoteItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
+    quote = session.get(Quote, item.quote_id)
     session.delete(item)
+    session.flush()
+    if quote:
+        _recalculate_total(session, quote)
     session.commit()
     return {"ok": True}
 
@@ -97,22 +118,9 @@ def download_quote_pdf(quote_id: int, session: Session = Depends(get_session)):
     quote = session.get(Quote, quote_id)
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found")
-
-    client = session.get(Client, quote.client_id)
-
-    statement = select(QuoteItem).where(QuoteItem.quote_id == quote_id)
-    items = session.exec(statement).all()
-
-    # Enrich items with product names for the PDF (quote items already carry
-    # their own unit_price/subtotal, unlike invoice items which look theirs
-    # up from the product - only the display name needs fetching here).
-    enriched_items = []
-    for item in items:
-        prod = session.get(Product, item.product_id)
-        enriched_items.append({**item.dict(), "product_name": prod.name if prod else "Unknown"})
-
-    pdf_buffer = generate_quote_pdf(quote.dict(), enriched_items, client.dict())
-
-    return StreamingResponse(pdf_buffer, media_type="application/pdf", headers={
-        "Content-Disposition": f"attachment; filename=quote_{quote_id}.pdf"
+    items = session.exec(select(QuoteItem).where(QuoteItem.quote_id == quote_id)).all()
+    pdf = generate_quote_pdf(get_business(session), quote, session.get(Client, quote.client_id),
+                             document_lines(session, items))
+    return StreamingResponse(pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f"attachment; filename={quote.number or quote_id}.pdf"
     })

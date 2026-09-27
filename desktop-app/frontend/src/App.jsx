@@ -19,6 +19,7 @@ import Invoices from "./pages/Invoices";
 import Settings from "./pages/Settings";
 import Programs from "./pages/Programs";
 import Weather from "./pages/Weather";
+import PurchaseOrders from "./pages/PurchaseOrders";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ const App = () => {
                   <Route path="quotes" element={<Quotes />} />
                   <Route path="orders" element={<Orders />} />
                   <Route path="invoices" element={<Invoices />} />
+                  <Route path="purchase-orders" element={<PurchaseOrders />} />
                   <Route path="settings" element={<Settings />} />
                 </Route>
               </Routes>

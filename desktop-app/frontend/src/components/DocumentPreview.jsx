@@ -4,12 +4,12 @@ import { Download } from "lucide-react";
 import Modal from "./Modal";
 import { fetchDocumentPdf, pdfFilename, saveBlob } from "../utils/documents";
 
-const LABEL = { invoice: "Invoice", quote: "Quote" };
+const LABEL = { invoice: "Invoice", quote: "Quote", "purchase-order": "Purchase order" };
 
 // Shows the real PDF (the same file Download saves) in Electron's built-in
 // PDF viewer. The packaged CSP allows this via frame-src blob: - see
 // registerContentSecurityPolicy() in desktop-app/index.js.
-// `doc` is { kind: "invoice" | "quote", id } or null when closed.
+// `doc` is { kind: "invoice" | "quote" | "purchase-order", id, title? } or null when closed.
 const DocumentPreview = ({ doc, onClose }) => {
   const { data: blob, isLoading, isError } = useQuery({
     queryKey: ["document-pdf", doc?.kind, doc?.id],
@@ -29,7 +29,7 @@ const DocumentPreview = ({ doc, onClose }) => {
     };
   }, [blob]);
 
-  const title = doc ? `${LABEL[doc.kind]} #${doc.id}` : "";
+  const title = doc ? `${LABEL[doc.kind]} ${doc.title || `#${doc.id}`}` : "";
 
   return (
     <Modal isOpen={Boolean(doc)} onClose={onClose} title={`${title} preview`} size="xl">
@@ -38,7 +38,7 @@ const DocumentPreview = ({ doc, onClose }) => {
           <button
             type="button"
             disabled={!blob}
-            onClick={() => saveBlob(blob, pdfFilename(doc.kind, doc.id))}
+            onClick={() => saveBlob(blob, pdfFilename(doc.kind, doc.id, doc.title))}
             className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
           >
             <Download size={16} /> Download PDF

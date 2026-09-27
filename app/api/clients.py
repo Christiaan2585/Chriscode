@@ -83,7 +83,8 @@ def update_client(client_id: int, client_data: Client, session: Session = Depend
     # out the primary key) and "created_at" (this endpoint edits contact
     # details, not the client's original registration date - without this
     # exclusion, editing a client would silently reset when they were added).
-    for key, value in client_data.dict(exclude={"id", "created_at"}).items():
+    # exclude_unset: a form that doesn't know a field (e.g. VAT number) mustn't blank it.
+    for key, value in client_data.model_dump(exclude_unset=True, exclude={"id", "created_at"}).items():
         setattr(db_client, key, value)
 
     session.add(db_client)

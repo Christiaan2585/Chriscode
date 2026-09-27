@@ -1,6 +1,6 @@
 import apiClient from "../api/client";
 
-const API_PATH = { invoice: "invoices", quote: "quotes" };
+const API_PATH = { invoice: "invoices", quote: "quotes", "purchase-order": "purchase-orders" };
 
 export async function fetchDocumentPdf(kind, id) {
   const response = await apiClient.get(`/${API_PATH[kind]}/${id}/pdf`, { responseType: "blob" });
@@ -18,11 +18,15 @@ export function saveBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-export const pdfFilename = (kind, id) => `${kind}_${id}.pdf`;
+export const pdfFilename = (kind, id, number) => `${number || `${kind}_${id}`}.pdf`;
 
-export async function downloadDocumentPdf(kind, id) {
-  saveBlob(await fetchDocumentPdf(kind, id), pdfFilename(kind, id));
+export async function downloadDocumentPdf(kind, id, number) {
+  saveBlob(await fetchDocumentPdf(kind, id), pdfFilename(kind, id, number));
 }
+
+// Same rule as the backend (app/core/documents.py): discount off the line, rounded to cents.
+export const lineTotal = (quantity, unitPrice, discountPercent) =>
+  Math.round(Number(quantity) * Number(unitPrice) * (100 - (Number(discountPercent) || 0))) / 100;
 
 export async function fetchDocumentItems(kind, id) {
   return (await apiClient.get(`/${API_PATH[kind]}/${id}/items`)).data;

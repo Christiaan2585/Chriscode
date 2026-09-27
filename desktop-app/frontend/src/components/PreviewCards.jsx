@@ -82,7 +82,7 @@ const DocumentCardContent = ({ kind, doc, clientName }) => {
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="font-semibold text-slate-800">{LABEL[kind]} #{doc.id}</div>
+          <div className="font-semibold text-slate-800">{LABEL[kind]} {doc.number || `#${doc.id}`}</div>
           <div className="text-xs text-slate-500">
             {shortDate(doc.date)}
             {clientName ? ` • ${clientName}` : ""}

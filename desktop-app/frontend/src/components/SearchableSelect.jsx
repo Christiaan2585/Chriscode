@@ -61,6 +61,8 @@ export default function SearchableSelect({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-white transition-all flex items-center justify-between text-left disabled:bg-slate-50 disabled:text-slate-400"
       >
         <span className={selected ? "text-slate-800" : "text-slate-400"}>

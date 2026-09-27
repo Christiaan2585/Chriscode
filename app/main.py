@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from app.core.db import create_db_and_tables, database_file_path
 from app.core.backup import backup_on_version_change, start_scheduler
 from app.core.security import get_current_user
-from app.api import auth, clients, animals, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups, exports
+from app.api import auth, clients, animals, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups, exports, business, purchase_orders
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -86,6 +86,8 @@ app.include_router(orders.router, dependencies=_protected)
 app.include_router(dosing.router, dependencies=_protected)
 app.include_router(backups.router, dependencies=_protected)
 app.include_router(exports.router, dependencies=_protected)
+app.include_router(business.router, dependencies=_protected)
+app.include_router(purchase_orders.router, dependencies=_protected)
 
 def _version_info() -> dict:
     # Bundled into the packaged backend by build_and_package.bat's

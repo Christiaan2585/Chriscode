@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Info, Landmark, Database, ShieldCheck, Users as UsersIcon, UserPlus, Trash2, UploadCloud, Package, Users, ClipboardList, RefreshCw, CheckCircle2, DownloadCloud, AlertTriangle, FolderOpen, Scale } from "lucide-react";
+import { Info, Database, ShieldCheck, Users as UsersIcon, UserPlus, Trash2, UploadCloud, Package, Users, ClipboardList, RefreshCw, CheckCircle2, DownloadCloud, AlertTriangle, FolderOpen, Scale } from "lucide-react";
 import apiClient from "../api/client";
 import { authService } from "../api/authService";
 import { useAuth } from "../context/AuthContext";
 import ImportModal from "../components/ImportModal";
+import BusinessSettings from "../components/BusinessSettings";
 import { isUpdaterAvailable, checkForUpdates, quitAndInstall, getUpdateStatus, onUpdateStatus } from "../utils/updater";
 import { canChooseFolder, canOpenFolder, chooseFolder, openFolder } from "../utils/desktop";
 import licenceText from "../legal/EULA.txt?raw";
@@ -356,6 +357,7 @@ const SecuritySettings = () => {
 };
 
 const Settings = () => {
+  const { user } = useAuth();
   const { data: version, isLoading } = useQuery({
     queryKey: ["version"],
     queryFn: async () => {
@@ -397,20 +399,7 @@ const Settings = () => {
 
       <DataImportSettings />
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-3">
-        <h3 className="flex items-center gap-2 font-semibold text-slate-800">
-          <Landmark size={18} /> Business Configuration
-        </h3>
-        <div className="text-sm text-slate-600 space-y-1">
-          <p><span className="font-medium">Currency:</span> ZAR</p>
-          <p><span className="font-medium">VAT:</span> 15%</p>
-          <p><span className="font-medium">Date format:</span> DD/MM/YYYY</p>
-          <p><span className="font-medium">Units:</span> Metric (ml / L / kg)</p>
-        </div>
-        <p className="text-xs text-slate-400">
-          These reflect how pricing and dates are currently calculated. Making them editable from here is planned but not built yet.
-        </p>
-      </div>
+      <BusinessSettings canEdit={user?.is_admin} />
 
       <BackupSettings databasePath={version?.database_path} />
 

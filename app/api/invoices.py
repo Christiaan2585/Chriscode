@@ -2,17 +2,29 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from typing import List
+from datetime import datetime
 from app.core.db import get_session
 from app.core.dates import coerce_datetime
 from app.models.invoice import Invoice, InvoiceItem
 from app.models.product import Product
 from app.core.pdf import generate_invoice_pdf
+from app.api.business import default_due_date, document_lines, get_business, next_document_number, price_line, totals_for
+from app.models.client import Client
 
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
 
+
+def _recalculate_total(session: Session, invoice: Invoice) -> None:
+    items = session.exec(select(InvoiceItem).where(InvoiceItem.invoice_id == invoice.id)).all()
+    invoice.total_amount = totals_for(items)["grand_total"]
+    session.add(invoice)
+
 @router.post("/", response_model=Invoice)
 def create_invoice(invoice: Invoice, session: Session = Depends(get_session)):
-    invoice.date = coerce_datetime(invoice.date)
+    invoice.date = coerce_datetime(invoice.date) or datetime.utcnow()
+    invoice.due_date = coerce_datetime(invoice.due_date) or default_due_date(session, invoice.date)
+    invoice.number = next_document_number(session, Invoice)  # only ever assigned here - never taken from the request
+    invoice.total_amount = 0.0  # set from the lines as they're added
     session.add(invoice)
     session.commit()
     session.refresh(invoice)
@@ -33,12 +45,16 @@ def update_invoice(invoice_id: int, invoice_data: Invoice, session: Session = De
     if not db_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    invoice_data.date = coerce_datetime(invoice_data.date)
-
-    # Exclude "id": unset on a normal edit payload, so applying it via setattr
-    # would null out the primary key and break the update.
-    for key, value in invoice_data.dict(exclude={"id"}).items():
+    # Only the fields actually sent: an edit form that doesn't know about a
+    # field (e.g. reference) must not blank it. The number is fixed once
+    # assigned, and the total always comes from the lines.
+    changes = invoice_data.model_dump(exclude_unset=True, exclude={"id", "number", "total_amount"})
+    for key in ("date", "due_date"):
+        if key in changes:
+            changes[key] = coerce_datetime(changes[key])
+    for key, value in changes.items():
         setattr(db_invoice, key, value)
+    _recalculate_total(session, db_invoice)
 
     session.add(db_invoice)
     session.commit()
@@ -60,26 +76,18 @@ def delete_invoice(invoice_id: int, session: Session = Depends(get_session)):
 
 @router.post("/items/", response_model=InvoiceItem)
 def add_invoice_item(item: InvoiceItem, session: Session = Depends(get_session)):
-    # Verify product exists and update subtotal
-    product = session.get(Product, item.product_id)
-    if not product:
+    if not session.get(Product, item.product_id):
         raise HTTPException(status_code=404, detail="Product not found")
+    invoice = session.get(Invoice, item.invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
 
-    item.unit_price = product.price
-    item.subtotal = item.quantity * item.unit_price
-
+    price_line(session, item)
     session.add(item)
+    session.flush()
+    _recalculate_total(session, invoice)
     session.commit()
     session.refresh(item)
-
-    # Update invoice total
-    invoice = session.get(Invoice, item.invoice_id)
-    statement = select(InvoiceItem).where(InvoiceItem.invoice_id == item.invoice_id)
-    items = session.exec(statement).all()
-    invoice.total_amount = sum(i.subtotal for i in items)
-    session.add(invoice)
-    session.commit()
-
     return item
 
 @router.get("/{invoice_id}/items", response_model=List[InvoiceItem])
@@ -96,13 +104,9 @@ def delete_invoice_item(item_id: int, session: Session = Depends(get_session)):
     session.delete(item)
     session.commit()
 
-    # Recompute the invoice total now that an item is gone, same as add_invoice_item does.
     invoice = session.get(Invoice, invoice_id)
     if invoice:
-        statement = select(InvoiceItem).where(InvoiceItem.invoice_id == invoice_id)
-        items = session.exec(statement).all()
-        invoice.total_amount = sum(i.subtotal for i in items)
-        session.add(invoice)
+        _recalculate_total(session, invoice)
         session.commit()
     return {"ok": True}
 
@@ -111,21 +115,9 @@ def download_invoice_pdf(invoice_id: int, session: Session = Depends(get_session
     invoice = session.get(Invoice, invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
-
-    from app.models.client import Client
-    client = session.get(Client, invoice.client_id)
-
-    statement = select(InvoiceItem).where(InvoiceItem.invoice_id == invoice_id)
-    items = session.exec(statement).all()
-
-    # Enrich items with product names for the PDF
-    enriched_items = []
-    for item in items:
-        prod = session.get(Product, item.product_id)
-        enriched_items.append({**item.dict(), "product_name": prod.name if prod else "Unknown"})
-
-    pdf_buffer = generate_invoice_pdf(invoice.dict(), enriched_items, client.dict())
-
-    return StreamingResponse(pdf_buffer, media_type="application/pdf", headers={
-        "Content-Disposition": f"attachment; filename=invoice_{invoice_id}.pdf"
+    items = session.exec(select(InvoiceItem).where(InvoiceItem.invoice_id == invoice_id)).all()
+    pdf = generate_invoice_pdf(get_business(session), invoice, session.get(Client, invoice.client_id),
+                               document_lines(session, items))
+    return StreamingResponse(pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f"attachment; filename={invoice.number or invoice_id}.pdf"
     })

@@ -21,6 +21,7 @@ from app.models.note import ClientNote
 from app.models.order import Order
 from app.models.product import Product
 from app.models.product_dosing import ProductDosing
+from app.models.purchase_order import PurchaseOrderItem
 from app.models.program import AnimalGroup, HerdingProgram, ProgramAssignment
 from app.models.quote import Quote
 from app.models.quote_item import QuoteItem
@@ -88,6 +89,10 @@ def delete_product(session: Session, product: Product) -> None:
         )
     for rule in _rows(session, ProductDosing, ProductDosing.product_id, product.id):
         session.delete(rule)
+    # Purchase order lines carry their own description, so they only lose the link.
+    for line in _rows(session, PurchaseOrderItem, PurchaseOrderItem.product_id, product.id):
+        line.product_id = None
+        session.add(line)
     session.delete(product)
 
 

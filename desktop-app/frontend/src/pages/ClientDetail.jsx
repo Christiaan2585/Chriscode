@@ -304,6 +304,8 @@ const ClientDetail = () => {
       email: client.email || "",
       phone: client.phone || "",
       address: client.address || "",
+      postal_address: client.postal_address || "",
+      vat_number: client.vat_number || "",
       farm_name: client.farm_name || "",
     });
     setIsEditClientOpen(true);
@@ -800,7 +802,7 @@ const ClientDetail = () => {
                   .map((q) => (
                     <div key={q.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-lg text-sm">
                       <div>
-                        <DocumentHover kind="quote" doc={q} className="font-medium text-slate-700">Quote #{q.id} — {money(q.total_amount)}</DocumentHover>
+                        <DocumentHover kind="quote" doc={q} className="font-medium text-slate-700">Quote {q.number || `#${q.id}`} — {money(q.total_amount)}</DocumentHover>
                         <div className="text-xs text-slate-400">{new Date(q.date).toLocaleDateString()}</div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -814,14 +816,14 @@ const ClientDetail = () => {
                           <option value="Accepted">Accepted</option>
                         </select>
                         <button
-                          onClick={() => setPreview({ kind: "quote", id: q.id })}
+                          onClick={() => setPreview({ kind: "quote", id: q.id, title: q.number })}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
                           title="Preview"
                         >
                           <Eye size={16} />
                         </button>
                         <button
-                          onClick={() => downloadDocumentPdf("quote", q.id)}
+                          onClick={() => downloadDocumentPdf("quote", q.id, q.number)}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
                           title="Download PDF"
                         >
@@ -914,7 +916,7 @@ const ClientDetail = () => {
                   .map((inv) => (
                     <div key={inv.id} className="flex items-center justify-between p-3 border border-slate-100 rounded-lg text-sm">
                       <div>
-                        <DocumentHover kind="invoice" doc={inv} className="font-medium text-slate-700">Invoice #{inv.id} — {money(inv.total_amount)}</DocumentHover>
+                        <DocumentHover kind="invoice" doc={inv} className="font-medium text-slate-700">Invoice {inv.number || `#${inv.id}`} — {money(inv.total_amount)}</DocumentHover>
                         <div className="text-xs text-slate-400">{new Date(inv.date).toLocaleDateString()}</div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -928,14 +930,14 @@ const ClientDetail = () => {
                           <option value="cancelled">Cancelled</option>
                         </select>
                         <button
-                          onClick={() => setPreview({ kind: "invoice", id: inv.id })}
+                          onClick={() => setPreview({ kind: "invoice", id: inv.id, title: inv.number })}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
                           title="Preview"
                         >
                           <Eye size={16} />
                         </button>
                         <button
-                          onClick={() => downloadDocumentPdf("invoice", inv.id)}
+                          onClick={() => downloadDocumentPdf("invoice", inv.id, inv.number)}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
                           title="Download PDF"
                         >
@@ -1106,13 +1108,33 @@ const ClientDetail = () => {
                 />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Physical Address</label>
+                <textarea
+                  value={clientForm.address}
+                  onChange={(e) => setClientForm({ ...clientForm, address: e.target.value })}
+                  className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                  rows="3"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Postal Address</label>
+                <textarea
+                  value={clientForm.postal_address}
+                  onChange={(e) => setClientForm({ ...clientForm, postal_address: e.target.value })}
+                  className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                  rows="3"
+                />
+              </div>
+            </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Physical Address</label>
-              <textarea
-                value={clientForm.address}
-                onChange={(e) => setClientForm({ ...clientForm, address: e.target.value })}
+              <label className="block text-sm font-medium text-slate-700 mb-1">Customer VAT Number</label>
+              <input
+                value={clientForm.vat_number}
+                onChange={(e) => setClientForm({ ...clientForm, vat_number: e.target.value })}
+                placeholder="Printed on invoices if the client has one"
                 className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                rows="3"
               />
             </div>
             <button

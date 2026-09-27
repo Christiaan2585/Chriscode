@@ -1,6 +1,9 @@
 export const money = (n) =>
   `R ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+// Newest first, as Sage lists documents.
+export const newestFirst = (a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id;
+
 export const shortDate = (d) => (d ? new Date(d).toLocaleDateString() : "—");
 
 // Invoice statuses are lowercase, quote/order statuses capitalised.

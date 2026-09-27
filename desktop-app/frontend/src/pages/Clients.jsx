@@ -7,7 +7,7 @@ import { toTelLink, toWhatsAppLink } from "../utils/contact";
 import Modal from "../components/Modal";
 import { ClientHover } from "../components/PreviewCards";
 
-const emptyClient = { name: "", email: "", phone: "", address: "", farm_name: "" };
+const emptyClient = { name: "", email: "", phone: "", address: "", postal_address: "", vat_number: "", farm_name: "" };
 
 const Clients = () => {
   const navigate = useNavigate();
@@ -74,6 +74,8 @@ const Clients = () => {
       email: client.email || "",
       phone: client.phone || "",
       address: client.address || "",
+      postal_address: client.postal_address || "",
+      vat_number: client.vat_number || "",
       farm_name: client.farm_name || "",
     });
     setIsModalOpen(true);
@@ -257,14 +259,34 @@ const Clients = () => {
               />
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Physical Address</label>
+              <textarea
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                rows="3"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Postal Address</label>
+              <textarea
+                value={form.postal_address}
+                onChange={(e) => setForm({ ...form, postal_address: e.target.value })}
+                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                rows="3"
+              />
+            </div>
+          </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Physical Address</label>
-            <textarea
-              value={form.address}
-              onChange={e => setForm({...form, address: e.target.value})}
+            <label className="block text-sm font-medium text-slate-700 mb-1">Customer VAT Number</label>
+            <input
+              value={form.vat_number}
+              onChange={(e) => setForm({ ...form, vat_number: e.target.value })}
+              placeholder="Printed on invoices if the client has one"
               className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-              rows="3"
-            ></textarea>
+            />
           </div>
           <button
             disabled={!form.name || addMutation.isPending || updateMutation.isPending}

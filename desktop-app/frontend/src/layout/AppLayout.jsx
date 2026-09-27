@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Outlet, NavLink } from "react-router-dom";
-import { LayoutDashboard, Users, Dog, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, Lock, LogOut, CloudSun } from "lucide-react";
+import { LayoutDashboard, Users, Dog, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, Lock, LogOut, CloudSun, Truck } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import logo from "../assets/logo.png";
 import GrazingHeaderStrip from "../components/GrazingHeaderStrip";
@@ -18,6 +18,7 @@ const NAV = [
   { to: "/products", label: "Products", Icon: Package },
   { to: "/calculator", label: "Product Calc", Icon: Calculator },
   { to: "/invoices", label: "Invoices", Icon: FileText },
+  { to: "/purchase-orders", label: "Purchase Orders", Icon: Truck },
 ];
 
 const navClass = ({ isActive }) =>

@@ -8,6 +8,8 @@ class QuoteItem(SQLModel, table=True):
     product_id: int = Field(foreign_key="product.id")
     quantity: float
     unit_price: float
-    subtotal: float = 0.0
+    subtotal: float = 0.0  # the line's inclusive total (after discount, plus VAT)
+    discount_percent: Optional[float] = None
+    vat_percent: Optional[float] = None
 
     quote: Optional["Quote"] = Relationship(back_populates="items")
