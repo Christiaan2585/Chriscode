@@ -35,6 +35,19 @@ if not exist "..\venv\Scripts\python.exe" (
     goto :error
 )
 
+REM Removed first, before anything that can fail: if any later part of this
+REM step is skipped or blocked, there is no old exe left for the check after
+REM PyInstaller to find, so the build stops instead of packaging a stale
+REM backend. (On 2026-09-27 Device Guard blocked pip.exe, the rest of this
+REM step was silently skipped, and an installer was built around the old
+REM 25-Sep backend.)
+echo Removing any previous backend build...
+if exist backend rmdir /s /q backend
+if exist backend (
+    echo ERROR: could not delete desktop-app\backend - is the app or its backend still running?
+    goto :error
+)
+
 pushd ..
 call venv\Scripts\activate.bat
 if errorlevel 1 (
@@ -42,16 +55,16 @@ if errorlevel 1 (
     goto :error
 )
 
+REM "python -m" rather than pip.exe/pyinstaller.exe: those are unsigned
+REM launcher exes that Windows Device Guard / Smart App Control blocks on
+REM this PC, while python.exe itself is signed.
 echo Installing/updating PyInstaller in the venv...
-pip install pyinstaller --quiet
+python -m pip install pyinstaller --quiet
 if errorlevel 1 (
     call deactivate
     popd
     goto :error
 )
-
-echo Removing any previous backend build...
-if exist desktop-app\backend rmdir /s /q desktop-app\backend
 
 echo Running PyInstaller - this is the slowest step and can take a few minutes...
 REM --onedir (not --onefile): a folder of files starts faster and is easier
@@ -70,7 +83,7 @@ REM --add-data version.json: GET /version (and the pre-update backup that
 REM keys off it) read this file; without it every install reported "0.0.0".
 REM Absolute path because --specpath makes relative paths resolve from build\.
 REM --add-data logo.png: printed on invoices/quotes/purchase orders (app/core/pdf.py).
-call pyinstaller --noconfirm --clean --onedir --name sandveld-backend ^
+python -m PyInstaller --noconfirm --clean --onedir --name sandveld-backend ^
     --distpath desktop-app\backend --workpath build\pyinstaller-work --specpath build ^
     --collect-all uvicorn ^
     --collect-all fastapi ^
@@ -107,6 +120,10 @@ popd
 if not exist "backend\sandveld-backend\sandveld-backend.exe" (
     echo ERROR: PyInstaller did not produce the expected executable at
     echo desktop-app\backend\sandveld-backend\sandveld-backend.exe
+    goto :error
+)
+if not exist "backend\sandveld-backend\_internal\assets\logo.png" (
+    echo ERROR: the backend was built without the invoice logo - check the --add-data lines.
     goto :error
 )
 
