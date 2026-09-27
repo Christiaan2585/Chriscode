@@ -137,12 +137,13 @@ def _key_values(rows, width):
     return table
 
 
-def _logo_block(business):
+def _logo_block(rep):
+    """`rep` is the (name, phone) printed in the green box under the logo."""
     parts = []
     logo = _logo_bytes()
     if logo:
         parts.append(Image(io.BytesIO(logo), width=30 * mm, height=30 * mm))
-    rep = "<br/>".join(_text(v) for v in (business.sales_rep, business.sales_rep_phone) if v)
+    rep = "<br/>".join(_text(v) for v in rep if v)
     if rep:
         box = Table([[_p(rep, "rep")]], colWidths=[40 * mm])
         box.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), BRAND), ("TOPPADDING", (0, 0), (-1, -1), 2),
@@ -154,7 +155,8 @@ def _logo_block(business):
     return table
 
 
-def _party(caption, name, vat_label, vat_number, postal, physical, width):
+def _party(caption, name, details, postal, physical, width):
+    """`details` are (label, value) lines under the name, e.g. the VAT number."""
     if postal is None:  # suppliers have one address
         addresses = Table([[_p("ADDRESS:", "small_bold")], [_p(_text(physical))]], colWidths=[width])
     else:
@@ -165,8 +167,9 @@ def _party(caption, name, vat_label, vat_number, postal, physical, width):
         )
     addresses.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
                                    ("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
-    rows = [[_p(caption, "label")], [_p(_text(name).upper(), "party")],
-            [_p(f"<b>{vat_label}</b> {_text(vat_number)}", "small_bold")], [addresses]]
+    rows = [[_p(caption, "label")], [_p(_text(name).upper(), "party")]]
+    rows += [[_p(f"<b>{label}</b> {_text(value)}", "small_bold")] for label, value in details]
+    rows.append([addresses])
     table = Table(rows, colWidths=[width])
     table.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 1.5),
                                ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5)]))
@@ -200,7 +203,36 @@ def _lines_table(lines, width):
     return table
 
 
-def _footer(bank_details, totals, due_label, due_amount, width):
+def _business_details(business):
+    """The FROM block's lines: VAT number (always shown, as on Sage documents),
+    then registration number and contact details when they're filled in."""
+    optional = [("REG NO:", business.registration_number), ("TEL:", business.phone),
+                ("EMAIL:", business.email), ("WEB:", business.website)]
+    return [("VAT NO:", business.vat_number)] + [(label, value) for label, value in optional if value]
+
+
+def _bank_block(business, width):
+    rows = [(label, value) for label, value in (
+        ("Bank:", business.bank_name), ("Account holder:", business.bank_account_holder),
+        ("Account number:", business.bank_account_number), ("Branch code:", business.bank_branch_code),
+        ("Account type:", business.bank_account_type),
+    ) if value]
+    if not rows and not business.payment_note:
+        return None
+    cells = [[_p("BANKING DETAILS", "small_bold"), ""]]
+    cells += [[_p(label, "label"), _p(_text(value))] for label, value in rows]
+    if business.payment_note:
+        cells.append([_p(_text(business.payment_note)), ""])
+    table = Table(cells, colWidths=[width * 0.35, width * 0.65])
+    style = [("SPAN", (0, 0), (-1, 0)), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+             ("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1)]
+    if business.payment_note:
+        style.append(("SPAN", (0, -1), (-1, -1)))
+    table.setStyle(TableStyle(style))
+    return table
+
+
+def _footer(bank, totals, due_label, due_amount, width):
     total_rows = [("Total Discount:", totals["total_discount"]), ("Total Exclusive:", totals["total_exclusive"]),
                   ("Total VAT:", totals["total_vat"]), ("Sub Total:", totals["grand_total"])]
     right = [[_p(label, "body"), _p(money(value), "value")] for label, value in total_rows]
@@ -209,26 +241,26 @@ def _footer(bank_details, totals, due_label, due_amount, width):
     totals_table = Table(right, colWidths=[width * 0.25, width * 0.2])
     totals_table.setStyle(TableStyle([("SPAN", (0, -2), (-1, -2)), ("SPAN", (0, -1), (-1, -1)),
                                       ("TOPPADDING", (0, 0), (-1, -1), 1), ("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
-    footer = Table([[_p(_text(bank_details)), totals_table]], colWidths=[width * 0.55, width * 0.45])
+    footer = Table([[bank or "", totals_table]], colWidths=[width * 0.55, width * 0.45])
     footer.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LINEABOVE", (0, 0), (-1, 0), 0.75, RULE),
                                 ("TOPPADDING", (0, 0), (-1, -1), 8), ("LEFTPADDING", (0, 0), (0, 0), 0)]))
     return footer
 
 
-def _build(title, meta, business, to_party, lines, notes, due_label, paid=False, show_bank=True):
+def _build(title, meta, business, rep, to_party, lines, notes, due_label, paid=False, show_bank=True):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm,
                             topMargin=15 * mm, bottomMargin=18 * mm, title=title)
     width = doc.width - 12  # the page frame keeps 6pt padding each side
 
-    heading = Table([[[_p(_text(title), "title"), Spacer(1, 4), _key_values(meta, width * 0.42)], _logo_block(business)]],
+    heading = Table([[[_p(_text(title), "title"), Spacer(1, 4), _key_values(meta, width * 0.42)], _logo_block(rep)]],
                     colWidths=[width * 0.55, width * 0.45])
     heading.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("ALIGN", (1, 0), (1, 0), "RIGHT"),
                                  ("LEFTPADDING", (0, 0), (0, 0), 0)]))
 
     half = width * 0.48
     parties = Table([[
-        _party("FROM", business.trading_name, "VAT NO:", business.vat_number,
+        _party("FROM", business.trading_name, _business_details(business),
                business.postal_address, business.physical_address, half),
         _party(*to_party, half),
     ]], colWidths=[width * 0.52, width * 0.48])
@@ -236,7 +268,7 @@ def _build(title, meta, business, to_party, lines, notes, due_label, paid=False,
 
     totals = document_totals([line_amounts(l["quantity"], l["unit_price"], l.get("discount_percent"),
                                            l.get("vat_percent")) for l in lines])
-    footer = _footer(business.bank_details if show_bank else None, totals, due_label,
+    footer = _footer(_bank_block(business, width * 0.5) if show_bank else None, totals, due_label,
                      0.0 if paid else totals["grand_total"], width)
 
     story = [heading, Spacer(1, 10 * mm), parties, Spacer(1, 8 * mm), _lines_table(lines, width)]
@@ -250,7 +282,7 @@ def _build(title, meta, business, to_party, lines, notes, due_label, paid=False,
 
 
 def _client_party(client):
-    return ("TO", client.name, "CUSTOMER VAT NO:", client.vat_number, client.postal_address or "", client.address)
+    return ("TO", client.name, [("CUSTOMER VAT NO:", client.vat_number)], client.postal_address or "", client.address)
 
 
 def _dicts(items):
@@ -258,24 +290,24 @@ def _dicts(items):
              "discount_percent": i.discount_percent, "vat_percent": i.vat_percent} for i in items]
 
 
-def generate_invoice_pdf(business, invoice, client, lines):
+def generate_invoice_pdf(business, invoice, client, lines, rep=(None, None)):
     title = "TAX INVOICE" if business.vat_registered else "INVOICE"
     if invoice.status == "cancelled":
         title += " (CANCELLED)"
     meta = [("Number", invoice.number or f"#{invoice.id}"), ("Reference", invoice.reference),
-            ("Date", _date(invoice.date)), ("Due date", _date(invoice.due_date)), ("Sales rep", business.sales_rep)]
-    return _build(title, meta, business, _client_party(client), lines, invoice.notes, "Balance due",
+            ("Date", _date(invoice.date)), ("Due date", _date(invoice.due_date)), ("Sales rep", rep[0])]
+    return _build(title, meta, business, rep, _client_party(client), lines, invoice.notes, "Balance due",
                   paid=invoice.status in ("paid", "cancelled"))
 
 
-def generate_quote_pdf(business, quote, client, lines):
+def generate_quote_pdf(business, quote, client, lines, rep=(None, None)):
     meta = [("Number", quote.number or f"#{quote.id}"), ("Reference", quote.reference),
-            ("Date", _date(quote.date)), ("Valid until", _date(quote.expiry_date)), ("Sales rep", business.sales_rep)]
-    return _build("QUOTATION", meta, business, _client_party(client), lines, quote.notes, "Quote total")
+            ("Date", _date(quote.date)), ("Valid until", _date(quote.expiry_date)), ("Sales rep", rep[0])]
+    return _build("QUOTATION", meta, business, rep, _client_party(client), lines, quote.notes, "Quote total")
 
 
-def generate_purchase_order_pdf(business, po, supplier, items):
+def generate_purchase_order_pdf(business, po, supplier, items, rep=(None, None)):
     meta = [("Number", po.number or f"#{po.id}"), ("Reference", po.reference),
             ("Date", _date(po.date)), ("Delivery date", _date(po.delivery_date))]
-    to_party = ("SUPPLIER", supplier.name, "SUPPLIER VAT NO:", supplier.vat_number, None, supplier.address)
-    return _build("PURCHASE ORDER", meta, business, to_party, _dicts(items), po.notes, "Total due", show_bank=False)
+    to_party = ("SUPPLIER", supplier.name, [("SUPPLIER VAT NO:", supplier.vat_number)], None, supplier.address)
+    return _build("PURCHASE ORDER", meta, business, rep, to_party, _dicts(items), po.notes, "Total due", show_bank=False)

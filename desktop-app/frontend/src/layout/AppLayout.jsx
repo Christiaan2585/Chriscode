@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Outlet, NavLink } from "react-router-dom";
 import { LayoutDashboard, Users, Dog, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, Lock, LogOut, CloudSun, Truck } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import SetupReminder from "../components/SetupReminder";
 import logo from "../assets/logo.png";
 import GrazingHeaderStrip from "../components/GrazingHeaderStrip";
 import GlobalSearch from "../components/GlobalSearch";
@@ -102,6 +103,7 @@ const AppLayout = () => {
             )}
           </div>
         </header>
+        <SetupReminder user={user} />
         <div className="flex-1 overflow-auto p-8">
           <Outlet />
         </div>

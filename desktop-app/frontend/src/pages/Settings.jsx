@@ -6,6 +6,7 @@ import { authService } from "../api/authService";
 import { useAuth } from "../context/AuthContext";
 import ImportModal from "../components/ImportModal";
 import BusinessSettings from "../components/BusinessSettings";
+import MyDetails from "../components/MyDetails";
 import { isUpdaterAvailable, checkForUpdates, quitAndInstall, getUpdateStatus, onUpdateStatus } from "../utils/updater";
 import { canChooseFolder, canOpenFolder, chooseFolder, openFolder } from "../utils/desktop";
 import licenceText from "../legal/EULA.txt?raw";
@@ -357,7 +358,7 @@ const SecuritySettings = () => {
 };
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, refreshMe } = useAuth();
   const { data: version, isLoading } = useQuery({
     queryKey: ["version"],
     queryFn: async () => {
@@ -393,13 +394,15 @@ const Settings = () => {
         )}
       </div>
 
+      <MyDetails user={user} onSaved={refreshMe} />
+
+      <BusinessSettings canEdit={user?.is_admin} />
+
       <SoftwareUpdateSettings currentVersion={version?.version} />
 
       <SecuritySettings />
 
       <DataImportSettings />
-
-      <BusinessSettings canEdit={user?.is_admin} />
 
       <BackupSettings databasePath={version?.database_path} />
 

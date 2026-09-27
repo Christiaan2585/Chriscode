@@ -10,6 +10,7 @@ class User(SQLModel, table=True):
     password_hash: Optional[str] = None
     google_sub: Optional[str] = Field(default=None, index=True, unique=True)
     avatar_url: Optional[str] = None
+    phone: Optional[str] = None  # printed as the sales rep's number on documents they create
     pin_hash: Optional[str] = None
     is_admin: bool = False
     is_active: bool = True

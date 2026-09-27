@@ -37,7 +37,7 @@ class InvoiceDocumentTests(unittest.TestCase):
     def new_invoice(self, **fields):
         return invoices.create_invoice(
             Invoice.model_validate({"client_id": self.client.id, "date": "2026-09-24T00:00:00", **fields}),
-            session=self.s,
+            session=self.s, user=None,
         )
 
     def add_line(self, invoice, **fields):
@@ -98,7 +98,7 @@ class InvoiceDocumentTests(unittest.TestCase):
         self.settings(quote_valid_days=30)
         self.new_invoice()
         # Not model_validate(dict): Quote's "items" relationship would pick up dict.items.
-        q = quotes.create_quote(Quote(client_id=self.client.id, date="2026-09-01T00:00:00"), session=self.s)
+        q = quotes.create_quote(Quote(client_id=self.client.id, date="2026-09-01T00:00:00"), session=self.s, user=None)
         line = quotes.add_quote_item(q.id, QuoteItem.model_validate(
             {"product_id": self.tag.id, "quantity": 2, "unit_price": 0, "discount_percent": 50}), session=self.s)
         self.s.refresh(q)

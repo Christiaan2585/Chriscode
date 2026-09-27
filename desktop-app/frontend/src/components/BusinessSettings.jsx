@@ -3,18 +3,31 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Landmark, Save } from "lucide-react";
 import apiClient from "../api/client";
 
-const TEXT_FIELDS = [
-  ["trading_name", "Business name (as printed)", "e.g. NSL de Waal t/a Sandveld Veedienste"],
-  ["vat_number", "VAT number", "Leave blank if not VAT registered"],
-  ["phone", "Phone", ""],
-  ["email", "Email", ""],
-  ["sales_rep", "Sales rep", "Printed on every invoice"],
-  ["sales_rep_phone", "Sales rep phone", ""],
+const SECTIONS = [
+  ["Business", [
+    ["trading_name", "Business name (as printed)", "e.g. NSL de Waal t/a Sandveld Veedienste"],
+    ["registration_number", "Company / CK registration number", ""],
+    ["vat_number", "VAT number", "Leave blank if not VAT registered"],
+    ["phone", "Phone", ""],
+    ["email", "Email", ""],
+    ["website", "Website", ""],
+  ]],
+  ["Banking details (printed at the bottom of invoices)", [
+    ["bank_name", "Bank", "e.g. Capitec Bank"],
+    ["bank_account_holder", "Account holder", ""],
+    ["bank_account_number", "Account number", ""],
+    ["bank_branch_code", "Branch code", ""],
+    ["bank_account_type", "Account type", "e.g. Cheque, Savings"],
+    ["payment_note", "Payment note", "e.g. Use the invoice number as reference"],
+  ]],
+  ["Default sales rep (only for documents made before each user had their own details)", [
+    ["sales_rep", "Name", ""],
+    ["sales_rep_phone", "Phone", ""],
+  ]],
 ];
 const AREA_FIELDS = [
   ["postal_address", "Postal address"],
   ["physical_address", "Physical address"],
-  ["bank_details", "Bank details (printed at the bottom of invoices)"],
 ];
 const NUMBERING = [
   ["invoice", "Invoice", "next_invoice_number"],
@@ -64,21 +77,38 @@ const BusinessForm = ({ saved, canEdit, justSaved, onSaved }) => {
         save.mutate();
       }}
     >
-      <fieldset disabled={!canEdit} className="space-y-5">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {TEXT_FIELDS.map(([key, label, placeholder]) => (
-            <Field key={key} label={label}>
-              <input className={inputClass} value={draft[key] ?? ""} onChange={set(key)} placeholder={placeholder} />
-            </Field>
-          ))}
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {AREA_FIELDS.map(([key, label]) => (
-            <Field key={key} label={label}>
-              <textarea rows={4} className={inputClass} value={draft[key] ?? ""} onChange={set(key)} />
-            </Field>
-          ))}
-        </div>
+      {saved.missing?.length > 0 && (
+        <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+          Still needed on your invoices: {saved.missing.join(", ")}.
+        </p>
+      )}
+      <fieldset disabled={!canEdit} className="space-y-6">
+        {SECTIONS.map(([title, fields], i) => (
+          <React.Fragment key={title}>
+            <section className="space-y-3">
+              <h4 className="text-sm font-semibold text-slate-800">{title}</h4>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {fields.map(([key, label, placeholder]) => (
+                  <Field key={key} label={label}>
+                    <input className={inputClass} value={draft[key] ?? ""} onChange={set(key)} placeholder={placeholder} />
+                  </Field>
+                ))}
+              </div>
+            </section>
+            {i === 0 && (
+              <section className="space-y-3">
+                <h4 className="text-sm font-semibold text-slate-800">Addresses</h4>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {AREA_FIELDS.map(([key, label]) => (
+                    <Field key={key} label={label}>
+                      <textarea rows={4} className={inputClass} value={draft[key] ?? ""} onChange={set(key)} />
+                    </Field>
+                  ))}
+                </div>
+              </section>
+            )}
+          </React.Fragment>
+        ))}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <label className="flex items-center gap-2 text-sm font-medium text-slate-700 sm:col-span-3">
@@ -135,32 +165,35 @@ const BusinessForm = ({ saved, canEdit, justSaved, onSaved }) => {
   );
 };
 
-const BusinessSettings = ({ canEdit }) => {
+const BusinessSettings = ({ canEdit, bare = false }) => {
   const [justSaved, setJustSaved] = useState(false);
   const { data, isLoading, isError } = useQuery({
     queryKey: ["business"],
     queryFn: async () => (await apiClient.get("/business/")).data,
   });
 
+  const body = isLoading ? (
+    <p className="text-sm text-slate-400">Loading…</p>
+  ) : isError ? (
+    <p className="text-sm text-red-600">Couldn't load the business details.</p>
+  ) : (
+    <BusinessForm
+      key={JSON.stringify(data)}
+      saved={data}
+      canEdit={Boolean(canEdit)}
+      justSaved={justSaved}
+      onSaved={() => setJustSaved(true)}
+    />
+  );
+  if (bare) return body;
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+    <div id="business-details" className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
       <h3 className="flex items-center gap-2 font-semibold text-slate-800">
         <Landmark size={18} /> Business Details
       </h3>
       <p className="text-sm text-slate-500">Printed on invoices, quotes and purchase orders.</p>
-      {isLoading ? (
-        <p className="text-sm text-slate-400">Loading…</p>
-      ) : isError ? (
-        <p className="text-sm text-red-600">Couldn't load the business details.</p>
-      ) : (
-        <BusinessForm
-          key={JSON.stringify(data)}
-          saved={data}
-          canEdit={Boolean(canEdit)}
-          justSaved={justSaved}
-          onSaved={() => setJustSaved(true)}
-        />
-      )}
+      {body}
     </div>
   );
 };

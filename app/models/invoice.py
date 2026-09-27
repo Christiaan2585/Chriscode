@@ -14,6 +14,7 @@ class Invoice(SQLModel, table=True):
     number: Optional[str] = Field(default=None, index=True)  # INV0000181 - fixed once assigned
     reference: Optional[str] = None
     due_date: Optional[datetime] = None
+    created_by: Optional[int] = Field(default=None, foreign_key="user.id")  # the sales rep printed on it
 
 class InvoiceItem(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

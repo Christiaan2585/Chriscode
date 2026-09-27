@@ -13,5 +13,6 @@ class Quote(SQLModel, table=True):
     reference: Optional[str] = None
     expiry_date: Optional[datetime] = None
     notes: Optional[str] = None
+    created_by: Optional[int] = Field(default=None, foreign_key="user.id")  # the sales rep printed on it
 
     items: List[QuoteItem] = Relationship(back_populates="quote")

@@ -8,8 +8,10 @@ from app.core.dates import coerce_datetime
 from app.models.invoice import Invoice, InvoiceItem
 from app.models.product import Product
 from app.core.pdf import generate_invoice_pdf
-from app.api.business import default_due_date, document_lines, get_business, next_document_number, price_line, totals_for
+from app.api.business import default_due_date, document_lines, get_business, next_document_number, price_line, sales_rep_for, totals_for
 from app.models.client import Client
+from app.core.security import get_current_user
+from app.models.user import User
 
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
 
@@ -20,11 +22,12 @@ def _recalculate_total(session: Session, invoice: Invoice) -> None:
     session.add(invoice)
 
 @router.post("/", response_model=Invoice)
-def create_invoice(invoice: Invoice, session: Session = Depends(get_session)):
+def create_invoice(invoice: Invoice, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
     invoice.date = coerce_datetime(invoice.date) or datetime.utcnow()
     invoice.due_date = coerce_datetime(invoice.due_date) or default_due_date(session, invoice.date)
     invoice.number = next_document_number(session, Invoice)  # only ever assigned here - never taken from the request
     invoice.total_amount = 0.0  # set from the lines as they're added
+    invoice.created_by = user.id if user else None
     session.add(invoice)
     session.commit()
     session.refresh(invoice)
@@ -48,7 +51,7 @@ def update_invoice(invoice_id: int, invoice_data: Invoice, session: Session = De
     # Only the fields actually sent: an edit form that doesn't know about a
     # field (e.g. reference) must not blank it. The number is fixed once
     # assigned, and the total always comes from the lines.
-    changes = invoice_data.model_dump(exclude_unset=True, exclude={"id", "number", "total_amount"})
+    changes = invoice_data.model_dump(exclude_unset=True, exclude={"id", "number", "total_amount", "created_by"})
     for key in ("date", "due_date"):
         if key in changes:
             changes[key] = coerce_datetime(changes[key])
@@ -117,7 +120,7 @@ def download_invoice_pdf(invoice_id: int, session: Session = Depends(get_session
         raise HTTPException(status_code=404, detail="Invoice not found")
     items = session.exec(select(InvoiceItem).where(InvoiceItem.invoice_id == invoice_id)).all()
     pdf = generate_invoice_pdf(get_business(session), invoice, session.get(Client, invoice.client_id),
-                               document_lines(session, items))
+                               document_lines(session, items), sales_rep_for(session, invoice))
     return StreamingResponse(pdf, media_type="application/pdf", headers={
         "Content-Disposition": f"attachment; filename={invoice.number or invoice_id}.pdf"
     })

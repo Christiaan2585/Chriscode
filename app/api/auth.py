@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlmodel import Session, select
 
 from app.core.db import get_session
@@ -33,6 +33,7 @@ class UserOut(BaseModel):
     name: str
     email: str
     avatar_url: Optional[str] = None
+    phone: Optional[str] = None
     is_admin: bool
     has_pin: bool
 
@@ -43,6 +44,7 @@ class UserOut(BaseModel):
             name=user.name,
             email=user.email,
             avatar_url=user.avatar_url,
+            phone=user.phone,
             is_admin=user.is_admin,
             has_pin=bool(user.pin_hash),
         )
@@ -257,6 +259,26 @@ def forget_device(payload: ForgetDeviceRequest, session: Session = Depends(get_s
 
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)):
+    return UserOut.from_user(user)
+
+
+class ProfileUpdate(BaseModel):
+    name: str = Field(max_length=100)
+    phone: Optional[str] = Field(default=None, max_length=50)
+
+
+@router.put("/me", response_model=UserOut)
+def update_me(payload: ProfileUpdate, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """A user's own name and phone - printed as the sales rep on what they
+    create. The email is the sign-in identity, so it isn't editable here."""
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name can't be blank")
+    user.name = name
+    user.phone = (payload.phone or "").strip() or None
+    session.add(user)
+    session.commit()
+    session.refresh(user)
     return UserOut.from_user(user)
 
 

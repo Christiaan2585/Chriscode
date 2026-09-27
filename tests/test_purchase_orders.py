@@ -29,7 +29,7 @@ class PurchaseOrderTests(unittest.TestCase):
 
     def new_po(self, **fields):
         return po_api.create_purchase_order(
-            PurchaseOrder(supplier_id=self.supplier.id, date="2026-09-02T00:00:00", **fields), session=self.s)
+            PurchaseOrder(supplier_id=self.supplier.id, date="2026-09-02T00:00:00", **fields), session=self.s, user=None)
 
     def add_line(self, po, **fields):
         data = {"product_id": self.tag.id, "quantity": 7, "unit_price": 0, "description": "", **fields}

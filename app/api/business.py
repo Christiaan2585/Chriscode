@@ -12,6 +12,7 @@ from app.models.invoice import Invoice
 from app.models.product import Product
 from app.models.purchase_order import PurchaseOrder
 from app.models.quote import Quote
+from app.models.user import User
 
 router = APIRouter(prefix="/business", tags=["Business settings"])
 
@@ -94,6 +95,7 @@ _PREFIX = Field(min_length=1, max_length=10, pattern=r"^[A-Za-z0-9-]+$")
 
 class BusinessSettingsUpdate(BaseModel):
     trading_name: str = Field(min_length=1, max_length=200)
+    registration_number: str | None = Field(default=None, max_length=50)
     vat_registered: bool = False
     vat_number: str | None = Field(default=None, max_length=30)
     vat_rate: float = Field(default=15.0, ge=0, le=100)
@@ -101,9 +103,15 @@ class BusinessSettingsUpdate(BaseModel):
     physical_address: str | None = Field(default=None, max_length=500)
     phone: str | None = Field(default=None, max_length=50)
     email: str | None = Field(default=None, max_length=200)
+    website: str | None = Field(default=None, max_length=200)
     sales_rep: str | None = Field(default=None, max_length=100)
     sales_rep_phone: str | None = Field(default=None, max_length=50)
-    bank_details: str | None = Field(default=None, max_length=500)
+    bank_name: str | None = Field(default=None, max_length=100)
+    bank_account_holder: str | None = Field(default=None, max_length=100)
+    bank_account_number: str | None = Field(default=None, max_length=30)
+    bank_branch_code: str | None = Field(default=None, max_length=20)
+    bank_account_type: str | None = Field(default=None, max_length=50)
+    payment_note: str | None = Field(default=None, max_length=300)
     payment_terms_days: int = Field(default=30, ge=0, le=365)
     quote_valid_days: int = Field(default=30, ge=0, le=365)
     invoice_prefix: str = _PREFIX
@@ -114,9 +122,34 @@ class BusinessSettingsUpdate(BaseModel):
     po_start_number: int = Field(default=1, ge=1, le=9_999_999)
 
 
+# What an invoice can't do without, as (label, fields that must all be filled).
+_REQUIRED = [
+    ("Business name", ("trading_name",)),
+    ("Address", ("physical_address",)),
+    ("Phone number", ("phone",)),
+    ("Bank details", ("bank_name", "bank_account_holder", "bank_account_number", "bank_branch_code")),
+]
+
+
+def missing_details(settings: BusinessSettings) -> list:
+    return [label for label, fields in _REQUIRED
+            if not all((getattr(settings, f) or "").strip() for f in fields)]
+
+
+def sales_rep_for(session: Session, document) -> tuple:
+    """(name, phone) printed as the sales rep: whoever created the document,
+    or the default rep from the settings for documents with no creator."""
+    creator = session.get(User, document.created_by) if document.created_by else None
+    if creator is not None:
+        return creator.name, creator.phone
+    settings = get_business(session)
+    return settings.sales_rep, settings.sales_rep_phone
+
+
 def _with_next_numbers(session: Session, settings: BusinessSettings) -> dict:
     return {
         **settings.model_dump(),
+        "missing": missing_details(settings),
         "next_invoice_number": next_document_number(session, Invoice),
         "next_quote_number": next_document_number(session, Quote),
         "next_po_number": next_document_number(session, PurchaseOrder),

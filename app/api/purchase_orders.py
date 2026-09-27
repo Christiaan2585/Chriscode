@@ -5,11 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 
-from app.api.business import get_business, next_document_number, price_line, product_label, totals_for
+from app.api.business import get_business, next_document_number, price_line, product_label, sales_rep_for, totals_for
 from app.core.dates import coerce_datetime
 from app.core.db import get_session
 from app.core.pdf import generate_purchase_order_pdf
+from app.core.security import get_current_user
 from app.models.product import Product
+from app.models.user import User
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem, Supplier
 
 router = APIRouter(tags=["Purchase orders"])
@@ -77,13 +79,14 @@ def read_purchase_orders(session: Session = Depends(get_session)):
 
 
 @router.post("/purchase-orders/", response_model=PurchaseOrder)
-def create_purchase_order(po: PurchaseOrder, session: Session = Depends(get_session)):
+def create_purchase_order(po: PurchaseOrder, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
     _get_or_404(session, Supplier, po.supplier_id, "Supplier")
     po.id = None
     po.date = coerce_datetime(po.date) or datetime.utcnow()
     po.delivery_date = coerce_datetime(po.delivery_date)
     po.number = next_document_number(session, PurchaseOrder)  # only ever assigned here - never taken from the request
     po.total_amount = 0.0  # set from the lines as they're added
+    po.created_by = user.id if user else None
     session.add(po)
     session.commit()
     session.refresh(po)
@@ -93,7 +96,7 @@ def create_purchase_order(po: PurchaseOrder, session: Session = Depends(get_sess
 @router.put("/purchase-orders/{po_id}", response_model=PurchaseOrder)
 def update_purchase_order(po_id: int, data: PurchaseOrder, session: Session = Depends(get_session)):
     po = _get_or_404(session, PurchaseOrder, po_id, "Purchase order")
-    changes = data.model_dump(exclude_unset=True, exclude={"id", "number", "total_amount"})
+    changes = data.model_dump(exclude_unset=True, exclude={"id", "number", "total_amount", "created_by"})
     for key in ("date", "delivery_date"):
         if key in changes:
             changes[key] = coerce_datetime(changes[key])
@@ -156,7 +159,7 @@ def download_purchase_order_pdf(po_id: int, session: Session = Depends(get_sessi
     po = _get_or_404(session, PurchaseOrder, po_id, "Purchase order")
     supplier = session.get(Supplier, po.supplier_id)
     items = read_purchase_order_items(po_id, session)
-    pdf = generate_purchase_order_pdf(get_business(session), po, supplier, items)
+    pdf = generate_purchase_order_pdf(get_business(session), po, supplier, items, sales_rep_for(session, po))
     return StreamingResponse(pdf, media_type="application/pdf", headers={
         "Content-Disposition": f"attachment; filename={po.number or po_id}.pdf"
     })

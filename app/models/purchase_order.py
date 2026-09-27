@@ -23,6 +23,7 @@ class PurchaseOrder(SQLModel, table=True):
     reference: Optional[str] = None
     notes: Optional[str] = None  # e.g. a delivery address for this order
     status: str = "Draft"  # Draft, Sent, Received, Cancelled
+    created_by: Optional[int] = Field(default=None, foreign_key="user.id")  # the sales rep printed on it
     total_amount: float = 0.0
 
 
