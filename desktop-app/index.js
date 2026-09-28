@@ -137,36 +137,8 @@ async function startBackend() {
 
     console.log(`Starting bundled backend: ${PACKAGED_BACKEND_EXE}`);
     console.log(`Data directory: ${PACKAGED_DATA_DIR}`);
-    backendProcess = spawn(
-      PACKAGED_BACKEND_EXE,
-      [],
-      {
-        cwd: PACKAGED_DATA_DIR,
-        windowsHide: true,
-        env: {
-          ...process.env,
-          SANDVELD_DATA_DIR: PACKAGED_DATA_DIR,
-          SANDVELD_BACKEND_HOST: BACKEND_HOST,
-          SANDVELD_BACKEND_PORT: String(BACKEND_PORT),
-        },
-      }
-    );
-
-    backendProcess.on('error', (err) => {
-      const msg = `Failed to start the bundled backend: ${err.message}`;
-      console.error(msg);
-      logToBackendFile(msg);
-      dialog.showErrorBox(
-        'Sandveld Vee Dienste - backend failed to start',
-        `${msg}\n\nA log file may have more detail at:\n${path.join(PACKAGED_DATA_DIR, 'backend.log')}`
-      );
-    });
-
-    backendProcess.on('exit', (code, signal) => {
-      if (code !== 0 && code !== null) {
-        logToBackendFile(`Backend exited unexpectedly (code=${code}, signal=${signal})`);
-      }
-    });
+    spawnPackagedBackend(1);
+    return;
   } else {
     // Dev mode: unchanged - run straight out of this project's own venv.
     console.log(`Starting backend from ${PROJECT_ROOT} using ${PYTHON_BIN}`);
@@ -182,6 +154,10 @@ async function startBackend() {
     });
   }
 
+  pipeBackendOutput();
+}
+
+function pipeBackendOutput() {
   backendProcess.stdout?.on('data', (data) => {
     const line = `${data}`.trim();
     console.log(`[backend] ${line}`);
@@ -192,6 +168,56 @@ async function startBackend() {
     console.error(`[backend] ${line}`);
     logToBackendFile(line);
   });
+}
+
+// Windows Smart App Control can refuse the first launch of a newly updated,
+// unsigned backend exe and allow it moments later, once it has checked the
+// file (seen on the dev PC on 2026-09-28). So a failed start is retried a
+// couple of times before the user is shown an error.
+const BACKEND_START_ATTEMPTS = 3;
+const BACKEND_RETRY_DELAY_MS = 2500;
+
+function spawnPackagedBackend(attempt) {
+  let failed = false; // 'error' and 'exit' can both fire for one failed start
+  const retryOrReport = (reason) => {
+    if (failed) return;
+    failed = true;
+    logToBackendFile(`Backend start attempt ${attempt} failed: ${reason}`);
+    if (attempt < BACKEND_START_ATTEMPTS) {
+      setTimeout(() => spawnPackagedBackend(attempt + 1), BACKEND_RETRY_DELAY_MS);
+      return;
+    }
+    dialog.showErrorBox(
+      'Sandveld Vee Dienste - backend failed to start',
+      `Failed to start the bundled backend: ${reason}\n\n` +
+      `A log file may have more detail at:\n${path.join(PACKAGED_DATA_DIR, 'backend.log')}`
+    );
+  };
+
+  const startedAt = Date.now();
+  backendProcess = spawn(
+    PACKAGED_BACKEND_EXE,
+    [],
+    {
+      cwd: PACKAGED_DATA_DIR,
+      windowsHide: true,
+      env: {
+        ...process.env,
+        SANDVELD_DATA_DIR: PACKAGED_DATA_DIR,
+        SANDVELD_BACKEND_HOST: BACKEND_HOST,
+        SANDVELD_BACKEND_PORT: String(BACKEND_PORT),
+      },
+    }
+  );
+  backendProcess.on('error', (err) => retryOrReport(err.message));
+  backendProcess.on('exit', (code, signal) => {
+    if (code === 0 || code === null) return;
+    logToBackendFile(`Backend exited unexpectedly (code=${code}, signal=${signal})`);
+    // Dying straight away is a failed start (blocked, or crashed on launch);
+    // dying later is a crash while running, which a retry here won't fix.
+    if (Date.now() - startedAt < 15000) retryOrReport(`exited with code ${code}`);
+  });
+  pipeBackendOutput();
 }
 
 function stopBackend() {
@@ -219,7 +245,8 @@ async function createWindow() {
   });
 
   await startBackend();
-  const backendReady = await waitForBackend();
+  // Longer when packaged: allows for spawnPackagedBackend's retries.
+  const backendReady = await waitForBackend(app.isPackaged ? 30000 : 20000);
   if (!backendReady) {
     const msg = `Backend did not respond on http://${BACKEND_HOST}:${BACKEND_PORT} within the timeout. ` +
       'Loading the UI anyway - API calls will fail until the backend is reachable.';
