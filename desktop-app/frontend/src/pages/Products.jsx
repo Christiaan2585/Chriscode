@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Package, Search, Trash2, Plus, Edit } from "lucide-react";
+import { Search, Trash2, Plus, Edit } from "lucide-react";
 import apiClient from "../api/client";
 import Modal from "../components/Modal";
+import { PictureField, ProductPictureViewer, ProductThumb, savePictureChange, useProductThumbnails } from "../components/ProductPicture";
 
 const formatMoney = (value) =>
   typeof value === "number"
@@ -33,26 +34,29 @@ const Products = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyProduct);
+  const [pictureChange, setPictureChange] = useState({ file: null, remove: false });
+  const [viewing, setViewing] = useState(null);
+  const thumbnails = useProductThumbnails();
 
   const { data: products, isLoading } = useQuery({
     queryKey: ["products"],
     queryFn: async () => (await apiClient.get("/products/")).data,
   });
 
-  const addMutation = useMutation({
-    mutationFn: async (data) => (await apiClient.post("/products/", data)).data,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      closeModal();
+  // The product first, then its picture (a new product needs its id first).
+  const saveMutation = useMutation({
+    mutationFn: async ({ id, data }) => {
+      const saved = id
+        ? (await apiClient.put(`/products/${id}`, data)).data
+        : (await apiClient.post("/products/", data)).data;
+      await savePictureChange(saved.id, pictureChange);
+      return saved;
     },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data }) => (await apiClient.put(`/products/${id}`, data)).data,
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      closeModal();
+      queryClient.invalidateQueries({ queryKey: ["product-thumbnails"] });
     },
+    onSuccess: () => closeModal(),
   });
 
   const deleteMutation = useMutation({
@@ -64,16 +68,19 @@ const Products = () => {
     setIsModalOpen(false);
     setEditingId(null);
     setForm(emptyProduct);
+    setPictureChange({ file: null, remove: false });
   };
 
   const openAddModal = () => {
     setEditingId(null);
     setForm(emptyProduct);
+    setPictureChange({ file: null, remove: false });
     setIsModalOpen(true);
   };
 
   const openEditModal = (p) => {
     setEditingId(p.id);
+    setPictureChange({ file: null, remove: false });
     setForm({
       name: p.name || "",
       price: p.price ?? "",
@@ -107,14 +114,7 @@ const Products = () => {
     price_excl_vat: form.price_excl_vat === "" ? null : Number(form.price_excl_vat),
   });
 
-  const handleSave = () => {
-    const payload = buildPayload();
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, data: payload });
-    } else {
-      addMutation.mutate(payload);
-    }
-  };
+  const handleSave = () => saveMutation.mutate({ id: editingId, data: buildPayload() });
 
   const categories = useMemo(() => {
     const list = products || [];
@@ -207,9 +207,7 @@ const Products = () => {
                 <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                        <Package size={16} />
-                      </div>
+                      <ProductThumb product={p} src={thumbnails[p.id]} onOpen={setViewing} />
                       <span className="font-medium text-slate-700">{p.name}</span>
                     </div>
                   </td>
@@ -343,6 +341,7 @@ const Products = () => {
           <p className="text-xs text-slate-400 -mt-2">
             Editing cost auto-fills the standard markup (excl = cost × 1.25, incl = excl × 1.15) - you can still override either selling price by hand.
           </p>
+          <PictureField currentSrc={editingId ? thumbnails[editingId] : null} change={pictureChange} onChange={setPictureChange} />
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Dosage (for the Product Calculator)</label>
             <input
@@ -353,16 +352,16 @@ const Products = () => {
             />
           </div>
           <button
-            disabled={!form.name || !form.price || addMutation.isPending || updateMutation.isPending}
+            disabled={!form.name || !form.price || saveMutation.isPending}
             onClick={handleSave}
             className="w-full bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50"
           >
-            {editingId
-              ? (updateMutation.isPending ? "Saving..." : "Save Changes")
-              : (addMutation.isPending ? "Saving..." : "Save Product")}
+            {saveMutation.isPending ? "Saving..." : editingId ? "Save Changes" : "Save Product"}
           </button>
         </div>
       </Modal>
+
+      <ProductPictureViewer product={viewing} onClose={() => setViewing(null)} />
     </div>
   );
 };

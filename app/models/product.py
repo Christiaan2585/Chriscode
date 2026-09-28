@@ -17,3 +17,13 @@ class Product(SQLModel, table=True):
     category: Optional[str] = None  # e.g. "Entstowwe / Vaccines", "Doseermiddels" - from the price list section
     cost: Optional[float] = None  # supplier "Unit Price" excl VAT - the base cost, before markup
     price_excl_vat: Optional[float] = None  # selling price excl VAT (cost x 1.25)
+
+
+class ProductImage(SQLModel, table=True):
+    """A product's picture, kept apart from Product so the product list stays
+    light. Stored already shrunk (see app/core/images.py) so the database -
+    and every daily backup of it - stays small."""
+    product_id: int = Field(primary_key=True, foreign_key="product.id")
+    image: bytes  # JPEG, at most 800px on the long side
+    thumbnail: bytes  # JPEG, at most 160px
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

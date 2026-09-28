@@ -10,7 +10,8 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 
-EXCLUDED_TABLES = frozenset({"user", "remembertoken"})
+# productimage: binary pictures, meaningless in a spreadsheet cell.
+EXCLUDED_TABLES = frozenset({"user", "remembertoken", "productimage"})
 
 
 def _clean(value):

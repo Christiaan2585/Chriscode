@@ -552,7 +552,9 @@ function registerContentSecurityPolicy() {
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self'",
-    "img-src 'self' data: https:",
+    // blob: - full-size product pictures (components/ProductPicture.jsx) are
+    // fetched with the sign-in token and shown from a blob: URL.
+    "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
     // Both localhost and 127.0.0.1 for the backend: CSP treats them as
     // different origins even though they're the same machine, and

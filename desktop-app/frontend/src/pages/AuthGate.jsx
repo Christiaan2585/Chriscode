@@ -223,6 +223,26 @@ function usePinInput(length, onComplete) {
   return { pin, setPin, reset, inputEl, inputRef, append, backspace };
 }
 
+// Optional: the Kyron Agri logo is shown when an image named kyron-agri-logo
+// is in src/assets (the build picks it up automatically); without it the
+// name is shown as text.
+const KYRON_LOGO = Object.values(
+  import.meta.glob('../assets/kyron-agri-logo.{png,jpg,jpeg,svg,webp}', { eager: true, import: 'default' })
+)[0];
+
+function PoweredBy() {
+  return (
+    <div className="mt-5 flex items-center justify-center gap-2 text-xs text-slate-400">
+      <span>Powered by</span>
+      {KYRON_LOGO ? (
+        <img src={KYRON_LOGO} alt="Kyron Agri" className="h-10 w-auto max-w-[8rem] object-contain" />
+      ) : (
+        <span className="font-semibold text-slate-500">Kyron Agri</span>
+      )}
+    </div>
+  );
+}
+
 function Keypad({ onDigit, onBackspace }) {
   return (
     <div className="grid grid-cols-3 gap-2 mt-4 select-none">
@@ -360,6 +380,7 @@ function UnlockScreen() {
         {inputEl}
         <Keypad onDigit={append} onBackspace={backspace} />
         {busy && <p className="text-center text-xs text-slate-400 mt-2">Checking...</p>}
+        <PoweredBy />
         <button
           type="button"
           className="w-full text-center text-xs text-slate-400 hover:text-slate-600 mt-6"

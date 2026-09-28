@@ -6,7 +6,11 @@ import io
 from openpyxl import load_workbook
 from app.core.db import get_session
 from app.core import cascade
-from app.models.product import Product
+import base64
+from datetime import datetime
+from fastapi.responses import Response
+from app.core.images import NotAnImage, process_image
+from app.models.product import Product, ProductImage
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
@@ -22,6 +26,52 @@ def create_product(product: Product, session: Session = Depends(get_session)):
 @router.get("/", response_model=List[Product])
 def read_products(session: Session = Depends(get_session)):
     return session.exec(select(Product)).all()
+
+
+MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024  # phone photos are a few MB
+
+
+@router.get("/thumbnails")
+def read_product_thumbnails(session: Session = Depends(get_session)):
+    """{product_id: data URL} for every product that has a picture - one
+    request for the whole product list instead of one per row."""
+    rows = session.exec(select(ProductImage.product_id, ProductImage.thumbnail)).all()
+    return {pid: "data:image/jpeg;base64," + base64.b64encode(thumb).decode() for pid, thumb in rows}
+
+
+@router.get("/{product_id}/image")
+def read_product_image(product_id: int, session: Session = Depends(get_session)):
+    row = session.get(ProductImage, product_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="This product has no picture")
+    return Response(content=row.image, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+
+@router.put("/{product_id}/image")
+async def upload_product_image(product_id: int, file: UploadFile = File(...), session: Session = Depends(get_session)):
+    if not session.get(Product, product_id):
+        raise HTTPException(status_code=404, detail="Product not found")
+    data = await file.read(MAX_IMAGE_UPLOAD_BYTES + 1)
+    if len(data) > MAX_IMAGE_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="That picture is over 10 MB - please use a smaller one")
+    try:
+        image, thumbnail = process_image(data)
+    except NotAnImage:
+        raise HTTPException(status_code=422, detail="That file isn't a picture this app can read (use JPG, PNG or WEBP)")
+    row = session.get(ProductImage, product_id) or ProductImage(product_id=product_id, image=b"", thumbnail=b"")
+    row.image, row.thumbnail, row.updated_at = image, thumbnail, datetime.utcnow()
+    session.add(row)
+    session.commit()
+    return {"ok": True}
+
+
+@router.delete("/{product_id}/image")
+def delete_product_image(product_id: int, session: Session = Depends(get_session)):
+    row = session.get(ProductImage, product_id)
+    if row:
+        session.delete(row)
+        session.commit()
+    return {"ok": True}
 
 
 @router.put("/{product_id}", response_model=Product)

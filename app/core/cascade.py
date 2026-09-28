@@ -19,7 +19,7 @@ from app.models.invoice import Invoice, InvoiceItem
 from app.models.medical import MedicalRecord
 from app.models.note import ClientNote
 from app.models.order import Order
-from app.models.product import Product
+from app.models.product import Product, ProductImage
 from app.models.product_dosing import ProductDosing
 from app.models.purchase_order import PurchaseOrderItem
 from app.models.program import AnimalGroup, HerdingProgram, ProgramAssignment
@@ -93,6 +93,9 @@ def delete_product(session: Session, product: Product) -> None:
     for line in _rows(session, PurchaseOrderItem, PurchaseOrderItem.product_id, product.id):
         line.product_id = None
         session.add(line)
+    picture = session.get(ProductImage, product.id)
+    if picture:
+        session.delete(picture)
     session.delete(product)
 
 
