@@ -2,8 +2,9 @@ import apiClient from "../api/client";
 
 const API_PATH = { invoice: "invoices", quote: "quotes", "purchase-order": "purchase-orders" };
 
-export async function fetchDocumentPdf(kind, id) {
-  const response = await apiClient.get(`/${API_PATH[kind]}/${id}/pdf`, { responseType: "blob" });
+// `url` overrides the usual /{kind}s/{id}/pdf address (e.g. the product catalogue).
+export async function fetchDocumentPdf(kind, id, url) {
+  const response = await apiClient.get(url || `/${API_PATH[kind]}/${id}/pdf`, { responseType: "blob" });
   return new Blob([response.data], { type: "application/pdf" });
 }
 

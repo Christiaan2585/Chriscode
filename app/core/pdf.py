@@ -311,3 +311,90 @@ def generate_purchase_order_pdf(business, po, supplier, items, rep=(None, None))
             ("Date", _date(po.date)), ("Delivery date", _date(po.delivery_date))]
     to_party = ("SUPPLIER", supplier.name, [("SUPPLIER VAT NO:", supplier.vat_number)], None, supplier.address)
     return _build("PURCHASE ORDER", meta, business, rep, to_party, _dicts(items), po.notes, "Total due", show_bank=False)
+
+
+# --- Product catalogue (client-facing: selling prices only, never cost) ---
+
+_CAT = {
+    "title": ParagraphStyle("cat_title", **{**_BASE, "fontName": "Helvetica-Bold", "fontSize": 22, "leading": 26}),
+    "sub": ParagraphStyle("cat_sub", **{**_BASE, "fontSize": 9, "textColor": MUTED}),
+    "section": ParagraphStyle("cat_section", **{**_BASE, "fontName": "Helvetica-Bold", "fontSize": 11, "textColor": colors.white}),
+    "name": ParagraphStyle("cat_name", **{**_BASE, "fontName": "Helvetica-Bold", "fontSize": 9.5, "leading": 12}),
+    "meta": ParagraphStyle("cat_meta", **{**_BASE, "fontSize": 7.5, "leading": 9.5, "textColor": MUTED}),
+    "desc": ParagraphStyle("cat_desc", **{**_BASE, "fontSize": 8, "leading": 10}),
+    "price": ParagraphStyle("cat_price", **{**_BASE, "fontName": "Helvetica-Bold", "fontSize": 12, "leading": 15}),
+    "stock": ParagraphStyle("cat_stock", **{**_BASE, "fontName": "Helvetica-Bold", "fontSize": 7.5, "textColor": colors.HexColor("#b91c1c")}),
+}
+
+
+def _fit_image(data, box):
+    """A reportlab Image scaled to fit a box x box square, keeping its shape."""
+    from PIL import Image as PILImage
+    with PILImage.open(io.BytesIO(data)) as img:
+        w, h = img.size
+    scale = box / max(w, h)
+    return Image(io.BytesIO(data), width=w * scale, height=h * scale)
+
+
+def _catalogue_card(product, picture, width, price_note):
+    box = 24 * mm
+    pic = _fit_image(picture, box) if picture else ""
+    meta = " · ".join(_text(v) for v in (
+        product.code,
+        product.packaging,
+        f"{product.pack_size:g} {product.unit}" if product.pack_size and not product.packaging else None,
+    ) if v)
+    text = [Paragraph(_text(product.name), _CAT["name"])]
+    if meta:
+        text.append(Paragraph(meta, _CAT["meta"]))
+    if product.description:
+        text.append(Paragraph(_text(product.description), _CAT["desc"]))
+    text.append(Paragraph(f"{money(product.price)} <font size=7 color='#6b7280'>{price_note}</font>", _CAT["price"]))
+    if product.in_stock is False:
+        text.append(Paragraph("Out of stock", _CAT["stock"]))
+    card = Table([[pic, text]], colWidths=[box + 4, width - box - 4])
+    card.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"), ("ALIGN", (0, 0), (0, 0), "CENTER"),
+        ("BOX", (0, 0), (-1, -1), 0.5, RULE), ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    return card
+
+
+def generate_catalogue_pdf(business, groups):
+    """`groups` is [(category, [(product, thumbnail_jpeg_or_None), ...]), ...]."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm,
+                            topMargin=14 * mm, bottomMargin=16 * mm, title="Product catalogue")
+    width = doc.width - 12
+    logo = _logo_bytes()
+    contact = " · ".join(_text(v) for v in (business.phone, business.email, business.website) if v)
+    header_text = [Paragraph("PRODUCT CATALOGUE", _CAT["title"]),
+                   Paragraph(f"<b>{_text(business.trading_name)}</b>", _CAT["sub"])]
+    if contact:
+        header_text.append(Paragraph(contact, _CAT["sub"]))
+    header_text.append(Paragraph(f"Prices as at {datetime.now().strftime('%d/%m/%Y')} - subject to change.", _CAT["sub"]))
+    header = Table([[Image(io.BytesIO(logo), width=24 * mm, height=24 * mm) if logo else "", header_text]],
+                   colWidths=[28 * mm, width - 28 * mm])
+    header.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (0, 0), 0)]))
+
+    price_note = "incl. VAT" if business.vat_registered else ""
+    story = [header, Spacer(1, 6 * mm)]
+    if not groups:
+        story.append(_p("No products to show yet."))
+    half = (width - 6) / 2
+    for category, items in groups:
+        bar = Table([[Paragraph(_text(category), _CAT["section"])]], colWidths=[width])
+        bar.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), BRAND), ("TOPPADDING", (0, 0), (-1, -1), 4),
+                                 ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
+        cards = [_catalogue_card(p, pic, half, price_note) for p, pic in items]
+        rows = [cards[i:i + 2] + [""] * (2 - len(cards[i:i + 2])) for i in range(0, len(cards), 2)]
+        grid = Table(rows, colWidths=[half + 3, half + 3])
+        grid.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                  ("RIGHTPADDING", (0, 0), (-1, -1), 3), ("TOPPADDING", (0, 0), (-1, -1), 3),
+                                  ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
+        # Keeps a heading with its products; a category too long for one page still flows on.
+        story += [KeepTogether([bar, Spacer(1, 2 * mm), grid]), Spacer(1, 5 * mm)]
+    doc.build(story, canvasmaker=_NumberedCanvas)
+    buffer.seek(0)
+    return buffer

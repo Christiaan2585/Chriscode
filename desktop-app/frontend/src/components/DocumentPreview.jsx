@@ -4,16 +4,16 @@ import { Download } from "lucide-react";
 import Modal from "./Modal";
 import { fetchDocumentPdf, pdfFilename, saveBlob } from "../utils/documents";
 
-const LABEL = { invoice: "Invoice", quote: "Quote", "purchase-order": "Purchase order" };
+const LABEL = { invoice: "Invoice", quote: "Quote", "purchase-order": "Purchase order", catalogue: "Product" };
 
 // Shows the real PDF (the same file Download saves) in Electron's built-in
 // PDF viewer. The packaged CSP allows this via frame-src blob: - see
 // registerContentSecurityPolicy() in desktop-app/index.js.
-// `doc` is { kind: "invoice" | "quote" | "purchase-order", id, title? } or null when closed.
+// `doc` is { kind: "invoice" | "quote" | "purchase-order" | "catalogue", id, title?, url? } or null when closed.
 const DocumentPreview = ({ doc, onClose }) => {
   const { data: blob, isLoading, isError } = useQuery({
-    queryKey: ["document-pdf", doc?.kind, doc?.id],
-    queryFn: () => fetchDocumentPdf(doc.kind, doc.id),
+    queryKey: ["document-pdf", doc?.kind, doc?.id, doc?.url],
+    queryFn: () => fetchDocumentPdf(doc.kind, doc.id, doc.url),
     enabled: Boolean(doc),
     gcTime: 0, // always re-render from current data - an edit changes the PDF
   });

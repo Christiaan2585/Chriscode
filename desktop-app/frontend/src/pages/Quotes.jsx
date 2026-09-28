@@ -10,6 +10,7 @@ import DocumentPreview from "../components/DocumentPreview";
 import { ClientHover, DocumentHover } from "../components/PreviewCards";
 import { downloadDocumentPdf, lineTotal } from "../utils/documents";
 import { newestFirst } from "../utils/format";
+import { pickerProducts } from "../utils/products";
 
 const emptyQuote = { client_id: "", status: "Draft", reference: "", expiry_date: "", notes: "" };
 const emptyLine = { product_id: "", quantity: 1, unit_price: 0, discount_percent: "" };
@@ -359,7 +360,7 @@ const Quotes = () => {
                     unit_price: product ? product.price : newItem.unit_price,
                   });
                 }}
-                options={(products || []).map((p) => ({ value: p.id, label: p.name }))}
+                options={pickerProducts(products, newItem.product_id).map((p) => ({ value: p.id, label: p.name }))}
                 placeholder="Select product…"
                 searchPlaceholder="Search products…"
               />

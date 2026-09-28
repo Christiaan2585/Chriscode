@@ -17,6 +17,10 @@ class Product(SQLModel, table=True):
     category: Optional[str] = None  # e.g. "Entstowwe / Vaccines", "Doseermiddels" - from the price list section
     cost: Optional[float] = None  # supplier "Unit Price" excl VAT - the base cost, before markup
     price_excl_vat: Optional[float] = None  # selling price excl VAT (cost x 1.25)
+    # Catalog switches (2026-09-28). NULL on products from before then means
+    # yes - the schema sync adds the columns without back-filling.
+    in_stock: Optional[bool] = True
+    is_active: Optional[bool] = True  # False = hidden from the catalog and pickers, kept for old paperwork
 
 
 class ProductImage(SQLModel, table=True):

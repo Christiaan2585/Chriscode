@@ -9,6 +9,9 @@ from app.core import cascade
 import base64
 from datetime import datetime
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
+from app.api.business import get_business
+from app.core.pdf import generate_catalogue_pdf
 from app.core.images import NotAnImage, process_image
 from app.models.product import Product, ProductImage
 
@@ -37,6 +40,24 @@ def read_product_thumbnails(session: Session = Depends(get_session)):
     request for the whole product list instead of one per row."""
     rows = session.exec(select(ProductImage.product_id, ProductImage.thumbnail)).all()
     return {pid: "data:image/jpeg;base64," + base64.b64encode(thumb).decode() for pid, thumb in rows}
+
+
+@router.get("/catalogue.pdf")
+def product_catalogue_pdf(category: Optional[str] = None, session: Session = Depends(get_session)):
+    """The client-facing catalogue: active products only, grouped by
+    category, with pictures and selling prices - never cost prices."""
+    rows = [p for p in session.exec(select(Product)).all() if p.is_active is not False]
+    if category:
+        rows = [p for p in rows if (p.category or "Uncategorised") == category]
+    groups = {}
+    for p in sorted(rows, key=lambda p: ((p.category or "~").lower(), p.name.lower())):
+        groups.setdefault(p.category or "Uncategorised", []).append(p)
+    thumbs = dict(session.exec(select(ProductImage.product_id, ProductImage.thumbnail)).all())
+    pdf = generate_catalogue_pdf(get_business(session), [
+        (name, [(p, thumbs.get(p.id)) for p in items]) for name, items in groups.items()
+    ])
+    return Response(content=pdf.getvalue(), media_type="application/pdf",
+                    headers={"Content-Disposition": "attachment; filename=product-catalogue.pdf"})
 
 
 @router.get("/{product_id}/image")
@@ -72,6 +93,40 @@ def delete_product_image(product_id: int, session: Session = Depends(get_session
         session.delete(row)
         session.commit()
     return {"ok": True}
+
+
+class ProductPatch(BaseModel):
+    """Any subset of a product's fields - the catalog saves one field at a time."""
+    name: Optional[str] = Field(default=None, max_length=200)
+    code: Optional[str] = Field(default=None, max_length=50)
+    category: Optional[str] = Field(default=None, max_length=100)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    packaging: Optional[str] = Field(default=None, max_length=100)
+    unit: Optional[str] = Field(default=None, max_length=30)
+    pack_size: Optional[float] = Field(default=None, ge=0)
+    price: Optional[float] = Field(default=None, ge=0)
+    price_excl_vat: Optional[float] = Field(default=None, ge=0)
+    cost: Optional[float] = Field(default=None, ge=0)
+    dosage: Optional[float] = Field(default=None, ge=0)
+    in_stock: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
+@router.patch("/{product_id}", response_model=Product)
+def patch_product(product_id: int, changes: ProductPatch, session: Session = Depends(get_session)):
+    product = session.get(Product, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    for key, value in changes.model_dump(exclude_unset=True).items():
+        if isinstance(value, str):
+            value = value.strip() or None
+        if key in ("name", "price") and value is None:
+            raise HTTPException(status_code=422, detail=f"A product needs a {key}")
+        setattr(product, key, value)
+    session.add(product)
+    session.commit()
+    session.refresh(product)
+    return product
 
 
 @router.put("/{product_id}", response_model=Product)

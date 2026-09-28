@@ -7,6 +7,7 @@ import SearchableSelect from "../components/SearchableSelect";
 import DocumentPreview from "../components/DocumentPreview";
 import { downloadDocumentPdf, lineTotal } from "../utils/documents";
 import { money, newestFirst, shortDate, statusStyle } from "../utils/format";
+import { pickerProducts } from "../utils/products";
 
 const STATUSES = ["Draft", "Sent", "Received", "Cancelled"];
 const emptyOrder = { supplier_id: "", status: "Draft", reference: "", delivery_date: "", notes: "" };
@@ -274,7 +275,7 @@ const PurchaseOrders = () => {
             <p className="text-xs text-slate-500">Pick a product (priced at its cost price unless you type one), or type a description for anything else.</p>
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4rem_5.5rem_4.5rem_2.75rem] gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <SearchableSelect value={line.product_id} onChange={(v) => setLine({ ...line, product_id: v })}
-                options={products.map((p) => ({ value: p.id, label: p.code ? `${p.code} - ${p.name}` : p.name }))}
+                options={pickerProducts(products, line.product_id).map((p) => ({ value: p.id, label: p.code ? `${p.code} - ${p.name}` : p.name }))}
                 placeholder="Product…" searchPlaceholder="Search products…" />
               <input className="rounded-lg border border-slate-200 p-2 text-sm" placeholder={line.product_id ? "Description (optional)" : "Description"}
                 value={line.description} onChange={(e) => setLine({ ...line, description: e.target.value })} aria-label="Description" />

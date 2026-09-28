@@ -9,6 +9,7 @@ import DocumentPreview from "../components/DocumentPreview";
 import { ClientHover, DocumentHover } from "../components/PreviewCards";
 import { downloadDocumentPdf } from "../utils/documents";
 import { newestFirst } from "../utils/format";
+import { pickerProducts } from "../utils/products";
 
 const emptyInvoice = { client_id: "", status: "unpaid", notes: "", reference: "", due_date: "" };
 const emptyLine = { product_id: "", quantity: 1, unit_price: "", discount_percent: "" };
@@ -423,7 +424,7 @@ const Invoices = () => {
               <SearchableSelect
                 value={newItem.product_id}
                 onChange={(v) => setNewItem({ ...newItem, product_id: v })}
-                options={(products || []).map((p) => ({ value: p.id, label: p.name }))}
+                options={pickerProducts(products, newItem.product_id).map((p) => ({ value: p.id, label: p.name }))}
                 placeholder="Select product…"
                 searchPlaceholder="Search products…"
               />

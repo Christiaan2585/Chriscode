@@ -81,7 +81,7 @@ const AppLayout = () => {
                   {initials}
                 </div>
               )}
-              <span className="text-sm text-slate-600">{user?.name}</span>
+              <span className="hidden xl:inline text-sm text-slate-600">{user?.name}</span>
             </button>
             {menuOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-10">
