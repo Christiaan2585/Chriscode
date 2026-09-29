@@ -10,7 +10,7 @@ from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_RIGHT
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas as pdf_canvas
@@ -124,7 +124,7 @@ class _NumberedCanvas(pdf_canvas.Canvas):
             self.__dict__.update(state)
             self.setFont("Helvetica", 7.5)
             self.setFillColor(MUTED)
-            self.drawRightString(A4[0] - 18 * mm, 10 * mm, f"Page {self._pageNumber} of {total}")
+            self.drawRightString(self._pagesize[0] - 18 * mm, 10 * mm, f"Page {self._pageNumber} of {total}")
             super().showPage()
         super().save()
 
@@ -324,7 +324,36 @@ _CAT = {
     "desc": ParagraphStyle("cat_desc", **{**_BASE, "fontSize": 8, "leading": 10}),
     "price": ParagraphStyle("cat_price", **{**_BASE, "fontName": "Helvetica-Bold", "fontSize": 12, "leading": 15}),
     "stock": ParagraphStyle("cat_stock", **{**_BASE, "fontName": "Helvetica-Bold", "fontSize": 7.5, "textColor": colors.HexColor("#b91c1c")}),
+    "qty": ParagraphStyle("cat_qty", **{**_BASE, "fontName": "Helvetica-Bold", "fontSize": 8, "leading": 10}),
+    "how": ParagraphStyle("cat_how", **{**_BASE, "fontSize": 9, "leading": 12}),
 }
+
+# Field names on the fillable order form, read back by app/core/order_form.py.
+ORDER_QTY_PREFIX = "qty_"
+ORDER_CLIENT_FIELD = "order_client"
+ORDER_NOTES_FIELD = "order_notes"
+
+
+class _FormField(Flowable):
+    """A fillable PDF text box (AcroForm) placed like any other flowable."""
+
+    def __init__(self, name, width, height, value="", tooltip=None, multiline=False, hidden=False):
+        super().__init__()
+        self.name, self.width, self.height = name, width, height
+        self.value, self.tooltip, self.multiline, self.hidden = value, tooltip, multiline, hidden
+
+    def wrap(self, *_):
+        return self.width, self.height
+
+    def draw(self):
+        self.canv.acroForm.textfield(
+            name=self.name, value=self.value, tooltip=self.tooltip, x=0, y=0, relative=True,
+            width=self.width, height=self.height, fontName="Helvetica", fontSize=10,
+            borderColor=BRAND, fillColor=colors.white, textColor=INK, borderWidth=1, forceBorder=True,
+            maxlen=1000 if self.multiline else 10,
+            fieldFlags="readOnly" if self.hidden else ("multiline" if self.multiline else ""),
+            annotationFlags="hidden" if self.hidden else "print",
+        )
 
 
 def _fit_image(data, box):
@@ -336,7 +365,7 @@ def _fit_image(data, box):
     return Image(io.BytesIO(data), width=w * scale, height=h * scale)
 
 
-def _catalogue_card(product, picture, width, price_note):
+def _catalogue_card(product, picture, width, price_note, order_form=False):
     box = 24 * mm
     pic = _fit_image(picture, box) if picture else ""
     meta = " · ".join(_text(v) for v in (
@@ -352,6 +381,13 @@ def _catalogue_card(product, picture, width, price_note):
     text.append(Paragraph(f"{money(product.price)} <font size=7 color='#6b7280'>{price_note}</font>", _CAT["price"]))
     if product.in_stock is False:
         text.append(Paragraph("Out of stock", _CAT["stock"]))
+    if order_form:
+        qty = Table([[Paragraph("Qty", _CAT["qty"]),
+                      _FormField(f"{ORDER_QTY_PREFIX}{product.id}", 16 * mm, 6 * mm, tooltip=f"How many {product.name}")]],
+                    colWidths=[8 * mm, 17 * mm], hAlign="LEFT")
+        qty.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                 ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+        text.append(qty)
     card = Table([[pic, text]], colWidths=[box + 4, width - box - 4])
     card.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"), ("ALIGN", (0, 0), (0, 0), "CENTER"),
@@ -361,8 +397,11 @@ def _catalogue_card(product, picture, width, price_note):
     return card
 
 
-def generate_catalogue_pdf(business, groups):
-    """`groups` is [(category, [(product, thumbnail_jpeg_or_None), ...]), ...]."""
+def generate_catalogue_pdf(business, groups, order_for=None):
+    """`groups` is [(category, [(product, thumbnail_jpeg_or_None), ...]), ...].
+    With `order_for` (a client) it's also a fillable order form: a Qty box on
+    every product, a notes box, and the client's id in a hidden field so the
+    returned form can be turned into a quote for them."""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm,
                             topMargin=14 * mm, bottomMargin=16 * mm, title="Product catalogue")
@@ -371,6 +410,8 @@ def generate_catalogue_pdf(business, groups):
     contact = " · ".join(_text(v) for v in (business.phone, business.email, business.website) if v)
     header_text = [Paragraph("PRODUCT CATALOGUE", _CAT["title"]),
                    Paragraph(f"<b>{_text(business.trading_name)}</b>", _CAT["sub"])]
+    if order_for is not None:
+        header_text.append(Paragraph(f"Order form for <b>{_text(order_for.name)}</b>", _CAT["sub"]))
     if contact:
         header_text.append(Paragraph(contact, _CAT["sub"]))
     header_text.append(Paragraph(f"Prices as at {datetime.now().strftime('%d/%m/%Y')} - subject to change.", _CAT["sub"]))
@@ -380,6 +421,17 @@ def generate_catalogue_pdf(business, groups):
 
     price_note = "incl. VAT" if business.vat_registered else ""
     story = [header, Spacer(1, 6 * mm)]
+    if order_for is not None:
+        send_to = " or ".join(v for v in (
+            f"WhatsApp ({_text(business.phone)})" if business.phone else None,
+            f"email ({_text(business.email)})" if business.email else None,
+        ) if v) or "us"
+        story += [
+            _FormField(ORDER_CLIENT_FIELD, 1, 1, value=str(order_for.id), hidden=True),
+            Paragraph("<b>How to order:</b> type how many you want in the Qty box of each product, add any notes "
+                      f"at the end, then save this PDF and send it back to us on {send_to}.", _CAT["how"]),
+            Spacer(1, 5 * mm),
+        ]
     if not groups:
         story.append(_p("No products to show yet."))
     half = (width - 6) / 2
@@ -387,7 +439,7 @@ def generate_catalogue_pdf(business, groups):
         bar = Table([[Paragraph(_text(category), _CAT["section"])]], colWidths=[width])
         bar.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), BRAND), ("TOPPADDING", (0, 0), (-1, -1), 4),
                                  ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
-        cards = [_catalogue_card(p, pic, half, price_note) for p, pic in items]
+        cards = [_catalogue_card(p, pic, half, price_note, order_for is not None) for p, pic in items]
         rows = [cards[i:i + 2] + [""] * (2 - len(cards[i:i + 2])) for i in range(0, len(cards), 2)]
         grid = Table(rows, colWidths=[half + 3, half + 3])
         grid.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
@@ -395,6 +447,92 @@ def generate_catalogue_pdf(business, groups):
                                   ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
         # Keeps a heading with its products; a category too long for one page still flows on.
         story += [KeepTogether([bar, Spacer(1, 2 * mm), grid]), Spacer(1, 5 * mm)]
+    if order_for is not None:
+        story.append(KeepTogether([
+            Paragraph("<b>Notes for your order</b> (delivery, collection, anything else)", _CAT["how"]),
+            Spacer(1, 2 * mm),
+            _FormField(ORDER_NOTES_FIELD, width, 28 * mm, tooltip="Notes for your order", multiline=True),
+        ]))
+    doc.build(story, canvasmaker=_NumberedCanvas)
+    buffer.seek(0)
+    return buffer
+
+
+# --- A client's herding program, laid out like the business's Excel sheet ---
+
+_PROG = {
+    "cell": ParagraphStyle("prog_cell", **{**_BASE, "fontSize": 7.5, "leading": 9.5}),
+    "head": ParagraphStyle("prog_head", **{**_BASE, "fontName": "Helvetica-Bold", "fontSize": 8, "textColor": colors.white}),
+    "date": ParagraphStyle("prog_date", **{**_BASE, "fontName": "Helvetica-Bold", "fontSize": 8.5, "leading": 10.5}),
+    "products": ParagraphStyle("prog_products", **{**_BASE, "fontSize": 7.5, "leading": 9.5, "textColor": BRAND}),
+}
+PROGRAM_COLUMNS = [("stage", "Stage"), ("management", "Herd management"), ("vaccinations", "Vaccinations"),
+                   ("dosing", "Dosing"), ("vitamins", "Vitamins & trace elements"), ("feeding", "Feeding")]
+
+
+def _amount(value) -> str:
+    return f"{value:g}"
+
+
+def _product_line(line) -> str:
+    who = _text(line["animal_group"] or "all animals")
+    text = f"<b>{_text(line['product_name'])}</b>"
+    if line["dose"]:
+        text += f" - {_amount(line['dose'])} {_text(line['unit'])} per animal ({who})"
+        if line["total"]:
+            text += f": {line['head']} x {_amount(line['dose'])} = {_amount(line['total'])} {_text(line['unit'])}"
+            if line["pack_size"]:
+                text += f" ({_amount(line['units'])} x {_amount(line['pack_size'])} {_text(line['unit'])})"
+    if line["note"]:
+        text += f" - {_text(line['note'])}"
+    return text
+
+
+def generate_program_pdf(business, client, program, groups, schedule, template):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=12 * mm, rightMargin=12 * mm,
+                            topMargin=12 * mm, bottomMargin=16 * mm, title=program.name)
+    width = doc.width
+    anchors = schedule["anchors"]
+    logo = _logo_bytes()
+    who = " - ".join(v for v in (client.name if client else None, client.farm_name if client else None) if v)
+    facts = [f"First mating: <b>{anchors['mating_start']:%a %d %b %Y}</b>",
+             f"Mating season: <b>{program.mating_weeks or template.mating_weeks} weeks</b>",
+             f"Lambing starts: <b>{anchors['lambing_start']:%d %b %Y}</b>",
+             f"Weaning: <b>{anchors['weaning']:%d %b %Y}</b>"]
+    head_counts = " · ".join(f"{_text(g.animal_type)} {g.group_size}" for g in groups)
+    contact = " · ".join(_text(v) for v in (business.trading_name, business.phone, business.email) if v)
+    header_text = [Paragraph(_text(template.name.upper()), _CAT["title"]),
+                   Paragraph(f"<b>{_text(program.name)}</b>" + (f" for <b>{_text(who)}</b>" if who else ""), _CAT["sub"]),
+                   Paragraph(" · ".join(facts), _CAT["sub"])]
+    if head_counts:
+        header_text.append(Paragraph(f"Animals: {head_counts}", _CAT["sub"]))
+    if contact:
+        header_text.append(Paragraph(contact, _CAT["sub"]))
+    header = Table([[header_text, Image(io.BytesIO(logo), width=22 * mm, height=22 * mm) if logo else ""]],
+                   colWidths=[width - 26 * mm, 26 * mm])
+    header.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (0, 0), 0),
+                                ("ALIGN", (1, 0), (1, 0), "RIGHT")]))
+
+    date_w, stage_w = 20 * mm, 32 * mm
+    col_w = (width - date_w - stage_w) / (len(PROGRAM_COLUMNS) - 1)
+    rows = [[Paragraph("Date", _PROG["head"])] + [Paragraph(label, _PROG["head"]) for _, label in PROGRAM_COLUMNS]]
+    style = [("BACKGROUND", (0, 0), (-1, 0), BRAND), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+             ("GRID", (0, 0), (-1, -1), 0.4, RULE), ("TOPPADDING", (0, 0), (-1, -1), 3),
+             ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]
+    for step in schedule["steps"]:
+        when = f"{step['date']:%d %b %Y}" + ("<br/><font color='#047857'>Done</font>" if step["status"] == "done" else "")
+        rows.append([Paragraph(when, _PROG["date"])]
+                    + [Paragraph(_text(step[key]), _PROG["cell"]) for key, _ in PROGRAM_COLUMNS])
+        if step["products"]:
+            rows.append(["", Paragraph("Products: " + "<br/>".join(_product_line(l) for l in step["products"]),
+                                       _PROG["products"])] + [""] * (len(PROGRAM_COLUMNS) - 1))
+            style.append(("SPAN", (1, len(rows) - 1), (-1, len(rows) - 1)))
+    table = Table(rows, colWidths=[date_w, stage_w] + [col_w] * (len(PROGRAM_COLUMNS) - 1), repeatRows=1)
+    table.setStyle(TableStyle(style))
+    story = [header, Spacer(1, 5 * mm), table]
+    if not schedule["steps"]:
+        story.append(_p("The master herding program has no steps yet."))
     doc.build(story, canvasmaker=_NumberedCanvas)
     buffer.seek(0)
     return buffer

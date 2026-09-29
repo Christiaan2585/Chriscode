@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
-import { Plus, Search, FileText, Trash2, Edit, Save, X, Download, Eye } from "lucide-react";
+import { Plus, Search, FileText, Trash2, Edit, Save, X, Download, Eye, FileInput } from "lucide-react";
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
 import Modal from "../components/Modal";
 import SearchableSelect from "../components/SearchableSelect";
 import DocumentPreview from "../components/DocumentPreview";
+import OrderFormImport from "../components/OrderFormImport";
 import { ClientHover, DocumentHover } from "../components/PreviewCards";
 import { downloadDocumentPdf, lineTotal } from "../utils/documents";
 import { newestFirst } from "../utils/format";
@@ -197,6 +198,7 @@ const Quotes = () => {
   const restoreExistingItem = (id) => setRemovedItemIds(removedItemIds.filter((i) => i !== id));
 
   const [preview, setPreview] = useState(null);
+  const [importingOrder, setImportingOrder] = useState(false);
 
   if (isLoading) return <div className="p-8 text-center">Loading quotes...</div>;
 
@@ -207,12 +209,21 @@ const Quotes = () => {
           <h2 className="text-3xl font-bold text-slate-800">Quotations</h2>
           <p className="text-slate-500">Manage and create financial quotes for clients</p>
         </div>
-        <button
-          onClick={openAddModal}
-          className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
-        >
-          <Plus size={20} /> Create Quote
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setImportingOrder(true)}
+            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:border-emerald-300 hover:text-emerald-600 transition-colors shadow-sm"
+          >
+            <FileInput size={20} /> Import order form
+          </button>
+          <button
+            onClick={openAddModal}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+          >
+            <Plus size={20} /> Create Quote
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -458,6 +469,8 @@ const Quotes = () => {
       </Modal>
 
       <DocumentPreview doc={preview} onClose={() => setPreview(null)} />
+      <OrderFormImport isOpen={importingOrder} onClose={() => setImportingOrder(false)}
+        clients={clients || []} onOpenQuote={openEditModal} />
     </div>
   );
 };

@@ -1,7 +1,9 @@
 import React, { useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, ChevronLeft, ChevronRight, Clock, User, Dog, CheckCircle } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Plus, ChevronLeft, ChevronRight, Clock, User, Dog, CheckCircle, ClipboardList } from "lucide-react";
 import apiClient from "../api/client";
+import { STEP_STATUS } from "../utils/herding";
 import { clientService, animalService } from "../api/services";
 import Modal from "../components/Modal";
 import SearchableSelect from "../components/SearchableSelect";
@@ -68,6 +70,19 @@ const Calendar = () => {
     return map;
   }, [appointments]);
 
+  // Herding program steps of every client's program, for the weeks on screen.
+  const days = useMemo(() => monthGrid(month.year, month.month), [month]);
+  const range = { start: dayKey(days[0]), end: dayKey(days[days.length - 1]) };
+  const { data: programSteps } = useQuery({
+    queryKey: ["program-calendar", range.start, range.end],
+    queryFn: async () => (await apiClient.get("/programs/calendar", { params: range })).data,
+  });
+  const stepsByDay = useMemo(() => {
+    const map = {};
+    for (const step of programSteps || []) (map[step.date] ||= []).push(step);
+    return map;
+  }, [programSteps]);
+
   const addMutation = useMutation({
     mutationFn: async (data) =>
       (await apiClient.post("/appointments/", {
@@ -115,9 +130,9 @@ const Calendar = () => {
 
   if (isLoading) return <div className="p-8 text-center">Loading appointments...</div>;
 
-  const days = monthGrid(month.year, month.month);
   const monthLabel = new Date(month.year, month.month, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const selectedApps = byDay[selected] || [];
+  const selectedSteps = stepsByDay[selected] || [];
   const selectedLabel = new Date(`${selected}T00:00:00`).toLocaleDateString(undefined, {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
@@ -164,6 +179,8 @@ const Calendar = () => {
             {days.map((d) => {
               const key = dayKey(d);
               const apps = byDay[key] || [];
+              const steps = (stepsByDay[key] || []).slice(0, Math.max(0, MAX_CHIPS - apps.length));
+              const hidden = apps.length + (stepsByDay[key] || []).length - Math.min(apps.length, MAX_CHIPS) - steps.length;
               const inMonth = d.getMonth() === month.month;
               const isSelected = key === selected;
               return (
@@ -187,8 +204,14 @@ const Calendar = () => {
                       {app.reason}
                     </span>
                   ))}
-                  {apps.length > MAX_CHIPS && (
-                    <span className="px-1.5 text-[11px] text-slate-500">+{apps.length - MAX_CHIPS} more</span>
+                  {steps.map((step) => (
+                    <span key={`${step.program_id}-${step.step_id}`} title={`${step.client_name}: ${step.stage || step.program_name}`}
+                      className={`truncate rounded border-l-2 border-emerald-500 bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-700 ${step.status === "done" ? "line-through opacity-60" : ""}`}>
+                      {step.client_name}: {step.stage || step.program_name}
+                    </span>
+                  ))}
+                  {hidden > 0 && (
+                    <span className="px-1.5 text-[11px] text-slate-500">+{hidden} more</span>
                   )}
                 </button>
               );
@@ -198,6 +221,7 @@ const Calendar = () => {
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />Upcoming</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" />Overdue</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" />Done</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 border-l-2 border-emerald-500 bg-slate-200" />Herding program</span>
           </div>
         </div>
 
@@ -209,7 +233,7 @@ const Calendar = () => {
             <h3 className="text-base font-semibold text-slate-800">{selectedLabel}</h3>
           </div>
           <div className="divide-y divide-slate-100">
-            {selectedApps.length === 0 ? (
+            {selectedApps.length === 0 && selectedSteps.length === 0 ? (
               <p className="px-5 py-8 text-center text-sm text-slate-400">Nothing scheduled.</p>
             ) : (
               selectedApps.map((app) => {
@@ -239,6 +263,20 @@ const Calendar = () => {
                 );
               })
             )}
+            {selectedSteps.map((step) => (
+              <div key={`${step.program_id}-${step.step_id}`} className="px-5 py-4 space-y-1">
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <ClipboardList size={14} /> Herding program
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${STEP_STATUS[step.status].className}`}>
+                    {STEP_STATUS[step.status].label}
+                  </span>
+                </div>
+                <p className="font-semibold text-slate-800">{step.stage || step.program_name}</p>
+                <Link to={`/clients/${step.client_id}`} className="flex items-center gap-1 text-sm text-emerald-700 hover:underline">
+                  <User size={14} /> {step.client_name} - {step.program_name}
+                </Link>
+              </div>
+            ))}
           </div>
           <div className="p-4 border-t border-slate-100">
             <button type="button" onClick={() => openSchedule(selected)}

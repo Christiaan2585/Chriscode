@@ -1,17 +1,19 @@
 import React, { useState } from "react";
 import { Outlet, NavLink } from "react-router-dom";
-import { LayoutDashboard, Users, Dog, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, Lock, LogOut, CloudSun, Truck } from "lucide-react";
+import { LayoutDashboard, Users, ClipboardList, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, Lock, LogOut, CloudSun, Truck } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import SetupReminder from "../components/SetupReminder";
 import logo from "../assets/logo.png";
 import GrazingHeaderStrip from "../components/GrazingHeaderStrip";
 import GlobalSearch from "../components/GlobalSearch";
 import ThemeToggle from "../components/ThemeToggle";
+import PoweredBy from "../components/PoweredBy";
+import Avatar from "../components/Avatar";
 
 const NAV = [
   { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
   { to: "/clients", label: "Clients", Icon: Users },
-  { to: "/animals", label: "Animals", Icon: Dog },
+  { to: "/programs", label: "Herding Program", Icon: ClipboardList },
   { to: "/calendar", label: "System Calendar", Icon: Calendar },
   { to: "/weather", label: "Weather", Icon: CloudSun },
   { to: "/quotes", label: "Quotes", Icon: FileText },
@@ -28,12 +30,6 @@ const navClass = ({ isActive }) =>
 const AppLayout = () => {
   const { user, lock, forgetDevice } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const initials = (user?.name || "?")
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 
   return (
     <div className="app-bg flex h-screen bg-slate-50 text-slate-900 font-sans">
@@ -44,14 +40,49 @@ const AppLayout = () => {
           Sandveld Vee Dienste
         </div>
         <p className="nav-label px-7 mt-2 text-xs font-medium uppercase tracking-wider text-emerald-300/70">Menu</p>
-        <nav className="flex-1 px-4 space-y-1 mt-2">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-4 space-y-1 mt-2">
           {NAV.map(({ to, label, Icon, end }) => (
             <NavLink key={to} to={to} end={end} className={navClass}>
               <Icon size={20} /> {label}
             </NavLink>
           ))}
         </nav>
-        <div className="p-4 border-t border-emerald-800">
+        <PoweredBy onDark className="px-4 pb-3" />
+        <div className="p-4 border-t border-emerald-800 space-y-1">
+          {/* The signed-in user, with Lock / Sign out. */}
+          <div className="relative">
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-emerald-800"
+              aria-label={`Account menu for ${user?.name || "you"}`}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((o) => !o)}
+            >
+              <Avatar user={user} size="md" />
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-white">{user?.name}</span>
+                <span className="block truncate text-xs text-emerald-200/80">{user?.is_admin ? "Admin" : "Staff"}</span>
+              </span>
+            </button>
+            {menuOpen && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-10">
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50"
+                  onClick={() => { setMenuOpen(false); lock(); }}
+                >
+                  <Lock size={14} /> Lock (keep me remembered)
+                </button>
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50"
+                  onClick={() => { setMenuOpen(false); forgetDevice(); }}
+                >
+                  <LogOut size={14} /> Sign out completely
+                </button>
+              </div>
+            )}
+          </div>
           <NavLink to="/settings" className={navClass}>
             <Settings size={20} /> Settings
           </NavLink>
@@ -68,40 +99,6 @@ const AppLayout = () => {
           </div>
           <div className="flex-1 lg:hidden" />
           <ThemeToggle />
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              className="flex items-center gap-2"
-              onClick={() => setMenuOpen((o) => !o)}
-            >
-              {user?.avatar_url ? (
-                <img src={user.avatar_url} alt="" className="w-8 h-8 rounded-full" />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center">
-                  {initials}
-                </div>
-              )}
-              <span className="hidden xl:inline text-sm text-slate-600">{user?.name}</span>
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-10">
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
-                  onClick={() => { setMenuOpen(false); lock(); }}
-                >
-                  <Lock size={14} /> Lock (keep me remembered)
-                </button>
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
-                  onClick={() => { setMenuOpen(false); forgetDevice(); }}
-                >
-                  <LogOut size={14} /> Sign out completely
-                </button>
-              </div>
-            )}
-          </div>
         </header>
         <SetupReminder user={user} />
         <div className="flex-1 overflow-auto p-8">

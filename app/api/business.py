@@ -127,8 +127,13 @@ _REQUIRED = [
     ("Business name", ("trading_name",)),
     ("Address", ("physical_address",)),
     ("Phone number", ("phone",)),
+    ("Email", ("email",)),
     ("Bank details", ("bank_name", "bank_account_holder", "bank_account_number", "bank_branch_code")),
 ]
+
+
+# Everything else on the business details form is optional.
+REQUIRED_FIELDS = [f for _, fields in _REQUIRED for f in fields]
 
 
 def missing_details(settings: BusinessSettings) -> list:
@@ -150,6 +155,7 @@ def _with_next_numbers(session: Session, settings: BusinessSettings) -> dict:
     return {
         **settings.model_dump(),
         "missing": missing_details(settings),
+        "required_fields": REQUIRED_FIELDS,
         "next_invoice_number": next_document_number(session, Invoice),
         "next_quote_number": next_document_number(session, Quote),
         "next_po_number": next_document_number(session, PurchaseOrder),

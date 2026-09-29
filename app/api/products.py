@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from app.api.business import get_business
 from app.core.pdf import generate_catalogue_pdf
 from app.core.images import NotAnImage, process_image
+from app.models.client import Client
 from app.models.product import Product, ProductImage
 
 router = APIRouter(prefix="/products", tags=["Products"])
@@ -43,9 +44,17 @@ def read_product_thumbnails(session: Session = Depends(get_session)):
 
 
 @router.get("/catalogue.pdf")
-def product_catalogue_pdf(category: Optional[str] = None, session: Session = Depends(get_session)):
+def product_catalogue_pdf(category: Optional[str] = None, client_id: Optional[int] = None,
+                          session: Session = Depends(get_session)):
     """The client-facing catalogue: active products only, grouped by
-    category, with pictures and selling prices - never cost prices."""
+    category, with pictures and selling prices - never cost prices. With a
+    client_id it's a fillable order form for that client (see
+    quotes.quote_from_order_form for the way back)."""
+    client = None
+    if client_id is not None:
+        client = session.get(Client, client_id)
+        if client is None:
+            raise HTTPException(status_code=404, detail="Client not found")
     rows = [p for p in session.exec(select(Product)).all() if p.is_active is not False]
     if category:
         rows = [p for p in rows if (p.category or "Uncategorised") == category]
@@ -55,9 +64,14 @@ def product_catalogue_pdf(category: Optional[str] = None, session: Session = Dep
     thumbs = dict(session.exec(select(ProductImage.product_id, ProductImage.thumbnail)).all())
     pdf = generate_catalogue_pdf(get_business(session), [
         (name, [(p, thumbs.get(p.id)) for p in items]) for name, items in groups.items()
-    ])
+    ], order_for=client)
+    filename = f"order-form-{_slug(client.name)}.pdf" if client else "product-catalogue.pdf"
     return Response(content=pdf.getvalue(), media_type="application/pdf",
-                    headers={"Content-Disposition": "attachment; filename=product-catalogue.pdf"})
+                    headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-") or "client"
 
 
 @router.get("/{product_id}/image")

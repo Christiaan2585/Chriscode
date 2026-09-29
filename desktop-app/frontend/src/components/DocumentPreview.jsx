@@ -4,12 +4,13 @@ import { Download } from "lucide-react";
 import Modal from "./Modal";
 import { fetchDocumentPdf, pdfFilename, saveBlob } from "../utils/documents";
 
-const LABEL = { invoice: "Invoice", quote: "Quote", "purchase-order": "Purchase order", catalogue: "Product" };
+const LABEL = { invoice: "Invoice", quote: "Quote", "purchase-order": "Purchase order", catalogue: "Product", program: "Herding program" };
 
 // Shows the real PDF (the same file Download saves) in Electron's built-in
 // PDF viewer. The packaged CSP allows this via frame-src blob: - see
 // registerContentSecurityPolicy() in desktop-app/index.js.
-// `doc` is { kind: "invoice" | "quote" | "purchase-order" | "catalogue", id, title?, url? } or null when closed.
+// `doc` is { kind: "invoice" | "quote" | "purchase-order" | "catalogue", id, title?, url?, filename?, hint? }
+// or null when closed.
 const DocumentPreview = ({ doc, onClose }) => {
   const { data: blob, isLoading, isError } = useQuery({
     queryKey: ["document-pdf", doc?.kind, doc?.id, doc?.url],
@@ -34,12 +35,13 @@ const DocumentPreview = ({ doc, onClose }) => {
   return (
     <Modal isOpen={Boolean(doc)} onClose={onClose} title={`${title} preview`} size="xl">
       <div className="space-y-3">
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-4">
+          {doc?.hint && <p className="mr-auto text-sm text-slate-600">{doc.hint}</p>}
           <button
             type="button"
             disabled={!blob}
-            onClick={() => saveBlob(blob, pdfFilename(doc.kind, doc.id, doc.title))}
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
+            onClick={() => saveBlob(blob, doc.filename || pdfFilename(doc.kind, doc.id, doc.title))}
+            className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
           >
             <Download size={16} /> Download PDF
           </button>

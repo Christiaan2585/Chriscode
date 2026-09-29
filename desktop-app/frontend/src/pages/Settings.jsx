@@ -5,8 +5,8 @@ import apiClient from "../api/client";
 import { authService } from "../api/authService";
 import { useAuth } from "../context/AuthContext";
 import ImportModal from "../components/ImportModal";
-import BusinessSettings from "../components/BusinessSettings";
 import MyDetails from "../components/MyDetails";
+import Avatar from "../components/Avatar";
 import { isUpdaterAvailable, checkForUpdates, quitAndInstall, getUpdateStatus, onUpdateStatus } from "../utils/updater";
 import { canChooseFolder, canOpenFolder, chooseFolder, openFolder } from "../utils/desktop";
 import licenceText from "../legal/EULA.txt?raw";
@@ -283,7 +283,8 @@ const SecuritySettings = () => {
           <ul className="text-sm text-slate-600 space-y-1">
             {(users || []).map((u) => (
               <li key={u.id} className="flex items-center justify-between">
-                <span>
+                <span className="flex items-center gap-2">
+                  <Avatar user={u} />
                   {u.name} ({u.email}){u.is_admin ? " - admin" : ""}
                 </span>
                 {u.id !== user.id && (
@@ -395,8 +396,6 @@ const Settings = () => {
       </div>
 
       <MyDetails user={user} onSaved={refreshMe} />
-
-      <BusinessSettings canEdit={user?.is_admin} />
 
       <SoftwareUpdateSettings currentVersion={version?.version} />
 

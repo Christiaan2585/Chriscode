@@ -22,7 +22,7 @@ from app.models.order import Order
 from app.models.product import Product, ProductImage
 from app.models.product_dosing import ProductDosing
 from app.models.purchase_order import PurchaseOrderItem
-from app.models.program import AnimalGroup, HerdingProgram, ProgramAssignment
+from app.models.program import AnimalGroup, HerdingProgram, ProgramAssignment, ProgramStepProduct, ProgramStepProgress
 from app.models.quote import Quote
 from app.models.quote_item import QuoteItem
 from app.models.schedule import HealthSchedule
@@ -67,7 +67,7 @@ def delete_client(session: Session, client: Client) -> None:
     for animal in _rows(session, Animal, Animal.client_id, client.id):
         delete_animal(session, animal)
     for program in _rows(session, HerdingProgram, HerdingProgram.client_id, client.id):
-        for model in (AnimalGroup, ProgramAssignment):
+        for model in (AnimalGroup, ProgramAssignment, ProgramStepProgress):
             for row in _rows(session, model, model.program_id, program.id):
                 session.delete(row)
         session.delete(program)
@@ -87,8 +87,9 @@ def delete_product(session: Session, product: Product) -> None:
             f"{product.name} appears on {_plural(lines, 'invoice/quote line')}, so it can't be deleted - "
             "old invoices and quotes still need its name."
         )
-    for rule in _rows(session, ProductDosing, ProductDosing.product_id, product.id):
-        session.delete(rule)
+    for model in (ProductDosing, ProgramStepProduct):  # dosing rules; uses in the master herding program
+        for row in _rows(session, model, model.product_id, product.id):
+            session.delete(row)
     # Purchase order lines carry their own description, so they only lose the link.
     for line in _rows(session, PurchaseOrderItem, PurchaseOrderItem.product_id, product.id):
         line.product_id = None

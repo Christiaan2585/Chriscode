@@ -33,3 +33,60 @@ class HerdingProgram(SQLModel, table=True):
     # before this field existed still load fine.
     client_id: Optional[int] = Field(default=None, foreign_key="client.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    # The client's run of the master program (ProgramTemplate): every step's
+    # date is worked out from the first mating date. NULL on programs from
+    # before 2026-09-29, which just show their headcounts as before. The other
+    # four fall back to the template's defaults when NULL.
+    mating_date: Optional[datetime] = None
+    mating_weeks: Optional[int] = None
+    weaning_rule: Optional[str] = None  # "age" (lambing + weaning_months) or "fixed" (mating + weaning_days)
+    weaning_months: Optional[int] = None
+    weaning_days: Optional[int] = None
+
+
+class ProgramTemplate(SQLModel, table=True):
+    """The one master herding program (id 1) every client's program follows -
+    imported from the business's own Excel sheet, then edited in the app.
+    Not in the code: the repo is public and the programme is the business's."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = "Herding program"
+    gestation_days: int = 147  # lambing starts this long after the first mating day
+    mating_weeks: int = 6
+    weaning_rule: str = "fixed"
+    weaning_months: int = 4
+    weaning_days: int = 240
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ProgramStep(SQLModel, table=True):
+    """One row of the master program: when (a number of days from one of
+    app/core/herding.py's ANCHORS) and what to do, in the Excel's columns."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    sort_order: int = 0
+    anchor: str = "mating_start"
+    offset_days: int = 0
+    stage: Optional[str] = None
+    management: Optional[str] = None
+    vaccinations: Optional[str] = None
+    dosing: Optional[str] = None
+    vitamins: Optional[str] = None
+    feeding: Optional[str] = None
+
+
+class ProgramStepProduct(SQLModel, table=True):
+    """A product used at a step: `dose` per animal (in the product's own unit,
+    e.g. ml) for the animals of `animal_group` (matched to a program's
+    AnimalGroup.animal_type; blank = every animal in the program)."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    step_id: int = Field(foreign_key="programstep.id", index=True)
+    product_id: int = Field(foreign_key="product.id")
+    animal_group: Optional[str] = None
+    dose: Optional[float] = None
+    note: Optional[str] = None
+
+
+class ProgramStepProgress(SQLModel, table=True):
+    """A step ticked off on one client's program."""
+    program_id: int = Field(foreign_key="herdingprogram.id", primary_key=True)
+    step_id: int = Field(foreign_key="programstep.id", primary_key=True)
+    done_at: datetime = Field(default_factory=datetime.utcnow)

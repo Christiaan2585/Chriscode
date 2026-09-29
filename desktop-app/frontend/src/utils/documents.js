@@ -21,6 +21,16 @@ export function saveBlob(blob, filename) {
 
 export const pdfFilename = (kind, id, number) => `${number || `${kind}_${id}`}.pdf`;
 
+// The catalogue as a fillable order form for one client (DocumentPreview doc).
+// What they fill in comes back through the Quotes page's "Import order form".
+export const orderFormFor = (client) => ({
+  kind: "catalogue",
+  title: `order form for ${client.name}`,
+  url: `/products/catalogue.pdf?client_id=${client.id}`,
+  filename: `Order form - ${client.name.replace(/[\\/:*?"<>|]+/g, "")}.pdf`,
+  hint: "Download it and send it on WhatsApp or email. When it comes back filled in, use \"Import order form\" on the Quotes page.",
+});
+
 export async function downloadDocumentPdf(kind, id, number) {
   saveBlob(await fetchDocumentPdf(kind, id), pdfFilename(kind, id, number));
 }

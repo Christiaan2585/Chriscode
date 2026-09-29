@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 from app.core.db import get_session
 from app.core.dates import coerce_datetime
@@ -11,6 +11,8 @@ from app.models.client import Client
 from app.core.security import get_current_user
 from app.models.user import User
 from app.core.pdf import generate_quote_pdf
+from app.core.order_form import NotAnOrderForm, read_order_form
+from app.models.product import Product
 from app.api.business import default_expiry_date, document_lines, get_business, next_document_number, price_line, sales_rep_for, totals_for
 
 router = APIRouter(prefix="/quotes", tags=["Quotes"])
@@ -32,6 +34,57 @@ def create_quote(quote: Quote, session: Session = Depends(get_session), user: Us
     session.commit()
     session.refresh(quote)
     return quote
+
+MAX_ORDER_FORM_BYTES = 15 * 1024 * 1024  # the catalogue with pictures is a few MB at most
+
+
+def quote_from_order_form(session: Session, data: bytes, client_id: Optional[int], user: Optional[User]) -> dict:
+    """A draft quote from a client's filled-in order form. `client_id`, when
+    given, overrides the client the form was made for. Lines that can't be
+    used (product since deleted, quantity unreadable) are listed in
+    "skipped" rather than failing the whole order."""
+    try:
+        form = read_order_form(data)
+    except NotAnOrderForm as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    client = session.get(Client, client_id or form.client_id) if (client_id or form.client_id) else None
+    if client is None:
+        raise HTTPException(status_code=422, detail="Choose which client this order is from - the client on the form isn't in the app")
+
+    skipped, lines = [], []
+    for product_id, typed in form.unreadable.items():
+        product = session.get(Product, product_id)
+        skipped.append(f"{product.name if product else 'A product'}: couldn't read the quantity \"{typed}\"")
+    for product_id, quantity in form.quantities.items():
+        product = session.get(Product, product_id)
+        if product is None:
+            skipped.append(f"A product that has since been deleted (quantity {quantity:g})")
+        else:
+            lines.append((product, quantity))
+    if not lines:
+        raise HTTPException(status_code=422, detail="No quantities were filled in on that order form"
+                            + (" that could be read: " + "; ".join(skipped) if skipped else ""))
+
+    notes = "Order form from the client." + (f"\n{form.notes}" if form.notes else "")
+    quote = create_quote(Quote(client_id=client.id, reference="Order form", notes=notes), session, user)
+    for product, quantity in lines:
+        item = QuoteItem(quote_id=quote.id, product_id=product.id, quantity=quantity, unit_price=0.0)
+        price_line(session, item)
+        session.add(item)
+    session.flush()
+    _recalculate_total(session, quote)
+    session.commit()
+    session.refresh(quote)
+    return {"quote": quote, "skipped": skipped}
+
+
+@router.post("/from-order-form")
+async def import_order_form(file: UploadFile = File(...), client_id: Optional[int] = Form(None),
+                            session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    data = await file.read(MAX_ORDER_FORM_BYTES + 1)
+    if len(data) > MAX_ORDER_FORM_BYTES:
+        raise HTTPException(status_code=413, detail="That file is over 15 MB - it can't be an order form from this app")
+    return quote_from_order_form(session, data, client_id, user)
 
 @router.get("/", response_model=List[Quote])
 def read_quotes(session: Session = Depends(get_session)):

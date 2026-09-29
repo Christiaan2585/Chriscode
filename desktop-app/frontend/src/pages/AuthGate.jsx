@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Lock, LogIn, ShieldCheck, UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.png';
+import PoweredBy from '../components/PoweredBy';
+import Avatar from '../components/Avatar';
 
 const CARD = 'w-full max-w-sm bg-white rounded-2xl shadow-lg border border-slate-200 p-8';
 const SHELL = 'app-bg min-h-screen flex items-center justify-center bg-slate-50 px-4';
@@ -223,26 +225,6 @@ function usePinInput(length, onComplete) {
   return { pin, setPin, reset, inputEl, inputRef, append, backspace };
 }
 
-// Optional: the Kyron Agri logo is shown when an image named kyron-agri-logo
-// is in src/assets (the build picks it up automatically); without it the
-// name is shown as text.
-const KYRON_LOGO = Object.values(
-  import.meta.glob('../assets/kyron-agri-logo.{png,jpg,jpeg,svg,webp}', { eager: true, import: 'default' })
-)[0];
-
-function PoweredBy() {
-  return (
-    <div className="mt-5 flex items-center justify-center gap-2 text-xs text-slate-400">
-      <span>Powered by</span>
-      {KYRON_LOGO ? (
-        <img src={KYRON_LOGO} alt="Kyron Agri" className="h-10 w-auto max-w-[8rem] object-contain" />
-      ) : (
-        <span className="font-semibold text-slate-500">Kyron Agri</span>
-      )}
-    </div>
-  );
-}
-
 function Keypad({ onDigit, onBackspace }) {
   return (
     <div className="grid grid-cols-3 gap-2 mt-4 select-none">
@@ -352,24 +334,13 @@ function UnlockScreen() {
     }
   });
 
-  const initials = (rememberedUser?.name || '?')
-    .split(' ')
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-
   return (
     <div className={SHELL} onClick={() => inputRef.current?.focus()}>
+      <div className="w-full max-w-sm">
+      <LogoHeader />
       <div className={CARD}>
         <div className="flex flex-col items-center mb-4">
-          {rememberedUser?.avatar_url ? (
-            <img src={rememberedUser.avatar_url} alt="" className="w-16 h-16 rounded-full mb-3" />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-xl font-bold mb-3">
-              {initials}
-            </div>
-          )}
+          <Avatar user={rememberedUser} size="lg" className="mb-3" />
           <div className="flex items-center gap-2 text-slate-800 font-semibold">
             <Lock size={16} /> Welcome back, {rememberedUser?.name?.split(' ')[0] || 'there'}
           </div>
@@ -380,7 +351,7 @@ function UnlockScreen() {
         {inputEl}
         <Keypad onDigit={append} onBackspace={backspace} />
         {busy && <p className="text-center text-xs text-slate-400 mt-2">Checking...</p>}
-        <PoweredBy />
+        <PoweredBy className="mt-5" />
         <button
           type="button"
           className="w-full text-center text-xs text-slate-400 hover:text-slate-600 mt-6"
@@ -388,6 +359,7 @@ function UnlockScreen() {
         >
           Not you? Sign in as someone else
         </button>
+      </div>
       </div>
     </div>
   );

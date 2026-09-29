@@ -16,3 +16,13 @@ class User(SQLModel, table=True):
     is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login_at: Optional[datetime] = None
+
+
+class UserPhoto(SQLModel, table=True):
+    """A user's own profile photo (2026-09-29), kept apart from User so the
+    user row stays light. Already a small square JPEG - see
+    app/core/images.py's process_avatar. Shown instead of avatar_url (the
+    Google picture) when there is one."""
+    user_id: int = Field(primary_key=True, foreign_key="user.id")
+    image: bytes
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

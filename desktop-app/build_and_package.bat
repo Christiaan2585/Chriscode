@@ -97,6 +97,7 @@ python -m PyInstaller --noconfirm --clean --onedir --name sandveld-backend ^
     --collect-all bcrypt ^
     --collect-all openpyxl ^
     --collect-all reportlab ^
+    --collect-all pypdf ^
     --collect-all multipart ^
     --collect-all pandas ^
     --hidden-import sqlalchemy.dialects.sqlite ^

@@ -33,12 +33,21 @@ export function AuthProvider({ children }) {
 
   const rememberedToken = () => localStorage.getItem(REMEMBER_TOKEN_KEY);
 
+  // What the lock screen shows before anyone has signed in: name and photo.
+  const rememberUser = useCallback((u) => {
+    const remembered = { name: u.name, email: u.email, avatar_url: u.avatar_url };
+    try {
+      localStorage.setItem(REMEMBERED_USER_KEY, JSON.stringify(remembered));
+    } catch {
+      // Storage full or blocked - the lock screen falls back to initials.
+    }
+    setRememberedUser(remembered);
+  }, []);
+
   const persistSession = useCallback((result) => {
     setAccessToken(result.access_token);
     localStorage.setItem(REMEMBER_TOKEN_KEY, result.remember_token);
-    const remembered = { name: result.user.name, email: result.user.email, avatar_url: result.user.avatar_url };
-    localStorage.setItem(REMEMBERED_USER_KEY, JSON.stringify(remembered));
-    setRememberedUser(remembered);
+    rememberUser(result.user);
     setUser(result.user);
     setScreen(result.user.has_pin ? 'app' : 'pin-setup');
   }, []);
@@ -144,8 +153,9 @@ export function AuthProvider({ children }) {
   const refreshMe = useCallback(async () => {
     const me = await authService.me();
     setUser(me);
+    if (rememberedToken()) rememberUser(me); // a new name or photo shows on the lock screen too
     return me;
-  }, []);
+  }, [rememberUser]);
 
   const value = useMemo(
     () => ({

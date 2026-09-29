@@ -1,17 +1,22 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, Users, Dog, AlertCircle, CalendarClock, LineChart as LineChartIcon } from "lucide-react";
+import { Link } from "react-router-dom";
+import { TrendingUp, Users, AlertCircle, CalendarClock, ClipboardList, LineChart as LineChartIcon } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import apiClient from "../api/client";
+import { STEP_STATUS, dayLabel } from "../utils/herding";
+
+// YYYY-MM-DD for today plus `offset` days, in local time.
+const localDay = (offset) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 const Dashboard = () => {
   const clientsQuery = useQuery({
     queryKey: ["clients"],
     queryFn: async () => (await apiClient.get("/clients/")).data,
-  });
-  const animalsQuery = useQuery({
-    queryKey: ["animals"],
-    queryFn: async () => (await apiClient.get("/animals/")).data,
   });
   const revenueQuery = useQuery({
     queryKey: ["analytics", "revenue"],
@@ -25,12 +30,16 @@ const Dashboard = () => {
     queryKey: ["appointments"],
     queryFn: async () => (await apiClient.get("/appointments/")).data,
   });
+  const programStepsQuery = useQuery({
+    queryKey: ["program-calendar", "dashboard"],
+    queryFn: async () => (await apiClient.get("/programs/calendar", { params: { start: localDay(-60), end: localDay(7) } })).data,
+  });
   const salesChartQuery = useQuery({
     queryKey: ["analytics", "revenue-by-month"],
     queryFn: async () => (await apiClient.get("/analytics/revenue-by-month", { params: { months: 12 } })).data,
   });
 
-  const queries = [clientsQuery, animalsQuery, revenueQuery, overdueQuery, appointmentsQuery, salesChartQuery];
+  const queries = [clientsQuery, revenueQuery, overdueQuery, appointmentsQuery, salesChartQuery];
   const isLoading = queries.some((q) => q.isLoading);
   const isBackendUp = !queries.some((q) => q.isError);
 
@@ -43,6 +52,8 @@ const Dashboard = () => {
     .filter((a) => new Date(a.date) >= today && a.status !== "completed")
     .sort((a, b) => new Date(a.date) - new Date(b.date))
     .slice(0, 5);
+  // Not ticked off yet and dated up to a week ahead (overdue ones first, by date).
+  const programSteps = (programStepsQuery.data || []).filter((s) => s.status === "overdue" || s.status === "due");
 
   return (
     <div className="space-y-8">
@@ -53,16 +64,11 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatCard
           icon={<Users className="text-emerald-600" />}
           label="Total Clients"
           value={isLoading ? "…" : clientsQuery.data?.length ?? 0}
-        />
-        <StatCard
-          icon={<Dog className="text-blue-600" />}
-          label="Registered Animals"
-          value={isLoading ? "…" : animalsQuery.data?.length ?? 0}
         />
         <StatCard
           icon={<TrendingUp className="text-purple-600" />}
@@ -79,6 +85,31 @@ const Dashboard = () => {
           label="Overdue Treatments"
           value={isLoading ? "…" : overdueQuery.data?.length ?? 0}
         />
+      </div>
+
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-slate-800">
+          <ClipboardList size={18} className="text-emerald-600" /> Herding Program - This Week
+        </h3>
+        {programSteps.length === 0 ? (
+          <p className="text-sm text-slate-400">Nothing due on any client's herding program this week.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {programSteps.slice(0, 8).map((s) => (
+              <li key={`${s.program_id}-${s.step_id}`} className="flex flex-wrap items-center gap-3 py-2 text-sm">
+                <span className="w-24 shrink-0 font-medium text-slate-700">{dayLabel(s.date, { day: "numeric", month: "short" })}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STEP_STATUS[s.status].className}`}>{STEP_STATUS[s.status].label}</span>
+                <span className="min-w-0 flex-1 text-slate-700">{s.stage || s.program_name}</span>
+                <Link to={`/clients/${s.client_id}`} className="text-emerald-700 hover:underline">{s.client_name}</Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        {programSteps.length > 8 && (
+          <Link to="/calendar" className="mt-2 inline-block text-sm text-emerald-700 hover:underline">
+            {programSteps.length - 8} more in the calendar
+          </Link>
+        )}
       </div>
 
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">

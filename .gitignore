@@ -44,5 +44,3 @@ Thumbs.db
 /build/
 desktop-app/backend/
 
-# Real Sage exports used to build the importer - client data, never commit
-sage-samples/

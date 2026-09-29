@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Search, Users, Dog, Package } from "lucide-react";
+import { Search, Users, Package } from "lucide-react";
 import apiClient from "../api/client";
 
 const PER_GROUP = 5;
@@ -12,7 +12,7 @@ const listQuery = (key, path, enabled) => ({
   enabled,
 });
 
-// Header search across clients, animals and products. Reuses the same
+// Header search across clients and products. Reuses the same
 // query keys as the list pages, so it shares their cache instead of
 // refetching; nothing loads until the box is first focused.
 const GlobalSearch = () => {
@@ -24,7 +24,6 @@ const GlobalSearch = () => {
   const navigate = useNavigate();
 
   const { data: clients = [] } = useQuery(listQuery("clients", "/clients/", loaded));
-  const { data: animals = [] } = useQuery(listQuery("animals", "/animals/", loaded));
   const { data: products = [] } = useQuery(listQuery("products", "/products/", loaded));
 
   useEffect(() => {
@@ -41,19 +40,14 @@ const GlobalSearch = () => {
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    const ownerName = Object.fromEntries(clients.map((c) => [c.id, c.name]));
     return [
       ...clients.filter((c) => matches(q, c.name, c.farm_name, c.email, c.phone)).slice(0, PER_GROUP)
         .map((c) => ({ key: `c${c.id}`, group: "Clients", Icon: Users, title: c.name, sub: c.farm_name || c.phone, to: `/clients/${c.id}` })),
-      ...animals.filter((a) => matches(q, a.name, a.tag_id, a.breed)).slice(0, PER_GROUP)
-        .map((a) => ({ key: `a${a.id}`, group: "Animals", Icon: Dog, title: a.name,
-          sub: [a.species, a.tag_id && `Tag ${a.tag_id}`, ownerName[a.client_id]].filter(Boolean).join(" · "),
-          to: `/clients/${a.client_id}` })),
       ...products.filter((p) => matches(q, p.name, p.code)).slice(0, PER_GROUP)
         .map((p) => ({ key: `p${p.id}`, group: "Products", Icon: Package, title: p.name,
           sub: `R ${Number(p.price || 0).toFixed(2)}${p.code ? ` · ${p.code}` : ""}`, to: "/products" })),
     ];
-  }, [query, clients, animals, products]);
+  }, [query, clients, products]);
 
   const go = (result) => {
     navigate(result.to);

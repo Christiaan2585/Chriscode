@@ -38,9 +38,12 @@ const NUMBERING = [
 const inputClass =
   "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50 disabled:text-slate-500";
 
-const Field = ({ label, children, hint }) => (
+const Field = ({ label, children, hint, required = false }) => (
   <label className="block">
-    <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
+    <span className="mb-1 block text-sm font-medium text-slate-700">
+      {label}
+      {required && <span className="text-red-600" aria-label="required"> *</span>}
+    </span>
     {children}
     {hint && <span className="mt-1 block text-xs text-slate-500">{hint}</span>}
   </label>
@@ -68,6 +71,7 @@ const BusinessForm = ({ saved, canEdit, justSaved, onSaved }) => {
   });
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
+  const required = new Set(saved.required_fields || []);
 
   return (
     <form
@@ -82,6 +86,9 @@ const BusinessForm = ({ saved, canEdit, justSaved, onSaved }) => {
           Still needed on your invoices: {saved.missing.join(", ")}.
         </p>
       )}
+      <p className="text-xs text-slate-500">
+        <span className="text-red-600">*</span> Needed on your invoices. Everything else is optional.
+      </p>
       <fieldset disabled={!canEdit} className="space-y-6">
         {SECTIONS.map(([title, fields], i) => (
           <React.Fragment key={title}>
@@ -89,7 +96,7 @@ const BusinessForm = ({ saved, canEdit, justSaved, onSaved }) => {
               <h4 className="text-sm font-semibold text-slate-800">{title}</h4>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {fields.map(([key, label, placeholder]) => (
-                  <Field key={key} label={label}>
+                  <Field key={key} label={label} required={required.has(key)}>
                     <input className={inputClass} value={draft[key] ?? ""} onChange={set(key)} placeholder={placeholder} />
                   </Field>
                 ))}
@@ -100,7 +107,7 @@ const BusinessForm = ({ saved, canEdit, justSaved, onSaved }) => {
                 <h4 className="text-sm font-semibold text-slate-800">Addresses</h4>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {AREA_FIELDS.map(([key, label]) => (
-                    <Field key={key} label={label}>
+                    <Field key={key} label={label} required={required.has(key)}>
                       <textarea rows={4} className={inputClass} value={draft[key] ?? ""} onChange={set(key)} />
                     </Field>
                   ))}

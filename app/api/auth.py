@@ -1,8 +1,9 @@
+import base64
 import re
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlmodel import Session, select
 
@@ -20,8 +21,9 @@ from app.core.security import (
     require_admin,
     verify_secret,
 )
+from app.core.images import NotAnImage, process_avatar
 from app.models.remember_token import RememberToken
-from app.models.user import User
+from app.models.user import User, UserPhoto
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -38,12 +40,16 @@ class UserOut(BaseModel):
     has_pin: bool
 
     @staticmethod
-    def from_user(user: User) -> "UserOut":
+    def from_user(user: User, session: Session) -> "UserOut":
+        # An uploaded photo wins over the Google picture. It's sent inline (a
+        # ~20 KB data URL) so the lock screen can keep showing it from the
+        # device's remembered details, before anyone has signed in.
+        photo = session.get(UserPhoto, user.id)
         return UserOut(
             id=user.id,
             name=user.name,
             email=user.email,
-            avatar_url=user.avatar_url,
+            avatar_url="data:image/jpeg;base64," + base64.b64encode(photo.image).decode() if photo else user.avatar_url,
             phone=user.phone,
             is_admin=user.is_admin,
             has_pin=bool(user.pin_hash),
@@ -109,7 +115,7 @@ def _issue_auth_result(user: User, session: Session) -> AuthResult:
     return AuthResult(
         access_token=create_access_token(user.id),
         remember_token=raw_remember_token,
-        user=UserOut.from_user(user),
+        user=UserOut.from_user(user, session),
     )
 
 
@@ -237,7 +243,7 @@ def verify_pin(payload: PinVerifyRequest, session: Session = Depends(get_session
     return AuthResult(
         access_token=create_access_token(user.id),
         remember_token=payload.remember_token,
-        user=UserOut.from_user(user),
+        user=UserOut.from_user(user, session),
     )
 
 
@@ -258,8 +264,8 @@ def forget_device(payload: ForgetDeviceRequest, session: Session = Depends(get_s
 
 
 @router.get("/me", response_model=UserOut)
-def me(user: User = Depends(get_current_user)):
-    return UserOut.from_user(user)
+def me(user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    return UserOut.from_user(user, session)
 
 
 class ProfileUpdate(BaseModel):
@@ -279,13 +285,44 @@ def update_me(payload: ProfileUpdate, user: User = Depends(get_current_user), se
     session.add(user)
     session.commit()
     session.refresh(user)
-    return UserOut.from_user(user)
+    return UserOut.from_user(user, session)
+
+
+MAX_PHOTO_UPLOAD_BYTES = 10 * 1024 * 1024  # phone photos are a few MB
+
+
+@router.put("/me/photo", response_model=UserOut)
+async def upload_my_photo(file: UploadFile = File(...), user: User = Depends(get_current_user),
+                          session: Session = Depends(get_session)):
+    """The signed-in user's own profile photo, stored as a small square JPEG
+    (re-encoding also drops EXIF data such as GPS location)."""
+    data = await file.read(MAX_PHOTO_UPLOAD_BYTES + 1)
+    if len(data) > MAX_PHOTO_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="That photo is over 10 MB - please use a smaller one")
+    try:
+        image = process_avatar(data)
+    except NotAnImage:
+        raise HTTPException(status_code=422, detail="That file isn't a picture this app can read (use JPG, PNG or WEBP)")
+    row = session.get(UserPhoto, user.id) or UserPhoto(user_id=user.id, image=b"")
+    row.image, row.updated_at = image, datetime.utcnow()
+    session.add(row)
+    session.commit()
+    return UserOut.from_user(user, session)
+
+
+@router.delete("/me/photo", response_model=UserOut)
+def delete_my_photo(user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    row = session.get(UserPhoto, user.id)
+    if row:
+        session.delete(row)
+        session.commit()
+    return UserOut.from_user(user, session)
 
 
 @router.get("/users", response_model=List[UserOut])
 def list_users(_: User = Depends(require_admin), session: Session = Depends(get_session)):
     users = session.exec(select(User).where(User.is_active == True)).all()  # noqa: E712
-    return [UserOut.from_user(u) for u in users]
+    return [UserOut.from_user(u, session) for u in users]
 
 
 @router.post("/users", response_model=UserOut)
@@ -302,7 +339,7 @@ def add_user(payload: AddUserRequest, _: User = Depends(require_admin), session:
     session.add(user)
     session.commit()
     session.refresh(user)
-    return UserOut.from_user(user)
+    return UserOut.from_user(user, session)
 
 
 @router.delete("/users/{user_id}")

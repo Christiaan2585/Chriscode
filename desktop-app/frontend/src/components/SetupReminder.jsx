@@ -1,12 +1,22 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import apiClient from "../api/client";
 import Modal from "./Modal";
 import BusinessSettings from "./BusinessSettings";
 
 const DISMISS_KEY = "sandveld_setup_later";
+// The bar stays hidden until what's missing changes (see `signature`).
+const HIDE_BAR_KEY = "sandveld_setup_bar_hidden";
+
+const readHiddenBar = () => {
+  try {
+    return localStorage.getItem(HIDE_BAR_KEY);
+  } catch {
+    return null;
+  }
+};
 
 const wasDismissed = () => {
   try {
@@ -18,7 +28,8 @@ const wasDismissed = () => {
 
 // Nags until invoices have what they need: the business details (the admin
 // is walked through them once per session) and the user's own phone number,
-// which is printed as the sales rep on what they create.
+// which is printed as the sales rep on what they create - plus their profile
+// photo, which the business wants every user to have.
 const SetupReminder = ({ user }) => {
   const { data } = useQuery({
     queryKey: ["business"],
@@ -26,9 +37,20 @@ const SetupReminder = ({ user }) => {
     enabled: Boolean(user),
   });
   const [dismissed, setDismissed] = useState(wasDismissed);
+  const [hiddenBar, setHiddenBar] = useState(readHiddenBar);
   const missing = data?.missing || [];
-  const needsPhone = Boolean(user) && !user.phone;
-  if (!missing.length && !needsPhone) return null;
+  const own = user ? [!user.phone && "your phone number", !user.avatar_url && "a profile photo"].filter(Boolean) : [];
+  if (!missing.length && !own.length) return null;
+  const signature = [...missing, ...own].join("|");
+
+  const hideBar = () => {
+    setHiddenBar(signature);
+    try {
+      localStorage.setItem(HIDE_BAR_KEY, signature);
+    } catch {
+      // Storage blocked - hidden for this session only.
+    }
+  };
 
   const later = () => {
     setDismissed(true);
@@ -41,7 +63,8 @@ const SetupReminder = ({ user }) => {
 
   return (
     <>
-      <div role="status" className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-amber-200 bg-amber-50 px-8 py-2 text-sm text-amber-700">
+      {hiddenBar !== signature && (
+      <div role="status" className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-amber-200 bg-amber-50 py-2 pl-8 pr-3 text-sm text-amber-700">
         <AlertTriangle size={16} className="shrink-0" aria-hidden="true" />
         {missing.length > 0 && (
           <span>
@@ -53,13 +76,18 @@ const SetupReminder = ({ user }) => {
             )}
           </span>
         )}
-        {needsPhone && (
+        {own.length > 0 && (
           <span>
-            Add your phone number, printed as the sales rep on your invoices.{" "}
+            Add {own.join(" and ")}{!user.phone ? " (your number is printed as the sales rep on your invoices)" : ""}.{" "}
             <Link to="/settings" className="font-semibold underline">My details</Link>
           </span>
         )}
+        <button type="button" onClick={hideBar} title="Hide this warning" aria-label="Hide this warning"
+          className="ml-auto rounded-md p-1 text-amber-700 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500">
+          <X size={16} aria-hidden="true" />
+        </button>
       </div>
+      )}
 
       <Modal isOpen={Boolean(user?.is_admin) && missing.length > 0 && !dismissed} onClose={later} size="lg"
         title="Set up your business details">

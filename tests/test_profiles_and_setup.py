@@ -18,6 +18,7 @@ COMPLETE = dict(
     trading_name="NSL de Waal t/a Sandveld Veedienste",
     physical_address="1 Sample street\nGraafwater",
     phone="000 000 0000",
+    email="office@example.com",
     bank_name="Sample Bank",
     bank_account_holder="NSL de Waal",
     bank_account_number="0000000000",
@@ -55,6 +56,17 @@ class SetupAndProfileTests(unittest.TestCase):
 
     def test_blank_text_counts_as_missing(self):
         self.assertIn("Bank details", self.save_business(**{**COMPLETE, "bank_account_number": "   "})["missing"])
+
+    def test_email_is_required(self):
+        self.assertIn("Email", self.save_business(**{**COMPLETE, "email": ""})["missing"])
+
+    def test_everything_else_is_optional(self):
+        out = self.save_business(**COMPLETE)
+        self.assertEqual(out["missing"], [])
+        self.assertIsNone(out["vat_number"] or None)
+        self.assertEqual(set(out["required_fields"]), {
+            "trading_name", "physical_address", "phone", "email",
+            "bank_name", "bank_account_holder", "bank_account_number", "bank_branch_code"})
 
     # --- per-user sales rep ---
 
