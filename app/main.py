@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from app.core.db import create_db_and_tables, database_file_path
 from app.core.backup import backup_on_version_change, start_scheduler
 from app.core.security import get_current_user
-from app.api import auth, clients, animals, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups, exports, business, purchase_orders
+from app.api import auth, clients, animals, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups, exports, business, purchase_orders, devices
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -63,6 +63,10 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+# Phones (Settings -> Phones): not behind the router-wide sign-in because a
+# phone pairs before it has an account token - /devices/pair is guarded by a
+# one-time code, every other route in it by require_admin + require_local.
+app.include_router(devices.router)
 
 # Every business route requires a signed-in user. auth.router is included
 # above this line (unprotected: you need to be able to log in before you
@@ -110,6 +114,15 @@ def on_startup():
         logger.exception("Pre-update backup failed")
     create_db_and_tables()
     start_scheduler(database_file_path())
+    try:
+        devices.start_if_enabled(app)  # the phone connection, if Settings -> Phones had it on
+    except Exception:
+        logger.exception("Couldn't start the phone connection")
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    devices.SERVER.stop()
 
 @app.get("/")
 def read_root():

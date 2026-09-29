@@ -8,6 +8,7 @@ pandas
 openpyxl
 reportlab
 pypdf
+cryptography
 python-multipart
 bcrypt
 pyjwt

@@ -153,11 +153,36 @@ def setup_first_account(payload: SetupRequest, session: Session = Depends(get_se
     return _issue_auth_result(user, session)
 
 
+# Password guessing limit - the PIN has had one from the start; the password
+# didn't need one while only this PC could reach the backend. Phones on the
+# office network (app/core/lan.py) changed that.
+MAX_LOGIN_ATTEMPTS = 5
+LOGIN_LOCKOUT = timedelta(minutes=15)
+
+
+def _utcnow() -> datetime:
+    return datetime.utcnow()
+
+
 @router.post("/login", response_model=AuthResult)
 def login(payload: LoginRequest, session: Session = Depends(get_session)):
     user = session.exec(select(User).where(User.email == payload.email.lower())).first()
+    now = _utcnow()
+    if user and user.login_locked_until and user.login_locked_until > now:
+        minutes = max(1, int((user.login_locked_until - now).total_seconds() // 60) + 1)
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail=f"Too many wrong passwords - try again in {minutes} minutes")
     if not user or not user.is_active or not verify_secret(payload.password, user.password_hash):
+        if user:
+            user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+            if user.failed_login_attempts >= MAX_LOGIN_ATTEMPTS:
+                user.login_locked_until = now + LOGIN_LOCKOUT
+                user.failed_login_attempts = 0
+            session.add(user)
+            session.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
+    user.failed_login_attempts = 0
+    user.login_locked_until = None
     return _issue_auth_result(user, session)
 
 

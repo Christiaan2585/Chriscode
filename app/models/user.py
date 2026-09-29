@@ -16,6 +16,10 @@ class User(SQLModel, table=True):
     is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login_at: Optional[datetime] = None
+    # Password sign-in limit (2026-09-29, before phones could reach the
+    # backend): see auth.MAX_LOGIN_ATTEMPTS. NULL on older rows = 0 / unlocked.
+    failed_login_attempts: Optional[int] = 0
+    login_locked_until: Optional[datetime] = None
 
 
 class UserPhoto(SQLModel, table=True):

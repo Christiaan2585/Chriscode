@@ -6,6 +6,7 @@ import { authService } from "../api/authService";
 import { useAuth } from "../context/AuthContext";
 import ImportModal from "../components/ImportModal";
 import MyDetails from "../components/MyDetails";
+import PhoneSettings from "../components/PhoneSettings";
 import Avatar from "../components/Avatar";
 import { isUpdaterAvailable, checkForUpdates, quitAndInstall, getUpdateStatus, onUpdateStatus } from "../utils/updater";
 import { canChooseFolder, canOpenFolder, chooseFolder, openFolder } from "../utils/desktop";
@@ -400,6 +401,8 @@ const Settings = () => {
       <SoftwareUpdateSettings currentVersion={version?.version} />
 
       <SecuritySettings />
+
+      {user?.is_admin && <PhoneSettings />}
 
       <DataImportSettings />
 
