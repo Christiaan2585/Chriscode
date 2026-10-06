@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 from pypdf import PdfReader
 
-from app.core.pdf import ORDER_CLIENT_FIELD, ORDER_NOTES_FIELD, ORDER_QTY_PREFIX
+from app.core.pdf import ORDER_CLIENT_FIELD, ORDER_NOTES_FIELD, ORDER_PICK_PREFIX, ORDER_QTY_PREFIX
 
 MAX_QUANTITY = 100_000
 
@@ -61,4 +61,13 @@ def read_order_form(data: bytes) -> OrderForm:
             continue
         if quantity:
             form.quantities[int(suffix)] = quantity
+    # A ticked box with no quantity typed means one; a typed quantity always wins.
+    for name in fields:
+        suffix = name[len(ORDER_PICK_PREFIX):]
+        if not name.startswith(ORDER_PICK_PREFIX) or not suffix.isdigit():
+            continue
+        ticked = str(value(name)).strip().lstrip("/").lower() not in ("", "off", "no", "false")
+        product_id = int(suffix)
+        if ticked and product_id not in form.quantities and product_id not in form.unreadable:
+            form.quantities[product_id] = 1.0
     return form

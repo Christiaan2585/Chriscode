@@ -416,6 +416,44 @@ ipcMain.handle('choose-folder', async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+// Sending a catalogue / order form to a client: WhatsApp and email can't be
+// handed a file by another program, so the PDF is saved into Documents\
+// Sandveld Vee Dienste\Sent to clients and shown selected in Explorer, ready
+// to drag into the chat or email. PDFs only, a plain file name, at most 60 MB.
+const MAX_SEND_BYTES = 60 * 1024 * 1024;
+ipcMain.handle('save-for-sending', async (_event, { name, data }) => {
+  const safe = path.basename(String(name || '')).replace(/[^\w .,()'&-]+/g, '').trim().slice(0, 120);
+  if (!safe.toLowerCase().endsWith('.pdf') || !(data instanceof ArrayBuffer || ArrayBuffer.isView(data))) {
+    return { error: 'Only PDF files can be saved for sending' };
+  }
+  const bytes = Buffer.from(data instanceof ArrayBuffer ? data : data.buffer);
+  if (bytes.length > MAX_SEND_BYTES || bytes.subarray(0, 4).toString() !== '%PDF') {
+    return { error: 'That file is not a PDF this app made' };
+  }
+  const folder = path.join(app.getPath('documents'), 'Sandveld Vee Dienste', 'Sent to clients');
+  fs.mkdirSync(folder, { recursive: true });
+  const file = path.join(folder, safe);
+  fs.writeFileSync(file, bytes);
+  shell.showItemInFolder(file);
+  return { path: file };
+});
+
+// Opens WhatsApp (wa.me, in the user's browser, which hands over to the
+// WhatsApp app) or the email program (mailto:). Nothing else - the renderer
+// must never be able to make this open arbitrary links or programs.
+ipcMain.handle('open-send-link', async (_event, url) => {
+  let parsed;
+  try {
+    parsed = new URL(String(url));
+  } catch {
+    return false;
+  }
+  const allowed = (parsed.protocol === 'https:' && parsed.hostname === 'wa.me') || parsed.protocol === 'mailto:';
+  if (!allowed) return false;
+  await shell.openExternal(parsed.toString());
+  return true;
+});
+
 // Directories only: shell.openPath on a *file* launches it with its default
 // program, which a compromised renderer must never be able to trigger.
 ipcMain.handle('open-folder', async (_event, folderPath) => {

@@ -330,8 +330,27 @@ _CAT = {
 
 # Field names on the fillable order form, read back by app/core/order_form.py.
 ORDER_QTY_PREFIX = "qty_"
+ORDER_PICK_PREFIX = "pick_"  # tick box: ticked with no quantity typed = 1
 ORDER_CLIENT_FIELD = "order_client"
 ORDER_NOTES_FIELD = "order_notes"
+
+
+class _TickBox(Flowable):
+    """A fillable PDF tick box (AcroForm checkbox, on-state /Yes)."""
+
+    def __init__(self, name, size, tooltip=None):
+        super().__init__()
+        self.name, self.width, self.height, self.tooltip = name, size, size, tooltip
+
+    def wrap(self, *_):
+        return self.width, self.height
+
+    def draw(self):
+        self.canv.acroForm.checkbox(
+            name=self.name, tooltip=self.tooltip, x=0, y=0, relative=True, size=self.width, buttonStyle="check",
+            borderColor=BRAND, fillColor=colors.white, textColor=BRAND, borderWidth=1, forceBorder=True,
+            fieldFlags="", annotationFlags="print",
+        )
 
 
 class _FormField(Flowable):
@@ -382,9 +401,10 @@ def _catalogue_card(product, picture, width, price_note, order_form=False):
     if product.in_stock is False:
         text.append(Paragraph("Out of stock", _CAT["stock"]))
     if order_form:
-        qty = Table([[Paragraph("Qty", _CAT["qty"]),
+        qty = Table([[_TickBox(f"{ORDER_PICK_PREFIX}{product.id}", 5 * mm, tooltip=f"I want {product.name}"),
+                      Paragraph("Qty", _CAT["qty"]),
                       _FormField(f"{ORDER_QTY_PREFIX}{product.id}", 16 * mm, 6 * mm, tooltip=f"How many {product.name}")]],
-                    colWidths=[8 * mm, 17 * mm], hAlign="LEFT")
+                    colWidths=[7 * mm, 8 * mm, 17 * mm], hAlign="LEFT")
         qty.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
                                  ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
         text.append(qty)
@@ -428,7 +448,7 @@ def generate_catalogue_pdf(business, groups, order_for=None):
         ) if v) or "us"
         story += [
             _FormField(ORDER_CLIENT_FIELD, 1, 1, value=str(order_for.id), hidden=True),
-            Paragraph("<b>How to order:</b> type how many you want in the Qty box of each product, add any notes "
+            Paragraph("<b>How to order:</b> tick each product you want and type how many in its Qty box, add any notes "
                       f"at the end, then save this PDF and send it back to us on {send_to}.", _CAT["how"]),
             Spacer(1, 5 * mm),
         ]
@@ -477,12 +497,14 @@ def _amount(value) -> str:
 def _product_line(line) -> str:
     who = _text(line["animal_group"] or "all animals")
     text = f"<b>{_text(line['product_name'])}</b>"
-    if line["dose"]:
+    if line.get("fixed_quantity"):
+        text += f" x {_amount(line['fixed_quantity'])}"
+    elif line["dose"]:
         text += f" - {_amount(line['dose'])} {_text(line['unit'])} per animal ({who})"
         if line["total"]:
             text += f": {line['head']} x {_amount(line['dose'])} = {_amount(line['total'])} {_text(line['unit'])}"
             if line["pack_size"]:
-                text += f" ({_amount(line['units'])} x {_amount(line['pack_size'])} {_text(line['unit'])})"
+                text += f" ({_amount(line['buy'])} x {_amount(line['pack_size'])} {_text(line['unit'])})"
     if line["note"]:
         text += f" - {_text(line['note'])}"
     return text
@@ -521,7 +543,8 @@ def generate_program_pdf(business, client, program, groups, schedule, template):
              ("GRID", (0, 0), (-1, -1), 0.4, RULE), ("TOPPADDING", (0, 0), (-1, -1), 3),
              ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]
     for step in schedule["steps"]:
-        when = f"{step['date']:%d %b %Y}" + ("<br/><font color='#047857'>Done</font>" if step["status"] == "done" else "")
+        when = (f"{step['date']:%d %b %Y}" if step["date"] else "Any time") \
+            + ("<br/><font color='#047857'>Done</font>" if step["status"] == "done" else "")
         rows.append([Paragraph(when, _PROG["date"])]
                     + [Paragraph(_text(step[key]), _PROG["cell"]) for key, _ in PROGRAM_COLUMNS])
         if step["products"]:
@@ -533,6 +556,101 @@ def generate_program_pdf(business, client, program, groups, schedule, template):
     story = [header, Spacer(1, 5 * mm), table]
     if not schedule["steps"]:
         story.append(_p("The master herding program has no steps yet."))
+    doc.build(story, canvasmaker=_NumberedCanvas)
+    buffer.seek(0)
+    return buffer
+
+
+# --- A client's program costs, laid out like the business's cost sheet ---
+
+_COST = {
+    "cell": ParagraphStyle("cost_cell", **{**_BASE, "fontSize": 7.5, "leading": 9}),
+    "num": ParagraphStyle("cost_num", **{**_BASE, "fontSize": 7.5, "leading": 9, "alignment": TA_RIGHT}),
+    "head": ParagraphStyle("cost_head", **{**_BASE, "fontName": "Helvetica-Bold", "fontSize": 7.5, "leading": 9,
+                                           "textColor": colors.white}),
+    "step": ParagraphStyle("cost_step", **{**_BASE, "fontName": "Helvetica-Bold", "fontSize": 8.5, "leading": 10.5}),
+    "sum": ParagraphStyle("cost_sum", **{**_BASE, "fontName": "Helvetica-Bold", "fontSize": 8, "leading": 10,
+                                         "alignment": TA_RIGHT}),
+}
+
+
+def _cost_row(line):
+    pack = f"{_amount(line['pack_size'])} {_text(line['unit'] or '')}".strip() if line["pack_size"] else ""
+    if line["fixed_quantity"]:
+        dose, head = f"x {_amount(line['fixed_quantity'])}", ""
+    else:
+        dose = f"{_amount(line['dose'])} {_text(line['unit'] or '')}".strip() if line["dose"] else "-"
+        head = f"{line['head']:,}" + (f"<br/><font size=6 color='#6b7280'>{_text(line['animal_group'])}</font>"
+                                    if line["animal_group"] else "")
+    used = f"{line['used']:.2f}" + (f" ({_amount(line['buy'])})" if line["buy"] != line["used"] else "")
+    return [Paragraph(_text(line["category"]), _COST["cell"]), Paragraph(_text(line["product_name"]), _COST["cell"]),
+            Paragraph(pack, _COST["cell"]), Paragraph(money(line["price_excl_vat"]), _COST["num"]),
+            Paragraph(dose, _COST["num"]), Paragraph(head, _COST["num"]), Paragraph(used, _COST["num"]),
+            Paragraph(money(line["cost_used"]), _COST["num"])]
+
+
+def generate_program_cost_pdf(business, client, program, groups, schedule, rep=(None, None, None)):
+    """Every step's products with pack, price excl VAT, dose, animals, packs
+    used (whole packs to buy in brackets) and cost; step subtotals, the
+    total and the cost per animal per year - the cost sheet, per client."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=12 * mm, rightMargin=12 * mm,
+                            topMargin=12 * mm, bottomMargin=16 * mm, title=f"{program.name} - costs")
+    width = doc.width
+    totals = schedule["totals"]
+    logo = _logo_bytes()
+    year = schedule["anchors"]["lambing_start"].year if schedule["anchors"] else ""
+    rep_lines = [_text(v) for v in rep if v]
+    client_lines = [_text(v) for v in ((client.farm_name, client.name, client.address, client.email, client.phone,
+                                        f"VAT no: {client.vat_number}" if client.vat_number else None)
+                                       if client else ()) if v]
+    counts = [[Paragraph(_text(g.animal_type), _COST["cell"]), Paragraph(f"{g.group_size:,}", _COST["num"])] for g in groups]
+    counts.append([Paragraph("<b>Total animals</b>", _COST["cell"]), Paragraph(f"<b>{totals['animals']:,}</b>", _COST["num"])])
+    count_table = Table(counts, colWidths=[30 * mm, 18 * mm])
+    count_table.setStyle(TableStyle([("LINEABOVE", (0, -1), (-1, -1), 0.6, INK), ("TOPPADDING", (0, 0), (-1, -1), 1),
+                                     ("BOTTOMPADDING", (0, 0), (-1, -1), 1), ("LEFTPADDING", (0, 0), (-1, -1), 0)]))
+    title = [Paragraph(f"VACCINATION &amp; DOSING COSTS {year}", _CAT["title"]),
+             Paragraph(f"<b>{_text(program.name)}</b> · amounts exclude VAT", _CAT["sub"])]
+    if rep_lines:
+        title.append(Paragraph("Sales rep: " + " · ".join(rep_lines), _CAT["sub"]))
+    header = Table([[title, Image(io.BytesIO(logo), width=22 * mm, height=22 * mm) if logo else ""]],
+                   colWidths=[width - 26 * mm, 26 * mm])
+    header.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (0, 0), 0),
+                                ("ALIGN", (1, 0), (1, 0), "RIGHT")]))
+    who = Table([[Paragraph("<br/>".join(client_lines) or "&nbsp;", _COST["cell"]), count_table]],
+                colWidths=[width - 52 * mm, 52 * mm])
+    who.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (0, 0), 0)]))
+
+    widths = [26 * mm, 42 * mm, 16 * mm, 20 * mm, 16 * mm, 27 * mm, 18 * mm]
+    widths.append(width - sum(widths))
+    heads = ["", "Product", "Pack", "Price excl VAT", "Dose / animal", "Animals", "Packs used", "Total excl VAT"]
+    rows = [[Paragraph(h, _COST["head"]) for h in heads]]
+    style = [("BACKGROUND", (0, 0), (-1, 0), BRAND), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+             ("LINEBELOW", (0, 1), (-1, -1), 0.3, RULE), ("TOPPADDING", (0, 0), (-1, -1), 2),
+             ("BOTTOMPADDING", (0, 0), (-1, -1), 2)]
+    for step in schedule["steps"]:
+        if not step["products"]:
+            continue
+        when = f"{step['date']:%a %d %b %Y}" if step["date"] else ""
+        label = " · ".join(_text(v) for v in (when, step["stage"]) if v) or "&nbsp;"
+        rows.append([Paragraph(label, _COST["step"])] + [""] * 7)
+        style += [("SPAN", (0, len(rows) - 1), (-1, len(rows) - 1)),
+                  ("BACKGROUND", (0, len(rows) - 1), (-1, len(rows) - 1), colors.HexColor("#ecfdf5"))]
+        rows += [_cost_row(line) for line in step["products"]]
+        rows.append([""] * 6 + [Paragraph("Subtotal", _COST["sum"]), Paragraph(money(step["subtotal"]), _COST["sum"])])
+    table = Table(rows, colWidths=widths, repeatRows=1)
+    table.setStyle(TableStyle(style))
+
+    summary = Table([
+        [Paragraph("Total (what's used)", _COST["sum"]), Paragraph(money(totals["cost_used"]), _COST["sum"])],
+        [Paragraph("Total buying whole packs", _COST["num"]), Paragraph(money(totals["cost_buy"]), _COST["num"])],
+        [Paragraph("Cost per animal per year", _COST["sum"]), Paragraph(money(totals["per_animal"]), _COST["sum"])],
+    ], colWidths=[50 * mm, 30 * mm], hAlign="RIGHT")
+    summary.setStyle(TableStyle([("LINEABOVE", (0, 0), (-1, 0), 0.8, INK), ("TOPPADDING", (0, 0), (-1, -1), 2)]))
+    story = [header, Spacer(1, 3 * mm), who, Spacer(1, 4 * mm), table, Spacer(1, 3 * mm), summary]
+    if business.trading_name:
+        story += [Spacer(1, 4 * mm), _p(" · ".join(_text(v) for v in (business.trading_name, business.phone,
+                                                                        business.email) if v), "label")]
     doc.build(story, canvasmaker=_NumberedCanvas)
     buffer.seek(0)
     return buffer

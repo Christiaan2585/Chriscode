@@ -23,13 +23,32 @@ export const pdfFilename = (kind, id, number) => `${number || `${kind}_${id}`}.p
 
 // The catalogue as a fillable order form for one client (DocumentPreview doc).
 // What they fill in comes back through the Quotes page's "Import order form".
-export const orderFormFor = (client) => ({
-  kind: "catalogue",
-  title: `order form for ${client.name}`,
-  url: `/products/catalogue.pdf?client_id=${client.id}`,
-  filename: `Order form - ${client.name.replace(/[\\/:*?"<>|]+/g, "")}.pdf`,
-  hint: "Download it and send it on WhatsApp or email. When it comes back filled in, use \"Import order form\" on the Quotes page.",
-});
+// What goes with an order form sent to a client, in their language (utils/sending.js).
+export const orderFormMessage = (client, lang) =>
+  lang === "af"
+    ? {
+        subject: "Ons produkkatalogus en bestelvorm",
+        message: `Goeie dag ${client.name}, hier is ons produkkatalogus met pryse. Merk wat u wil hê, tik hoeveel in die Hoev.-blokkies, stoor dan die PDF en stuur dit terug na ons. Dankie!`,
+      }
+    : {
+        subject: "Our product catalogue and order form",
+        message: `Good day ${client.name}, here is our product catalogue with prices. Tick what you want, type how many in the Qty boxes, then save the PDF and send it back to us. Thank you!`,
+      };
+
+// With `lang` ("en"/"af") it's the supplier's catalogue book with prices and
+// Qty boxes (app/api/catalogue.py); without, the app's own catalogue.
+export const orderFormFor = (client, lang = null) => {
+  const name = client.name.replace(/[\\/:*?"<>|]+/g, "");
+  return {
+    kind: "catalogue",
+    id: lang || "own",
+    title: `order form for ${client.name}${lang === "af" ? " (Afrikaans)" : lang === "en" ? " (English)" : ""}`,
+    url: lang ? `/catalogue/kyron/${lang}.pdf?client_id=${client.id}` : `/products/catalogue.pdf?client_id=${client.id}`,
+    filename: lang === "af" ? `Bestelvorm - ${name}.pdf` : `Order form - ${name}.pdf`,
+    hint: "Send it on WhatsApp or email. When it comes back filled in, use \"Import order form\" on the Quotes page.",
+    send: { phone: client.phone, email: client.email, ...orderFormMessage(client, lang) },
+  };
+};
 
 export async function downloadDocumentPdf(kind, id, number) {
   saveBlob(await fetchDocumentPdf(kind, id), pdfFilename(kind, id, number));

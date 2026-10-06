@@ -59,6 +59,23 @@ class OrderFormTests(unittest.TestCase):
     def test_plain_catalogue_has_no_form_fields(self):
         self.assertEqual(self.form_fields(catalogue_bytes(self.s)), {})
 
+    def test_order_form_has_a_tick_box_per_product(self):
+        fields = self.form_fields(catalogue_bytes(self.s, self.client.id))
+        self.assertIn(f"pick_{self.dip.id}", fields)
+        self.assertIn(f"pick_{self.tag.id}", fields)
+
+    def test_ticked_without_a_quantity_means_one(self):
+        data = fill(catalogue_bytes(self.s, self.client.id), {f"pick_{self.dip.id}": "/Yes"})
+        quote = self.order(data)["quote"]
+        items = self.s.exec(select(QuoteItem).where(QuoteItem.quote_id == quote.id)).all()
+        self.assertEqual([(i.product_id, i.quantity) for i in items], [(self.dip.id, 1.0)])
+
+    def test_typed_quantity_wins_over_the_tick(self):
+        data = fill(catalogue_bytes(self.s, self.client.id), {f"pick_{self.dip.id}": "/Yes", f"qty_{self.dip.id}": "4"})
+        quote = self.order(data)["quote"]
+        items = self.s.exec(select(QuoteItem).where(QuoteItem.quote_id == quote.id)).all()
+        self.assertEqual([(i.product_id, i.quantity) for i in items], [(self.dip.id, 4.0)])
+
     def test_order_form_has_a_quantity_box_per_active_product(self):
         fields = self.form_fields(catalogue_bytes(self.s, self.client.id))
         self.assertIn(f"qty_{self.dip.id}", fields)

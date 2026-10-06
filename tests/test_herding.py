@@ -102,18 +102,22 @@ class AnchorDateTests(HerdingTestCase):
 
 
 class DoseTests(unittest.TestCase):
+    def packs(self, product, dose, head):
+        costs = herding.line_costs(product, dose, head, None, product.price)
+        return costs["total"], costs["buy"]
+
     def test_bottles_are_rounded_up(self):
         product = Product(name="Vaccine X 100ml", price=100, unit="ml", pack_size=100)
-        self.assertEqual(herding.quantity_for(product, 2, 120), (240, 3))
+        self.assertEqual(self.packs(product, 2, 120), (240, 3))
 
     def test_product_without_pack_size_is_counted_per_dose(self):
         product = Product(name="Ear tag", price=10)
-        self.assertEqual(herding.quantity_for(product, 1, 120), (120, 120))
+        self.assertEqual(self.packs(product, 1, 120), (120, 120))
 
     def test_no_dose_or_no_animals_means_nothing(self):
         product = Product(name="Vaccine X", price=100, pack_size=100)
-        self.assertEqual(herding.quantity_for(product, None, 120), (0, 0))
-        self.assertEqual(herding.quantity_for(product, 2, 0), (0, 0))
+        self.assertEqual(self.packs(product, None, 120), (0, 0))
+        self.assertEqual(self.packs(product, 2, 0), (0, 0))
 
     def test_headcount_by_group(self):
         groups = [AnimalGroup(program_id=1, animal_type="Ooie", group_size=120),
@@ -147,7 +151,7 @@ class ScheduleAndQuoteTests(HerdingTestCase):
         self.assertEqual((first["date"], first["status"]), (date(2025, 10, 6), "overdue"))
         self.assertEqual((second["date"], second["status"]), (date(2026, 4, 27), "upcoming"))
         ewes = first["products"][0]
-        self.assertEqual((ewes["head"], ewes["total"], ewes["units"]), (100, 300, 3))
+        self.assertEqual((ewes["head"], ewes["total"], ewes["buy"]), (100, 300, 3))
         self.assertEqual(out["progress"], {"done": 0, "total": 2})
 
     def test_step_due_within_a_week(self):
@@ -206,9 +210,14 @@ class ScheduleAndQuoteTests(HerdingTestCase):
                          [self.vaccine.id, self.vaccine.id])
 
     def test_deleting_a_step_removes_its_products_and_progress(self):
-        programs.set_step_done(self.prog.id, self.before.id, programs.StepDone(done=True), session=self.s)
         programs.delete_template_step(self.before.id, session=self.s)
         self.assertEqual([l.step_id for l in self.s.exec(select(ProgramStepProduct)).all()], [self.lambing.id])
+
+    def test_deleting_a_master_step_leaves_client_copies_alone(self):
+        programs.set_step_done(self.prog.id, self.before.id, programs.StepDone(done=True), session=self.s)
+        programs.delete_template_step(self.before.id, session=self.s)
+        out = herding.schedule(self.s, self.prog, today=date(2025, 10, 8))
+        self.assertEqual([s["status"] for s in out["steps"]], ["done", "upcoming"])
         self.assertEqual(self.s.exec(select(ProgramStepProgress)).all(), [])
 
 

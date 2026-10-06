@@ -1,5 +1,5 @@
 // Shared bits for the master herding program (pages/Programs.jsx) and a
-// client's run of it (components/HerdingProgramPanel.jsx). Dates and amounts
+// client's own copy of it (components/HerdingProgramPanel.jsx). Dates, amounts and costs
 // are worked out server-side (app/core/herding.py) - nothing is recomputed here.
 
 export const ANCHOR_LABELS = {
@@ -9,6 +9,13 @@ export const ANCHOR_LABELS = {
   lambing_end: "lambing ends",
   weaning: "weaning day",
 };
+export const UNDATED = "none"; // a step with no date - the medicine box
+
+// The five headcounts every program has, as on the business's cost sheet
+// (app/core/herding.py GROUPS). A product line is for one or more of them.
+export const GROUPS = ["Ooie", "Ramme", "Lammers", "Jong ooitjies", "Jong rammetjies"];
+export const splitGroups = (text) =>
+  String(text || "").split(/[,+&]/).map((s) => s.trim()).filter(Boolean);
 
 export const TEXT_COLUMNS = [
   ["management", "Herd management"],
@@ -25,10 +32,12 @@ const span = (days) => {
 };
 
 // "6 weeks before the first mating day", "On weaning day", "3 days after lambing ends"
-export const ruleText = (anchor, offset) =>
-  offset === 0
+export const ruleText = (anchor, offset) => {
+  if (anchor === UNDATED) return "No date - keep on hand";
+  return offset === 0
     ? `On ${ANCHOR_LABELS[anchor]}`
     : `${span(offset)} ${offset < 0 ? "before" : "after"} ${ANCHOR_LABELS[anchor]}`;
+};
 
 // API dates are "YYYY-MM-DD" - read them as local days, not UTC midnight.
 export const parseDay = (d) => {
@@ -45,16 +54,7 @@ export const STEP_STATUS = {
   overdue: { label: "Overdue", className: "bg-red-100 text-red-700" },
   due: { label: "This week", className: "bg-amber-100 text-amber-700" },
   upcoming: { label: "Coming up", className: "bg-slate-100 text-slate-600" },
+  none: { label: "Any time", className: "bg-slate-100 text-slate-500" },
 };
 
-const amount = (n) => Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
-
-// "3 ml each for Ooie (120): 360 ml = 4 x 100 ml"
-export const productAmount = (line) => {
-  if (!line.dose) return "No dose set";
-  const who = line.animal_group || "all animals";
-  const each = `${amount(line.dose)} ${line.unit} each for ${who}`;
-  if (!line.total) return `${each} - no ${who.toLowerCase()} counted in this program`;
-  const packs = line.pack_size ? ` = ${amount(line.units)} x ${amount(line.pack_size)} ${line.unit}` : "";
-  return `${each} (${line.head}): ${amount(line.total)} ${line.unit}${packs}`;
-};
+export const amount = (n) => Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });

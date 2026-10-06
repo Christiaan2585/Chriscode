@@ -24,6 +24,8 @@ config/backup_settings.json
 
 # Phone connection (app/core/lan.py): this PC's private key and certificate - never commit
 config/lan/
+# The supplier's catalogue books (app/core/kyron_catalogue.py) - their content, never commit
+config/catalogue/
 
 # Google OAuth client secret - see SETUP_GOOGLE_LOGIN.md. config/google_oauth.example.json
 # stays tracked (it's just a blank template); only the real, filled-in file is excluded.

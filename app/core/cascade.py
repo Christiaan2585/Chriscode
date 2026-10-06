@@ -22,7 +22,9 @@ from app.models.order import Order
 from app.models.product import Product, ProductImage
 from app.models.product_dosing import ProductDosing
 from app.models.purchase_order import PurchaseOrderItem
+from app.core import herding
 from app.models.program import AnimalGroup, HerdingProgram, ProgramAssignment, ProgramStepProduct, ProgramStepProgress
+from app.models.catalogue import CatalogueLink
 from app.models.quote import Quote
 from app.models.quote_item import QuoteItem
 from app.models.schedule import HealthSchedule
@@ -70,6 +72,8 @@ def delete_client(session: Session, client: Client) -> None:
         for model in (AnimalGroup, ProgramAssignment, ProgramStepProgress):
             for row in _rows(session, model, model.program_id, program.id):
                 session.delete(row)
+        for step in herding.ordered_steps(session, program.id):  # the client's own copy
+            herding.delete_step(session, step)
         session.delete(program)
     for model in (Appointment, ClientNote, Herd):
         for row in _rows(session, model, model.client_id, client.id):
@@ -87,7 +91,8 @@ def delete_product(session: Session, product: Product) -> None:
             f"{product.name} appears on {_plural(lines, 'invoice/quote line')}, so it can't be deleted - "
             "old invoices and quotes still need its name."
         )
-    for model in (ProductDosing, ProgramStepProduct):  # dosing rules; uses in the master herding program
+    # dosing rules; uses in the master herding program; links to the supplier's catalogue book
+    for model in (ProductDosing, ProgramStepProduct, CatalogueLink):
         for row in _rows(session, model, model.product_id, product.id):
             session.delete(row)
     # Purchase order lines carry their own description, so they only lose the link.

@@ -18,6 +18,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
   chooseFolder: () => ipcRenderer.invoke('choose-folder'),
   openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
+  // Order forms / catalogues for clients: save the PDF where it's easy to
+  // attach and show it in Explorer; open WhatsApp (wa.me) or email (mailto:) only.
+  saveForSending: (name, data) => ipcRenderer.invoke('save-for-sending', { name, data }),
+  openSendLink: (url) => ipcRenderer.invoke('open-send-link', url),
   onUpdateStatus: (callback) => {
     const listener = (_event, status) => callback(status);
     ipcRenderer.on('update-status', listener);

@@ -12,7 +12,7 @@ from app.api.quotes import _recalculate_total, create_quote
 from app.core import herding
 from app.core.db import get_session
 from app.core.dates import coerce_datetime
-from app.core.pdf import generate_program_pdf
+from app.core.pdf import generate_program_cost_pdf, generate_program_pdf
 from app.core.security import get_current_user, require_admin
 from app.models.client import Client
 from app.models.product import Product
@@ -108,6 +108,8 @@ def delete_program(program_id: int, session: Session = Depends(get_session)):
     for model in (ProgramAssignment, ProgramStepProgress):
         for row in session.exec(select(model).where(model.program_id == program_id)).all():
             session.delete(row)
+    for step in herding.ordered_steps(session, program_id):
+        herding.delete_step(session, step)
     session.delete(program)
     session.commit()
     return {"ok": True}
@@ -128,6 +130,33 @@ def add_program_group(program_id: int, group: AnimalGroup, session: Session = De
     session.commit()
     session.refresh(group)
     return group
+
+class HeadCounts(BaseModel):
+    counts: dict[str, int] = Field(max_length=20)
+
+
+@router.put("/{program_id}/counts", response_model=List[AnimalGroup])
+def set_head_counts(program_id: int, data: HeadCounts, session: Session = Depends(get_session)):
+    """Sets the program's headcounts by group name ("Ooie": 1200, ...): a
+    group it already has gets the new count, 0 removes the group."""
+    _program_or_404(session, program_id)
+    existing = {g.animal_type.strip().lower(): g for g in
+                session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program_id)).all()}
+    for name, count in data.counts.items():
+        name = name.strip()[:60]
+        if not name or not 0 <= count <= 1_000_000:
+            raise HTTPException(status_code=422, detail="Each group needs a name and a count from 0 up")
+        group = existing.get(name.lower())
+        if count == 0:
+            if group:
+                session.delete(group)
+            continue
+        group = group or AnimalGroup(program_id=program_id, animal_type=name, group_size=count)
+        group.group_size = count
+        session.add(group)
+    session.commit()
+    return session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program_id)).all()
+
 
 @router.delete("/groups/{group_id}")
 def delete_program_group(group_id: int, session: Session = Depends(get_session)):
@@ -355,9 +384,10 @@ class TemplateSettings(BaseModel):
 
 
 class StepFields(BaseModel):
-    anchor: Optional[Literal[herding.ANCHORS]] = None
+    anchor: Optional[Literal[herding.ANCHORS + (herding.UNDATED,)]] = None
     offset_days: Optional[int] = Field(default=None, ge=-400, le=800)
     sort_order: Optional[int] = None
+    date_override: Optional[date] = None  # a client's own program only
     stage: Optional[str] = Field(default=None, max_length=300)
     management: Optional[str] = Field(default=None, max_length=3000)
     vaccinations: Optional[str] = Field(default=None, max_length=3000)
@@ -368,9 +398,11 @@ class StepFields(BaseModel):
 
 class StepProductFields(BaseModel):
     product_id: Optional[int] = None
-    animal_group: Optional[str] = Field(default=None, max_length=60)
+    animal_group: Optional[str] = Field(default=None, max_length=120)
     dose: Optional[float] = Field(default=None, ge=0, le=100_000)
     note: Optional[str] = Field(default=None, max_length=200)
+    category: Optional[str] = Field(default=None, max_length=80)
+    fixed_quantity: Optional[float] = Field(default=None, ge=0, le=100_000)
 
 
 class StepDone(BaseModel):
@@ -408,7 +440,7 @@ def read_template(mating_date: Optional[date] = None, session: Session = Depends
     if mating_date:
         anchors = herding.anchor_dates(HerdingProgram(name="preview", mating_date=mating_date), out["settings"])
         for step in out["steps"]:
-            step["date"] = anchors[step["anchor"]] + timedelta(days=step["offset_days"])
+            step["date"] = herding.step_date(ProgramStep(anchor=step["anchor"], offset_days=step["offset_days"]), anchors)
     return out
 
 
@@ -439,10 +471,42 @@ async def import_template(file: UploadFile = File(...), session: Session = Depen
     return {**result, **_template_out(session)}
 
 
+@router.post("/template/import-costs")
+async def import_cost_sheet(file: UploadFile = File(...), session: Session = Depends(get_session),
+                            _: User = Depends(require_admin)):
+    """The business's cost sheet ("Ent en doseer kostes"): its product lines,
+    groups and doses go into the master program."""
+    data = await file.read(MAX_TEMPLATE_UPLOAD_BYTES + 1)
+    if len(data) > MAX_TEMPLATE_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="That file is over 5 MB - it can't be a cost sheet")
+    try:
+        result = herding.import_cost_sheet(session, data)
+    except herding.TemplateImportError as exc:
+        session.rollback()
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {**result, **_template_out(session)}
+
+
+def _master_step(session: Session, step_id: int) -> ProgramStep:
+    step = session.get(ProgramStep, step_id)
+    if not step or step.program_id is not None:
+        raise HTTPException(status_code=404, detail="Step not found")
+    return step
+
+
+def _master_line(session: Session, line_id: int) -> ProgramStepProduct:
+    line = session.get(ProgramStepProduct, line_id)
+    step = session.get(ProgramStep, line.step_id) if line else None
+    if step is None or step.program_id is not None:
+        raise HTTPException(status_code=404, detail="Product line not found")
+    return line
+
+
 @router.post("/template/steps")
 def create_template_step(data: StepFields, session: Session = Depends(get_session), _: User = Depends(require_admin)):
-    last = session.exec(select(func.max(ProgramStep.sort_order))).one() or 0
-    step = ProgramStep(**{"sort_order": last + 1, **_blank_to_none(data.model_dump(exclude_unset=True))})
+    last = session.exec(select(func.max(ProgramStep.sort_order)).where(ProgramStep.program_id.is_(None))).one() or 0
+    step = ProgramStep(**{"sort_order": last + 1,
+                          **_blank_to_none(data.model_dump(exclude_unset=True, exclude={"date_override"}))})
     session.add(step)
     session.commit()
     session.refresh(step)
@@ -452,24 +516,26 @@ def create_template_step(data: StepFields, session: Session = Depends(get_sessio
 @router.patch("/template/steps/{step_id}")
 def update_template_step(step_id: int, data: StepFields, session: Session = Depends(get_session),
                          _: User = Depends(require_admin)):
-    step = session.get(ProgramStep, step_id)
-    if not step:
-        raise HTTPException(status_code=404, detail="Step not found")
-    for key, value in _blank_to_none(data.model_dump(exclude_unset=True)).items():
-        if value is None and key in ("anchor", "offset_days", "sort_order"):
-            raise HTTPException(status_code=422, detail="A step needs its date rule")
-        setattr(step, key, value)
+    step = _master_step(session, step_id)
+    _apply_step_changes(step, data.model_dump(exclude_unset=True, exclude={"date_override"}))
     session.add(step)
     session.commit()
     session.refresh(step)
     return step
 
 
+def _apply_step_changes(step: ProgramStep, changes: dict) -> None:
+    for key, value in _blank_to_none(changes).items():
+        if value is None and key in ("anchor", "offset_days", "sort_order"):
+            raise HTTPException(status_code=422, detail="A step needs its date rule")
+        if key == "date_override" and value is not None:
+            value = datetime(value.year, value.month, value.day)
+        setattr(step, key, value)
+
+
 @router.delete("/template/steps/{step_id}")
 def delete_template_step(step_id: int, session: Session = Depends(get_session), _: User = Depends(require_admin)):
-    step = session.get(ProgramStep, step_id)
-    if not step:
-        raise HTTPException(status_code=404, detail="Step not found")
+    step = _master_step(session, step_id)
     herding.delete_step(session, step)
     session.commit()
     return {"ok": True}
@@ -485,8 +551,7 @@ def _checked_product(session: Session, product_id) -> Product:
 @router.post("/template/steps/{step_id}/products")
 def add_step_product(step_id: int, data: StepProductFields, session: Session = Depends(get_session),
                      _: User = Depends(require_admin)):
-    if not session.get(ProgramStep, step_id):
-        raise HTTPException(status_code=404, detail="Step not found")
+    _master_step(session, step_id)
     _checked_product(session, data.product_id)
     line = ProgramStepProduct(step_id=step_id, **_blank_to_none(data.model_dump(exclude_unset=True)))
     session.add(line)
@@ -498,25 +563,25 @@ def add_step_product(step_id: int, data: StepProductFields, session: Session = D
 @router.patch("/template/products/{line_id}")
 def update_step_product(line_id: int, data: StepProductFields, session: Session = Depends(get_session),
                         _: User = Depends(require_admin)):
-    line = session.get(ProgramStepProduct, line_id)
-    if not line:
-        raise HTTPException(status_code=404, detail="Product line not found")
+    line = _master_line(session, line_id)
+    _apply_line_changes(session, line, data)
+    session.commit()
+    session.refresh(line)
+    return line
+
+
+def _apply_line_changes(session: Session, line: ProgramStepProduct, data: StepProductFields) -> None:
     changes = _blank_to_none(data.model_dump(exclude_unset=True))
     if "product_id" in changes:
         _checked_product(session, changes["product_id"])
     for key, value in changes.items():
         setattr(line, key, value)
     session.add(line)
-    session.commit()
-    session.refresh(line)
-    return line
 
 
 @router.delete("/template/products/{line_id}")
 def delete_step_product(line_id: int, session: Session = Depends(get_session), _: User = Depends(require_admin)):
-    line = session.get(ProgramStepProduct, line_id)
-    if not line:
-        raise HTTPException(status_code=404, detail="Product line not found")
+    line = _master_line(session, line_id)
     session.delete(line)
     session.commit()
     return {"ok": True}
@@ -540,7 +605,7 @@ def program_calendar(start: date, end: date, session: Session = Depends(get_sess
     events = []
     for program in session.exec(select(HerdingProgram).where(HerdingProgram.mating_date.is_not(None))).all():
         for step in herding.schedule(session, program)["steps"]:
-            if start <= step["date"] <= end:
+            if step["date"] is not None and start <= step["date"] <= end:
                 events.append({"date": step["date"], "status": step["status"], "step_id": step["id"],
                                "stage": step["stage"], "program_id": program.id, "program_name": program.name,
                                "client_id": program.client_id, "client_name": clients.get(program.client_id)})
@@ -552,19 +617,117 @@ def program_schedule(program_id: int, session: Session = Depends(get_session)):
     program = _program_or_404(session, program_id)
     groups = session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program_id)).all()
     return {"program": program, "groups": groups, "template": herding.get_template(session),
-            **herding.schedule(session, program)}
+            "group_names": list(herding.GROUPS), **herding.schedule(session, program)}
+
+
+# The client's own copy: anyone signed in can change it (it's that client's
+# plan, like ticking a step off); the master stays admin-only.
+
+def _dated_program(session: Session, program_id: int) -> HerdingProgram:
+    program = _program_or_404(session, program_id)
+    if program.mating_date is None:
+        raise HTTPException(status_code=422, detail="Set the first mating date first")
+    herding.ensure_client_copy(session, program)
+    return program
+
+
+def _own_step_or_404(session: Session, program: HerdingProgram, step_id: int) -> ProgramStep:
+    step = herding.own_step(session, program, step_id)
+    if step is None:
+        raise HTTPException(status_code=404, detail="Step not found")
+    return step
+
+
+def _own_line_or_404(session: Session, program: HerdingProgram, line_id: int) -> ProgramStepProduct:
+    line = herding.own_line(session, program, line_id)
+    if line is None:
+        raise HTTPException(status_code=404, detail="Product line not found")
+    return line
+
+
+@router.post("/{program_id}/steps")
+def add_program_step(program_id: int, data: StepFields, session: Session = Depends(get_session)):
+    program = _dated_program(session, program_id)
+    last = session.exec(select(func.max(ProgramStep.sort_order)).where(ProgramStep.program_id == program.id)).one() or 0
+    step = ProgramStep(program_id=program.id, sort_order=last + 1)
+    _apply_step_changes(step, data.model_dump(exclude_unset=True))
+    session.add(step)
+    session.commit()
+    session.refresh(step)
+    return step
+
+
+@router.patch("/{program_id}/steps/{step_id}")
+def update_program_step(program_id: int, step_id: int, data: StepFields, session: Session = Depends(get_session)):
+    step = _own_step_or_404(session, _dated_program(session, program_id), step_id)
+    _apply_step_changes(step, data.model_dump(exclude_unset=True))
+    session.add(step)
+    session.commit()
+    session.refresh(step)
+    return step
+
+
+@router.delete("/{program_id}/steps/{step_id}")
+def delete_program_step(program_id: int, step_id: int, session: Session = Depends(get_session)):
+    step = _own_step_or_404(session, _dated_program(session, program_id), step_id)
+    herding.delete_step(session, step)
+    session.commit()
+    return {"ok": True}
+
+
+@router.post("/{program_id}/steps/{step_id}/products")
+def add_program_line(program_id: int, step_id: int, data: StepProductFields, session: Session = Depends(get_session)):
+    step = _own_step_or_404(session, _dated_program(session, program_id), step_id)
+    _checked_product(session, data.product_id)
+    line = ProgramStepProduct(step_id=step.id, **_blank_to_none(data.model_dump(exclude_unset=True)))
+    session.add(line)
+    session.commit()
+    session.refresh(line)
+    return line
+
+
+@router.patch("/{program_id}/lines/{line_id}")
+def update_program_line(program_id: int, line_id: int, data: StepProductFields,
+                        session: Session = Depends(get_session)):
+    line = _own_line_or_404(session, _dated_program(session, program_id), line_id)
+    _apply_line_changes(session, line, data)
+    session.commit()
+    session.refresh(line)
+    return line
+
+
+@router.delete("/{program_id}/lines/{line_id}")
+def delete_program_line(program_id: int, line_id: int, session: Session = Depends(get_session)):
+    line = _own_line_or_404(session, _dated_program(session, program_id), line_id)
+    session.delete(line)
+    session.commit()
+    return {"ok": True}
+
+
+@router.post("/{program_id}/reset")
+def reset_from_master(program_id: int, session: Session = Depends(get_session)):
+    """Throws away this client's changes and copies the master program
+    again. Steps already ticked off stay ticked."""
+    program = _dated_program(session, program_id)
+    done = {}
+    for step in herding.ordered_steps(session, program.id):
+        if step.done_at and step.source_step_id:
+            done[step.source_step_id] = step.done_at
+        herding.delete_step(session, step)
+    session.flush()
+    herding.copy_master_into(session, program, done)
+    session.commit()
+    return {"ok": True}
 
 
 @router.put("/{program_id}/steps/{step_id}/done")
 def set_step_done(program_id: int, step_id: int, data: StepDone, session: Session = Depends(get_session)):
-    _program_or_404(session, program_id)
-    if not session.get(ProgramStep, step_id):
-        raise HTTPException(status_code=404, detail="Step not found")
-    row = session.get(ProgramStepProgress, (program_id, step_id))
-    if data.done and row is None:
-        session.add(ProgramStepProgress(program_id=program_id, step_id=step_id))
-    elif not data.done and row is not None:
-        session.delete(row)
+    step = _own_step_or_404(session, _dated_program(session, program_id), step_id)
+    if data.done and step.done_at is None:
+        step.done_at = datetime.utcnow()
+    elif not data.done:
+        step.done_at = None
+    session.add(step)
     session.commit()
     return {"ok": True}
 
@@ -572,25 +735,27 @@ def set_step_done(program_id: int, step_id: int, data: StepDone, session: Sessio
 @router.post("/{program_id}/quote")
 def quote_from_program(program_id: int, data: ProgramQuoteRequest, session: Session = Depends(get_session),
                        user: User = Depends(get_current_user)):
-    """A draft quote for the ticked product lines, their amounts worked out
-    from this program's headcounts and added up per product."""
-    program = _program_or_404(session, program_id)
+    """A draft quote for the ticked product lines: each line's whole packs
+    for this program's headcounts (or the medicine box's fixed number),
+    added up per product."""
+    program = _dated_program(session, program_id)
     if not program.client_id or not session.get(Client, program.client_id):
         raise HTTPException(status_code=422, detail="This program isn't linked to a client")
     groups = session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program_id)).all()
     totals, skipped, stages = {}, [], []
     for line_id in dict.fromkeys(data.line_ids):
-        line = session.get(ProgramStepProduct, line_id)
+        line = herding.own_line(session, program, line_id)
         product = session.get(Product, line.product_id) if line else None
         if product is None:
             skipped.append("A product line that has since been removed from the program")
             continue
-        total, _ = herding.quantity_for(product, line.dose, herding.headcount(groups, line.animal_group))
-        if not total:
+        head = herding.headcount(groups, line.animal_group)
+        units = herding.line_costs(product, line.dose, head, line.fixed_quantity, 0)["buy"]
+        if not units:
             skipped.append(f"{product.name} for {line.animal_group or 'all animals'}: "
                            + ("no dose set" if not line.dose else "no animals in that group"))
             continue
-        totals[product.id] = (product, totals.get(product.id, (product, 0))[1] + total)
+        totals[product.id] = (product, totals.get(product.id, (product, 0))[1] + units)
         step = session.get(ProgramStep, line.step_id)
         if step and step.stage and step.stage not in stages:
             stages.append(step.stage)
@@ -600,8 +765,7 @@ def quote_from_program(program_id: int, data: ProgramQuoteRequest, session: Sess
     notes = f"Herding program: {program.name}" + (f" - {', '.join(stages)}" if stages else "")
     quote = create_quote(Quote(client_id=program.client_id, reference="Herding program", notes=notes[:1000]),
                          session, user)
-    for product, total in totals.values():
-        _, units = herding.quantity_for(product, total, 1)
+    for product, units in totals.values():
         item = QuoteItem(quote_id=quote.id, product_id=product.id, quantity=units, unit_price=0.0)
         price_line(session, item)
         session.add(item)
@@ -612,15 +776,36 @@ def quote_from_program(program_id: int, data: ProgramQuoteRequest, session: Sess
     return {"quote": quote, "skipped": skipped}
 
 
-@router.get("/{program_id}/pdf")
-def program_pdf(program_id: int, session: Session = Depends(get_session)):
+def _pdf_parts(session: Session, program_id: int):
     program = _program_or_404(session, program_id)
     if program.mating_date is None:
         raise HTTPException(status_code=422, detail="Set the first mating date to print this program")
     client = session.get(Client, program.client_id) if program.client_id else None
     groups = session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program_id)).all()
+    name = re.sub(r"[^A-Za-z0-9]+", "-", f"{client.name if client else ''} {program.name}").strip("-") or "program"
+    return program, client, groups, name
+
+
+def _pdf_response(pdf, filename: str) -> Response:
+    return Response(content=pdf.getvalue(), media_type="application/pdf",
+                    headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+@router.get("/{program_id}/pdf")
+def program_pdf(program_id: int, session: Session = Depends(get_session)):
+    program, client, groups, name = _pdf_parts(session, program_id)
     pdf = generate_program_pdf(get_business(session), client, program, groups,
                                herding.schedule(session, program), herding.get_template(session))
-    name = re.sub(r"[^A-Za-z0-9]+", "-", f"{client.name if client else ''} {program.name}").strip("-") or "program"
-    return Response(content=pdf.getvalue(), media_type="application/pdf",
-                    headers={"Content-Disposition": f"attachment; filename=herding-program-{name}.pdf"})
+    return _pdf_response(pdf, f"herding-program-{name}.pdf")
+
+
+@router.get("/{program_id}/costs.pdf")
+def program_cost_pdf(program_id: int, session: Session = Depends(get_session),
+                     user: Optional[User] = Depends(get_current_user)):
+    """The program's costs, like the business's cost sheet, with whoever
+    prints it as the sales rep."""
+    program, client, groups, name = _pdf_parts(session, program_id)
+    rep = (user.name, user.phone, user.email) if isinstance(user, User) else (None, None, None)
+    pdf = generate_program_cost_pdf(get_business(session), client, program, groups,
+                                    herding.schedule(session, program), rep)
+    return _pdf_response(pdf, f"program-costs-{name}.pdf")

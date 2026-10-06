@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardList, FileSpreadsheet, Plus, Save, Trash2, X } from "lucide-react";
+import { ClipboardList, FileSpreadsheet, Pencil, Plus, Receipt, Save, Trash2, X } from "lucide-react";
 import apiClient from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import InlineEdit from "../components/InlineEdit";
-import SearchableSelect from "../components/SearchableSelect";
-import { ANCHOR_LABELS, TEXT_COLUMNS, dayLabel, ruleText } from "../utils/herding";
-import { pickerProducts } from "../utils/products";
+import ProgramLineForm from "../components/ProgramLineForm";
+import { ANCHOR_LABELS, TEXT_COLUMNS, UNDATED, amount, dayLabel, ruleText } from "../utils/herding";
 
 const inputClass =
   "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
@@ -98,18 +97,23 @@ const StepTiming = ({ step, canEdit, onSave }) => {
     <form className="flex flex-wrap items-center gap-2 text-sm"
       onSubmit={async (e) => {
         e.preventDefault();
-        await onSave({ anchor, offset_days: direction * Number(days || 0) });
+        await onSave({ anchor, offset_days: anchor === UNDATED ? 0 : direction * Number(days || 0) });
         setEditing(false);
       }}>
-      <input type="number" min="0" max="800" aria-label="Days" className={`${inputClass} w-20 py-1`} value={days}
-        onChange={(e) => setDays(e.target.value)} />
-      days
-      <select aria-label="Before or after" className={`${inputClass} py-1`} value={direction} onChange={(e) => setDirection(Number(e.target.value))}>
-        <option value={-1}>before</option>
-        <option value={1}>after</option>
-      </select>
+      {anchor !== UNDATED && (
+        <>
+          <input type="number" min="0" max="800" aria-label="Days" className={`${inputClass} w-20 py-1`} value={days}
+            onChange={(e) => setDays(e.target.value)} />
+          days
+          <select aria-label="Before or after" className={`${inputClass} py-1`} value={direction} onChange={(e) => setDirection(Number(e.target.value))}>
+            <option value={-1}>before</option>
+            <option value={1}>after</option>
+          </select>
+        </>
+      )}
       <select aria-label="From" className={`${inputClass} py-1`} value={anchor} onChange={(e) => setAnchor(e.target.value)}>
         {Object.entries(ANCHOR_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        <option value={UNDATED}>no date (medicine box)</option>
       </select>
       <button type="submit" className="rounded-lg bg-emerald-600 px-3 py-1 font-medium text-white hover:bg-emerald-700">Save</button>
       <button type="button" onClick={() => setEditing(false)} className="px-2 py-1 text-slate-500 hover:text-slate-700">Cancel</button>
@@ -117,66 +121,46 @@ const StepTiming = ({ step, canEdit, onSave }) => {
   );
 };
 
-const emptyLine = { product_id: "", animal_group: "", dose: "", note: "" };
+// One product line: "Ooie, Ramme - 2 ml per animal" or "2 packs (medicine box)".
+const lineText = (line) =>
+  line.fixed_quantity
+    ? `${amount(line.fixed_quantity)} pack${line.fixed_quantity === 1 ? "" : "s"} (medicine box)`
+    : `${line.dose ? `${amount(line.dose)} ${line.unit || ""} per animal` : "no dose set"} · ${line.animal_group || "all animals"}`;
 
-const StepProducts = ({ step, canEdit, products, groups, patchLine, addLine, removeLine }) => {
-  const [draft, setDraft] = useState(emptyLine);
-  const chosen = products.find((p) => p.id === Number(draft.product_id));
+const StepProducts = ({ step, canEdit, products, patchLine, addLine, removeLine }) => {
+  const [form, setForm] = useState(null); // "new" or a line id
+  const save = async (payload) => {
+    const ok = form === "new" ? await addLine(step.id, payload) : await patchLine(form, payload);
+    if (ok) setForm(null);
+  };
   return (
     <div className="mt-3 space-y-2 rounded-lg bg-slate-50 p-3">
       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Products</span>
       {step.products.length === 0 && <p className="text-sm text-slate-400">No products on this step.</p>}
-      {step.products.map((line) => (
-        <div key={line.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+      {step.products.map((line) => (form === line.id ? (
+        <ProgramLineForm key={line.id} line={line} products={products} onSubmit={save} onCancel={() => setForm(null)} />
+      ) : (
+        <div key={line.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+          {line.category && <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{line.category}</span>}
           <span className="font-medium text-slate-800">{line.product_name}</span>
-          {canEdit ? (
-            <>
-              <InlineEdit type="number" label="Dose per animal" value={line.dose} placeholder="Dose…"
-                format={(v) => `${v} ${line.unit} per animal`} onSave={(v) => patchLine(line.id, { dose: v })} />
-              <InlineEdit label="Group" value={line.animal_group} placeholder="All animals" listId="template-groups"
-                onSave={(v) => patchLine(line.id, { animal_group: v })} />
-              <InlineEdit label="Note" value={line.note} placeholder="Note…" onSave={(v) => patchLine(line.id, { note: v })} />
-              <button type="button" aria-label={`Remove ${line.product_name}`} onClick={() => removeLine(line.id)}
-                className="ml-auto text-slate-400 hover:text-red-600"><X size={14} /></button>
-            </>
-          ) : (
-            <span className="text-slate-600">
-              {line.dose ? `${line.dose} ${line.unit} per animal` : "no dose set"} · {line.animal_group || "all animals"}
-              {line.note ? ` · ${line.note}` : ""}
+          <span className="text-slate-600">{lineText(line)}{line.note ? ` · ${line.note}` : ""}</span>
+          {canEdit && (
+            <span className="ml-auto flex">
+              <button type="button" aria-label={`Change ${line.product_name}`} title="Change" onClick={() => setForm(line.id)}
+                className="p-1 text-slate-400 hover:text-emerald-700"><Pencil size={14} /></button>
+              <button type="button" aria-label={`Remove ${line.product_name}`} title="Remove" onClick={() => removeLine(line.id)}
+                className="p-1 text-slate-400 hover:text-red-600"><X size={14} /></button>
             </span>
           )}
         </div>
+      )))}
+      {canEdit && (form === "new" ? (
+        <ProgramLineForm products={products} submitLabel="Add" onSubmit={save} onCancel={() => setForm(null)} />
+      ) : (
+        <button type="button" onClick={() => setForm("new")} className="flex items-center gap-1 text-xs font-medium text-emerald-700 hover:underline">
+          <Plus size={13} /> Add a product
+        </button>
       ))}
-      {canEdit && (
-        <form className="flex flex-wrap items-end gap-2 border-t border-slate-200 pt-2"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            await addLine(step.id, {
-              product_id: Number(draft.product_id),
-              animal_group: draft.animal_group.trim() || null,
-              dose: draft.dose === "" ? null : Number(draft.dose),
-              note: draft.note.trim() || null,
-            });
-            setDraft(emptyLine);
-          }}>
-          <div className="min-w-[14rem] flex-1">
-            <SearchableSelect value={draft.product_id} onChange={(v) => setDraft({ ...draft, product_id: v })}
-              options={pickerProducts(products, draft.product_id).map((p) => ({ value: p.id, label: p.name, sublabel: p.code }))}
-              placeholder="Add a product…" searchPlaceholder="Search products…" />
-          </div>
-          <input list="template-groups" aria-label="Group" placeholder="Group (blank = all)" className={`${inputClass} w-36`}
-            value={draft.animal_group} onChange={(e) => setDraft({ ...draft, animal_group: e.target.value })} />
-          <label className="flex items-center gap-1 text-sm text-slate-600">
-            <input type="number" min="0" step="any" aria-label="Dose per animal" placeholder="Dose" className={`${inputClass} w-24`}
-              value={draft.dose} onChange={(e) => setDraft({ ...draft, dose: e.target.value })} />
-            {chosen ? `${chosen.unit} each` : "each"}
-          </label>
-          <input aria-label="Note" placeholder="Note, e.g. onderhuids" className={`${inputClass} w-40`}
-            value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
-          <button type="submit" disabled={!draft.product_id} className={secondary}><Plus size={16} /> Add</button>
-        </form>
-      )}
-      <datalist id="template-groups">{groups.map((g) => <option key={g} value={g} />)}</datalist>
     </div>
   );
 };
@@ -200,7 +184,17 @@ const Programs = () => {
     queryClient.invalidateQueries({ queryKey: ["program-schedule"] });
     queryClient.invalidateQueries({ queryKey: ["program-calendar"] });
   };
-  const call = (fn) => async (...args) => { await fn(...args); refresh(); };
+  // Failures already show as a toast (api/client.js); true when it worked.
+  const call = (fn) => async (...args) => {
+    try {
+      await fn(...args);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refresh();
+    }
+  };
   const patchStep = call((id, changes) => apiClient.patch(`/programs/template/steps/${id}`, changes));
   const patchLine = call((id, changes) => apiClient.patch(`/programs/template/products/${id}`, changes));
   const addLine = call((stepId, line) => apiClient.post(`/programs/template/steps/${stepId}/products`, line));
@@ -211,17 +205,21 @@ const Programs = () => {
     onSuccess: refresh,
   });
   const removeStep = useMutation({ mutationFn: (id) => apiClient.delete(`/programs/template/steps/${id}`), onSuccess: refresh });
+  const upload = (path, kind) => async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    return { kind, ...(await apiClient.post(path, form, { headers: { "Content-Type": "multipart/form-data" } })).data };
+  };
   const importSheet = useMutation({
-    mutationFn: async (file) => {
-      const form = new FormData();
-      form.append("file", file);
-      return (await apiClient.post("/programs/template/import", form, { headers: { "Content-Type": "multipart/form-data" } })).data;
-    },
+    mutationFn: upload("/programs/template/import", "program"),
+    onSuccess: (result) => { setImportResult(result); refresh(); },
+  });
+  const importCosts = useMutation({
+    mutationFn: upload("/programs/template/import-costs", "costs"),
     onSuccess: (result) => { setImportResult(result); refresh(); },
   });
 
   if (isLoading || !data) return <div className="p-8 text-center">Loading the herding program…</div>;
-  const groups = [...new Set(data.steps.flatMap((s) => s.products.map((p) => p.animal_group)).filter(Boolean))];
 
   return (
     <div className="space-y-6">
@@ -230,22 +228,43 @@ const Programs = () => {
           <h2 className="flex items-center gap-2 text-3xl font-bold text-slate-800">
             <ClipboardList size={28} className="text-emerald-600" /> Herding Program
           </h2>
-          <p className="text-slate-500">The master program every client's program follows. Dates are worked out from each client's first mating day.</p>
+          <p className="text-slate-500">
+            The master program every new client program is copied from. Dates are worked out from each client's first mating day;
+            each client's copy can then be changed on its own.
+          </p>
         </div>
         {canEdit && (
-          <label className={`${secondary} cursor-pointer`}>
-            <FileSpreadsheet size={18} /> {importSheet.isPending ? "Importing…" : "Import Excel sheet"}
-            <input type="file" accept=".xlsx" className="sr-only" disabled={importSheet.isPending}
-              onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) importSheet.mutate(file); }} />
-          </label>
+          <div className="flex flex-wrap gap-2">
+            {[[importSheet, "Import program sheet", FileSpreadsheet], [importCosts, "Import cost sheet", Receipt]].map(([mutation, label, Icon]) => (
+              <label key={label} className={`${secondary} cursor-pointer`}>
+                <Icon size={18} /> {mutation.isPending ? "Importing…" : label}
+                <input type="file" accept=".xlsx" className="sr-only" disabled={mutation.isPending}
+                  onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) mutation.mutate(file); }} />
+              </label>
+            ))}
+          </div>
         )}
       </div>
 
-      {importResult && (
+      {importResult?.kind === "program" && (
         <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           Imported "{importResult.name}": {importResult.steps.length} steps ({importResult.created} new, {importResult.updated} updated
-          {importResult.removed ? `, ${importResult.removed} removed` : ""}). Steps that kept their timing kept their products and progress.
+          {importResult.removed ? `, ${importResult.removed} removed` : ""}). Steps that kept their timing kept their products.
         </p>
+      )}
+      {importResult?.kind === "costs" && (
+        <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <p>
+            Imported the cost sheet: {importResult.lines} product lines ({importResult.steps_created} new steps; the rest joined
+            the program's steps on the same day). Clients' programs made before this keep their own copy - use "Start again
+            from the master program" on a client's program to bring these in.
+          </p>
+          {importResult.unmatched.length > 0 && (
+            <p className="mt-1 text-amber-700">
+              Not in the product list, so left out: {importResult.unmatched.join(", ")}. Add them under Products (same name) and import again.
+            </p>
+          )}
+        </div>
       )}
 
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -279,7 +298,7 @@ const Programs = () => {
               </div>
               {canEdit && (
                 <button type="button" aria-label="Delete step" title="Delete step"
-                  onClick={() => { if (window.confirm("Delete this step from the master program? Clients' ticks for it go too.")) removeStep.mutate(step.id); }}
+                  onClick={() => { if (window.confirm("Delete this step from the master program? Clients' own programs keep their copy.")) removeStep.mutate(step.id); }}
                   className="p-1.5 text-slate-400 hover:text-red-600"><Trash2 size={16} /></button>
               )}
             </div>
@@ -296,7 +315,7 @@ const Programs = () => {
                 </div>
               ))}
             </div>
-            <StepProducts step={step} canEdit={canEdit} products={products} groups={groups}
+            <StepProducts step={step} canEdit={canEdit} products={products}
               patchLine={patchLine} addLine={addLine} removeLine={removeLine} />
           </article>
         ))}

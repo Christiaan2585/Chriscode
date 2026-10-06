@@ -6,6 +6,8 @@ import Modal from "../components/Modal";
 import InlineEdit from "../components/InlineEdit";
 import DocumentPreview from "../components/DocumentPreview";
 import ProductCatalog, { useProductPatch } from "../components/ProductCatalog";
+import SupplierCatalogue, { LANGUAGE_NAMES, LoadBookPrompt, loadedLanguages, useSupplierBook } from "../components/SupplierCatalogue";
+import { useAuth } from "../context/AuthContext";
 import { PictureField, ProductPictureViewer, ProductThumb, savePictureChange, useProductThumbnails } from "../components/ProductPicture";
 import { money } from "../utils/format";
 import { categoryOf, isActive, isInStock, recomputeFromCost } from "../utils/products";
@@ -107,6 +109,10 @@ const Products = () => {
   const [viewing, setViewing] = useState(null);
   const [catalogue, setCatalogue] = useState(null);
   const thumbnails = useProductThumbnails();
+  const { user } = useAuth();
+  const { data: book } = useSupplierBook();
+  const bookLanguages = loadedLanguages(book);
+  const showBook = view === "catalog" && bookLanguages.length > 0;
 
   const { data: products, isLoading } = useQuery({
     queryKey: ["products"],
@@ -243,11 +249,20 @@ const Products = () => {
             {products?.length || 0} products{hiddenCount ? `, ${hiddenCount} hidden` : ""} - click any detail to change it
           </p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={openCatalogue}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-slate-700 shadow-sm hover:border-emerald-400">
-            <FileDown size={18} /> PDF catalogue
-          </button>
+        <div className="flex flex-wrap gap-2">
+          {bookLanguages.length ? bookLanguages.map((lang) => (
+            <button key={lang} type="button"
+              onClick={() => setCatalogue({ kind: "catalogue", id: lang, title: `catalogue (${LANGUAGE_NAMES[lang]})`,
+                url: `/catalogue/kyron/${lang}.pdf`, filename: `Catalogue (${LANGUAGE_NAMES[lang]}).pdf` })}
+              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-slate-700 shadow-sm hover:border-emerald-400">
+              <FileDown size={18} /> PDF ({LANGUAGE_NAMES[lang]})
+            </button>
+          )) : (
+            <button onClick={openCatalogue}
+              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-slate-700 shadow-sm hover:border-emerald-400">
+              <FileDown size={18} /> PDF catalogue
+            </button>
+          )}
           <button onClick={openAddModal}
             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm">
             <Plus size={20} /> Add Product
@@ -257,6 +272,7 @@ const Products = () => {
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-wrap items-center gap-3">
+          {!showBook && (<>
           <div className="relative flex-1 min-w-48">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
@@ -271,7 +287,8 @@ const Products = () => {
             <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} className="h-4 w-4 accent-emerald-600" />
             Show hidden
           </label>
-          <div className="flex overflow-hidden rounded-lg border border-slate-200" role="group" aria-label="View">
+          </>)}
+          <div className={`flex overflow-hidden rounded-lg border border-slate-200 ${showBook ? "ml-auto" : ""}`} role="group" aria-label="View">
             <ViewButton active={view === "catalog"} onClick={() => chooseView("catalog")} Icon={LayoutGrid}>Catalog</ViewButton>
             <ViewButton active={view === "table"} onClick={() => chooseView("table")} Icon={Rows3}>Table</ViewButton>
           </div>
@@ -281,9 +298,14 @@ const Products = () => {
           {categoryNames.map((c) => <option key={c} value={c} />)}
         </datalist>
 
-        {view === "catalog" ? (
-          <ProductCatalog products={filtered} thumbnails={thumbnails} onOpenPicture={setViewing}
-            onEdit={openEditModal} onDelete={handleDelete} />
+        {showBook ? (
+          <SupplierCatalogue book={book} products={products} canEdit={Boolean(user?.is_admin)} />
+        ) : view === "catalog" ? (
+          <>
+            {book && <LoadBookPrompt canEdit={Boolean(user?.is_admin)} />}
+            <ProductCatalog products={filtered} thumbnails={thumbnails} onOpenPicture={setViewing}
+              onEdit={openEditModal} onDelete={handleDelete} />
+          </>
         ) : (
           <ProductTable products={filtered} thumbnails={thumbnails} onOpenPicture={setViewing}
             onEdit={openEditModal} onDelete={handleDelete} />

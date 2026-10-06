@@ -14,6 +14,7 @@ import MedicalModal from "../components/MedicalModal";
 import WeightModal from "../components/WeightModal";
 import DocumentPreview from "../components/DocumentPreview";
 import HerdingProgramPanel from "../components/HerdingProgramPanel";
+import { loadedLanguages, useSupplierBook } from "../components/SupplierCatalogue";
 import { DocumentHover } from "../components/PreviewCards";
 import { downloadDocumentPdf, orderFormFor } from "../utils/documents";
 import { money, statusStyle } from "../utils/format";
@@ -27,6 +28,8 @@ const ClientDetail = () => {
   const { id } = useParams();
   const queryClient = useQueryClient();
   const [preview, setPreview] = useState(null);
+  const { data: book } = useSupplierBook();
+  const bookLanguages = loadedLanguages(book);
 
   const [isAnimalModalOpen, setIsAnimalModalOpen] = useState(false);
   const [newAnimal, setNewAnimal] = useState({ name: "", species: SPECIES_OPTIONS[0], breed: "" });
@@ -255,13 +258,16 @@ const ClientDetail = () => {
               <MessageCircle size={18} /> WhatsApp
             </a>
           )}
-          <button
-            type="button"
-            onClick={() => setPreview(orderFormFor(client))}
-            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:border-emerald-300 hover:text-emerald-600 transition-colors shadow-sm text-sm font-medium"
-          >
-            <BookOpen size={18} /> Order form
-          </button>
+          {(bookLanguages.length ? bookLanguages : [null]).map((lang) => (
+            <button
+              key={lang || "own"}
+              type="button"
+              onClick={() => setPreview(orderFormFor(client, lang))}
+              className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:border-emerald-300 hover:text-emerald-600 transition-colors shadow-sm text-sm font-medium"
+            >
+              <BookOpen size={18} /> {lang === "af" ? "Bestelvorm (Afrikaans)" : lang === "en" ? "Order form (English)" : "Order form"}
+            </button>
+          ))}
           <button
             onClick={openEditClient}
             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm text-sm font-medium"

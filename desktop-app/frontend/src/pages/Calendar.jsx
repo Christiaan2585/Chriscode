@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Plus, ChevronLeft, ChevronRight, Clock, User, Dog, CheckCircle, ClipboardList } from "lucide-react";
 import apiClient from "../api/client";
-import { STEP_STATUS } from "../utils/herding";
+import { STEP_STATUS, TEXT_COLUMNS, ruleText } from "../utils/herding";
 import { clientService, animalService } from "../api/services";
 import Modal from "../components/Modal";
 import SearchableSelect from "../components/SearchableSelect";
@@ -35,6 +35,15 @@ const CHIP = {
   scheduled: "bg-emerald-100 text-emerald-800",
   overdue: "bg-amber-100 text-amber-700",
   completed: "bg-blue-100 text-blue-700",
+};
+
+const PLAN_KEY = "sandveld_calendar_plan_mating_date";
+const readPlanDate = () => {
+  try {
+    return localStorage.getItem(PLAN_KEY) || "";
+  } catch {
+    return "";
+  }
 };
 
 const emptyAppointment = (date) => ({ client_id: "", animal_id: "", date, time: "09:00", reason: "", status: "scheduled" });
@@ -82,6 +91,34 @@ const Calendar = () => {
     for (const step of programSteps || []) (map[step.date] ||= []).push(step);
     return map;
   }, [programSteps]);
+
+  // "Plan the master program": the master herding program laid out from a
+  // chosen first mating day, no client needed. Remembered on this computer.
+  const [planDate, setPlanDate] = useState(readPlanDate);
+  const { data: plan } = useQuery({
+    queryKey: ["program-template", planDate],
+    queryFn: async () => (await apiClient.get("/programs/template", { params: { mating_date: planDate } })).data,
+    enabled: Boolean(planDate),
+  });
+  const planByDay = useMemo(() => {
+    const map = {};
+    if (planDate) for (const step of plan?.steps || []) if (step.date) (map[String(step.date).slice(0, 10)] ||= []).push(step);
+    return map;
+  }, [plan, planDate]);
+  const choosePlanDate = (value) => {
+    setPlanDate(value);
+    try {
+      if (value) localStorage.setItem(PLAN_KEY, value);
+      else localStorage.removeItem(PLAN_KEY);
+    } catch {
+      // Storage blocked - the plan just isn't remembered.
+    }
+    if (value) {
+      const d = new Date(`${value}T00:00:00`);
+      d.setMonth(d.getMonth() - 2); // the program starts about 8 weeks before mating
+      setMonth({ year: d.getFullYear(), month: d.getMonth() });
+    }
+  };
 
   const addMutation = useMutation({
     mutationFn: async (data) =>
@@ -133,6 +170,7 @@ const Calendar = () => {
   const monthLabel = new Date(month.year, month.month, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const selectedApps = byDay[selected] || [];
   const selectedSteps = stepsByDay[selected] || [];
+  const selectedPlan = planByDay[selected] || [];
   const selectedLabel = new Date(`${selected}T00:00:00`).toLocaleDateString(undefined, {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
@@ -172,6 +210,23 @@ const Calendar = () => {
             </button>
           </div>
 
+          <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50 px-5 py-3 text-sm text-slate-600">
+            <ClipboardList size={16} className="text-emerald-600" aria-hidden="true" />
+            <label className="flex flex-wrap items-center gap-2">
+              Plan the master herding program with a first mating day of
+              <input type="date" value={planDate} onChange={(e) => choosePlanDate(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            </label>
+            {planDate && (
+              <button type="button" onClick={() => choosePlanDate("")} className="text-xs font-medium text-slate-500 hover:text-red-600">
+                Clear plan
+              </button>
+            )}
+            {planDate && plan && !plan.steps.length && (
+              <span className="text-xs text-amber-700">The master program has no steps yet - import it under Herding Program.</span>
+            )}
+          </div>
+
           <div className="grid grid-cols-7 text-center text-xs font-semibold uppercase tracking-wider text-slate-400 py-2">
             {WEEKDAYS.map((d) => <div key={d}>{d}</div>)}
           </div>
@@ -180,7 +235,9 @@ const Calendar = () => {
               const key = dayKey(d);
               const apps = byDay[key] || [];
               const steps = (stepsByDay[key] || []).slice(0, Math.max(0, MAX_CHIPS - apps.length));
-              const hidden = apps.length + (stepsByDay[key] || []).length - Math.min(apps.length, MAX_CHIPS) - steps.length;
+              const plans = (planByDay[key] || []).slice(0, Math.max(0, MAX_CHIPS - apps.length - steps.length));
+              const total = apps.length + (stepsByDay[key] || []).length + (planByDay[key] || []).length;
+              const hidden = total - Math.min(apps.length, MAX_CHIPS) - steps.length - plans.length;
               const inMonth = d.getMonth() === month.month;
               const isSelected = key === selected;
               return (
@@ -210,6 +267,12 @@ const Calendar = () => {
                       {step.client_name}: {step.stage || step.program_name}
                     </span>
                   ))}
+                  {plans.map((step) => (
+                    <span key={`plan-${step.id}`} title={`Master program (plan): ${step.stage || ruleText(step.anchor, step.offset_days)}`}
+                      className="truncate rounded border border-dashed border-emerald-500 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">
+                      {step.stage || ruleText(step.anchor, step.offset_days)}
+                    </span>
+                  ))}
                   {hidden > 0 && (
                     <span className="px-1.5 text-[11px] text-slate-500">+{hidden} more</span>
                   )}
@@ -222,6 +285,7 @@ const Calendar = () => {
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" />Overdue</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" />Done</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 border-l-2 border-emerald-500 bg-slate-200" />Herding program</span>
+            {planDate && <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 border border-dashed border-emerald-500" />Master program (plan)</span>}
           </div>
         </div>
 
@@ -233,7 +297,7 @@ const Calendar = () => {
             <h3 className="text-base font-semibold text-slate-800">{selectedLabel}</h3>
           </div>
           <div className="divide-y divide-slate-100">
-            {selectedApps.length === 0 && selectedSteps.length === 0 ? (
+            {selectedApps.length === 0 && selectedSteps.length === 0 && selectedPlan.length === 0 ? (
               <p className="px-5 py-8 text-center text-sm text-slate-400">Nothing scheduled.</p>
             ) : (
               selectedApps.map((app) => {
@@ -275,6 +339,26 @@ const Calendar = () => {
                 <Link to={`/clients/${step.client_id}`} className="flex items-center gap-1 text-sm text-emerald-700 hover:underline">
                   <User size={14} /> {step.client_name} - {step.program_name}
                 </Link>
+              </div>
+            ))}
+            {selectedPlan.map((step) => (
+              <div key={`plan-${step.id}`} className="px-5 py-4 space-y-1">
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <ClipboardList size={14} /> Master program (plan)
+                </div>
+                <p className="font-semibold text-slate-800">{step.stage || ruleText(step.anchor, step.offset_days)}</p>
+                <p className="text-xs text-slate-500">{ruleText(step.anchor, step.offset_days)}</p>
+                {TEXT_COLUMNS.filter(([key]) => step[key]).map(([key, label]) => (
+                  <div key={key} className="text-sm">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+                    <p className="whitespace-pre-line text-slate-700">{step[key]}</p>
+                  </div>
+                ))}
+                {step.products?.length > 0 && (
+                  <p className="text-xs text-slate-600">
+                    Products: {step.products.map((p) => `${p.product_name}${p.dose ? ` (${p.dose} ${p.unit} each${p.animal_group ? `, ${p.animal_group}` : ""})` : ""}`).join("; ")}
+                  </p>
+                )}
               </div>
             ))}
           </div>

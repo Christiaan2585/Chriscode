@@ -59,8 +59,10 @@ class ProgramTemplate(SQLModel, table=True):
 
 
 class ProgramStep(SQLModel, table=True):
-    """One row of the master program: when (a number of days from one of
-    app/core/herding.py's ANCHORS) and what to do, in the Excel's columns."""
+    """One step of a herding program: when (a number of days from one of
+    app/core/herding.py's ANCHORS, or "none" for the undated medicine box)
+    and what to do. `program_id` NULL = the master program; set = that
+    client's own copy (made from the master, then changed freely)."""
     id: Optional[int] = Field(default=None, primary_key=True)
     sort_order: int = 0
     anchor: str = "mating_start"
@@ -71,18 +73,30 @@ class ProgramStep(SQLModel, table=True):
     dosing: Optional[str] = None
     vitamins: Optional[str] = None
     feeding: Optional[str] = None
+    # 2026-09-30: every client gets their own copy of the program.
+    program_id: Optional[int] = Field(default=None, foreign_key="herdingprogram.id", index=True)
+    source_step_id: Optional[int] = None  # a copy's master step
+    date_override: Optional[datetime] = None  # a date typed in for this client
+    done_at: Optional[datetime] = None  # a copy ticked off
+    origin: Optional[str] = None  # "kudde" / "cost" - which sheet made a master step
 
 
 class ProgramStepProduct(SQLModel, table=True):
     """A product used at a step: `dose` per animal (in the product's own unit,
-    e.g. ml) for the animals of `animal_group` (matched to a program's
-    AnimalGroup.animal_type; blank = every animal in the program)."""
+    e.g. ml) for the animals of `animal_group` - one or more group names,
+    comma-separated ("Ooie, Ramme"), matched to a program's
+    AnimalGroup.animal_type; blank = every animal. `fixed_quantity` instead
+    means that many packs whatever the headcount (the medicine box)."""
     id: Optional[int] = Field(default=None, primary_key=True)
     step_id: int = Field(foreign_key="programstep.id", index=True)
     product_id: int = Field(foreign_key="product.id")
     animal_group: Optional[str] = None
     dose: Optional[float] = None
     note: Optional[str] = None
+    category: Optional[str] = None  # Enting, Dosering, Minerale, ... (the cost sheet's second column)
+    fixed_quantity: Optional[float] = None
+    source_line_id: Optional[int] = None  # a copy's master line
+    origin: Optional[str] = None
 
 
 class ProgramStepProgress(SQLModel, table=True):
