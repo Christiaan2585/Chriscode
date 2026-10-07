@@ -64,7 +64,7 @@ const GlobalSearch = () => {
   };
 
   return (
-    <div className="relative shrink-0 w-48 lg:w-64">
+    <div className="relative min-w-0 flex-1 sm:flex-none sm:shrink-0 sm:w-48 lg:w-64">
       <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
       <input
         ref={inputRef}
@@ -78,7 +78,7 @@ const GlobalSearch = () => {
         className="w-full rounded-full border border-slate-200 bg-slate-50 pl-9 pr-4 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
       />
       {open && query.trim() && (
-        <div className="absolute left-0 top-full mt-2 w-96 max-h-96 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl z-50 py-2">
+        <div className="absolute left-0 top-full mt-2 w-[min(24rem,calc(100vw-2rem))] max-h-96 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl z-50 py-2">
           {results.length === 0 ? (
             <p className="px-4 py-3 text-sm text-slate-400">No matches for "{query.trim()}"</p>
           ) : (

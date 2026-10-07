@@ -180,12 +180,12 @@ const PurchaseOrders = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-3xl font-bold text-slate-800">Purchase Orders</h2>
           <p className="text-slate-500">Order stock from suppliers</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={() => setSuppliersOpen(true)}
             className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-slate-700 shadow-sm hover:border-emerald-400">
             <Building2 size={18} /> Suppliers
@@ -205,6 +205,7 @@ const PurchaseOrders = () => {
               className="w-full rounded-lg border border-slate-200 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
         </div>
+        <div className="relative overflow-x-auto">
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-sm uppercase text-slate-500">
             <tr>
@@ -240,6 +241,7 @@ const PurchaseOrders = () => {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       <Modal isOpen={editing !== null} onClose={close} size="lg"

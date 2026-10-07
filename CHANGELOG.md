@@ -2,9 +2,11 @@
 
 All notable changes to Sandveld Vee Dienste. Newest first.
 
-## Unreleased
+## 1.0.7 - 2026-10-07
 
 ### New
+- **Android app (first version)**: the same app on staff phones, connected to the office PC over the Wi-Fi. Pair a phone under Settings -> Phones on the PC; the phone asks before pairing and only pairs with an office-network address. Ticking program steps and new quotes are kept on the phone while it's away from the office Wi-Fi, and sent when it's back.
+- **Works on small screens**: on a phone or narrow window the menu slides in from a ☰ button, and wide lists scroll sideways instead of being cut off.
 - **Herding programs and quotes work together**:
   - "Quote the whole program" in a client's program, or tick products as before.
   - Quotes page -> **From herding program**: pick the client, the program and the steps.
@@ -22,6 +24,9 @@ All notable changes to Sandveld Vee Dienste. Newest first.
 
 ### Changed
 - The client page no longer shows Registered Animals (animal records are kept).
+
+### Security
+- Text typed into the app is always plain text in the Excel download, never an Excel formula.
 
 ## 1.0.6 - 2026-10-06
 
