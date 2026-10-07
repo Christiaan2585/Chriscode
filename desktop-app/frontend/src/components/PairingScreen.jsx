@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { App } from "@capacitor/app";
 import axios from "axios";
+import { ScanLine } from "lucide-react";
+import QrScanner from "./QrScanner";
 import { decodePairingLink, savePairing, trustHost } from "../utils/pairing";
 import { setDeviceConnection } from "../api/client";
 
@@ -56,15 +58,16 @@ async function pairAgainst(hosts, port, fingerprint, code) {
 
 // Android only: shown instead of the whole app until this phone is paired
 // with the office PC (see app/api/devices.py). Pairing normally happens by
-// tapping the PC's QR code open in this app (sandveld://pair?... - any
-// camera app recognises it as a link); the manual form below is the
-// fallback when that can't be scanned.
+// scanning the PC's QR code with the in-app camera (QrScanner); opening the
+// QR as a sandveld://pair link from another camera app still works, and the
+// manual form below is the fallback when neither can be used.
 const PairingScreen = ({ onPaired }) => {
   const [status, setStatus] = useState("idle"); // idle | pairing | error
   const [error, setError] = useState(null);
   const [manual, setManual] = useState({ host: "", port: "8443", fingerprint: "", code: "" });
 
   const [offer, setOffer] = useState(null); // pairing details from a link, waiting for the user's OK
+  const [scanning, setScanning] = useState(false);
 
   const pair = async ({ hosts, port, fp, code }) => {
     setOffer(null);
@@ -101,6 +104,16 @@ const PairingScreen = ({ onPaired }) => {
     };
   }, []);
 
+  // The camera found the PC's QR code. Same rule as a tapped link: show where
+  // it points and let the user say yes - the scan only saves the typing.
+  const scanned = (text) => {
+    const data = decodePairingLink(text);
+    setScanning(false);
+    setStatus("idle");
+    setError(null);
+    if (data) setOffer({ hosts: data.hosts, port: data.port, fp: data.fp, code: data.code });
+  };
+
   const submitManual = (e) => {
     e.preventDefault();
     pair({ hosts: [manual.host.trim()], port: Number(manual.port) || 8443, fp: manual.fingerprint.trim(), code: manual.code.trim() });
@@ -114,9 +127,13 @@ const PairingScreen = ({ onPaired }) => {
         <div className="text-center">
           <h1 className="text-lg font-semibold text-slate-800">Pair with the office PC</h1>
           <p className="mt-1 text-sm text-slate-500">
-            On the PC, open Settings &gt; Phones &gt; "Pair a phone", then scan the QR code with this phone's camera
-            and open it in Sandveld. Both devices must be on the office Wi-Fi.
+            On the PC, open Settings &gt; Phones &gt; "Pair a phone", then scan the QR code it shows. Both devices
+            must be on the office Wi-Fi.
           </p>
+          <button type="button" onClick={() => setScanning(true)}
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-3 text-sm font-semibold text-white hover:bg-emerald-700">
+            <ScanLine size={18} aria-hidden="true" /> Scan QR code
+          </button>
         </div>
 
         {offer && (
@@ -153,6 +170,9 @@ const PairingScreen = ({ onPaired }) => {
           </form>
         </details>
       </div>
+      {scanning && (
+        <QrScanner accept={(text) => decodePairingLink(text) !== null} onResult={scanned} onClose={() => setScanning(false)} />
+      )}
     </div>
   );
 };

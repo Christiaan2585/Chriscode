@@ -48,4 +48,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Camera: only to scan the office PC's pairing QR code (QrScanner.jsx). Not required, so
+         the app still installs on a phone without one (the manual pairing form covers that). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>

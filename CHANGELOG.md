@@ -6,6 +6,7 @@ All notable changes to Sandveld Vee Dienste. Newest first.
 
 ### New
 - **Android app (first version)**: the same app on staff phones, connected to the office PC over the Wi-Fi. Pair a phone under Settings -> Phones on the PC; the phone asks before pairing and only pairs with an office-network address. Ticking program steps and new quotes are kept on the phone while it's away from the office Wi-Fi, and sent when it's back.
+- **Scan the pairing QR with the phone's camera** (Android 1.0.8.1): a Scan QR code button on the pairing screen reads the PC's code in the app, then asks you to confirm before pairing.
 - **Works on small screens**: on a phone or narrow window the menu slides in from a ☰ button, and wide lists scroll sideways instead of being cut off.
 - **Herding programs and quotes are one**: every client's herding program is also their quote for the year - one menu item, **Programs & Quotes**.
   - The quote is made automatically and always matches the program: change a dose, an animal number, a price or a product on either side and both change.
