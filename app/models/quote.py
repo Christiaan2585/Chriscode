@@ -14,5 +14,6 @@ class Quote(SQLModel, table=True):
     expiry_date: Optional[datetime] = None
     notes: Optional[str] = None
     created_by: Optional[int] = Field(default=None, foreign_key="user.id")  # the sales rep printed on it
+    program_id: Optional[int] = Field(default=None, foreign_key="herdingprogram.id", index=True)  # made from this herding program
 
     items: List[QuoteItem] = Relationship(back_populates="quote")

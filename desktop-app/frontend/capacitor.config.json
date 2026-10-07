@@ -1,0 +1,8 @@
+{
+  "appId": "com.sandveldveedienste.app",
+  "appName": "Sandveld Vee Dienste",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  }
+}

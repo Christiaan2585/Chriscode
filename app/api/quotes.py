@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 from sqlmodel import Session, select
 from typing import List, Optional
-from datetime import datetime
+from datetime import date, datetime
 from app.core.db import get_session
 from app.core.dates import coerce_datetime
 from app.models.quote import Quote
 from app.models.quote_item import QuoteItem
+from app.models.program import HerdingProgram
+from app.core import herding
 from app.models.client import Client
 from app.core.security import get_current_user
 from app.models.user import User
@@ -30,6 +32,7 @@ def create_quote(quote: Quote, session: Session = Depends(get_session), user: Us
     quote.number = next_document_number(session, Quote)  # only ever assigned here - never taken from the request
     quote.total_amount = 0.0  # set from the lines as they're added
     quote.created_by = user.id if user else None
+    quote.program_id = None  # only a herding program's own quote endpoint links one
     session.add(quote)
     session.commit()
     session.refresh(quote)
@@ -110,7 +113,7 @@ def update_quote(quote_id: int, quote_data: Quote, session: Session = Depends(ge
 
     # Only the fields actually sent (see update_invoice). "id" matters too:
     # it's unset on an edit payload and would null out the primary key.
-    changes = quote_data.model_dump(exclude_unset=True, exclude={"id", "number", "total_amount", "created_by", "items"})
+    changes = quote_data.model_dump(exclude_unset=True, exclude={"id", "number", "total_amount", "created_by", "items", "program_id"})
     for key in ("date", "expiry_date"):
         if key in changes:
             changes[key] = coerce_datetime(changes[key])
@@ -143,6 +146,7 @@ def add_quote_item(quote_id: int, item: QuoteItem, session: Session = Depends(ge
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found")
     item.quote_id = quote_id
+    item.program_step_id = None  # a line added by hand prints under "Other items" on a program quote
     price_line(session, item)
     session.add(item)
     session.flush()
@@ -175,8 +179,18 @@ def download_quote_pdf(quote_id: int, session: Session = Depends(get_session)):
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found")
     items = session.exec(select(QuoteItem).where(QuoteItem.quote_id == quote_id)).all()
+    sections = [None] * len(items)
+    program = session.get(HerdingProgram, quote.program_id) if quote.program_id else None
+    if program:  # a herding program's quote: its lines under each step, in date order
+        labels = herding.step_labels(session, program, {i.program_step_id for i in items if i.program_step_id})
+        other = ((True, date.max, float("inf"), 0), "Other items")
+        keyed = sorted(((labels.get(i.program_step_id, other), i) for i in items), key=lambda pair: pair[0][0])
+        items, sections = [i for _, i in keyed], [label for (_, label), _ in keyed]
+    lines = document_lines(session, items)
+    for line, section in zip(lines, sections):
+        line["section"] = section
     pdf = generate_quote_pdf(get_business(session), quote, session.get(Client, quote.client_id),
-                             document_lines(session, items), sales_rep_for(session, quote))
-    return StreamingResponse(pdf, media_type="application/pdf", headers={
+                             lines, sales_rep_for(session, quote))
+    return Response(content=pdf.getvalue(), media_type="application/pdf", headers={
         "Content-Disposition": f"attachment; filename={quote.number or quote_id}.pdf"
     })

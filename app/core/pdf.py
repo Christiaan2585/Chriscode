@@ -177,12 +177,19 @@ def _party(caption, name, details, postal, physical, width):
 
 
 def _lines_table(lines, width):
-    """`lines` are dicts: description, quantity, unit_price, discount_percent, vat_percent."""
+    """`lines` are dicts: description, quantity, unit_price, discount_percent, vat_percent,
+    and optionally `section` - a heading row (a herding program step) above its lines."""
     widths = [0.29, 0.09, 0.12, 0.095, 0.095, 0.155, 0.155]
     header = [_p("Description", "head")] + [_p(h, "head_right") for h in
                                             ("Quantity", "Unit Price", "Disc %", "VAT %", "Excl. Total", "Incl. Total")]
     rows = [header]
+    sections = []
+    section = None
     for line in lines:
+        if line.get("section") and line["section"] != section:
+            section = line["section"]
+            rows.append([_p(f"<b>{_text(section)}</b>", "cell")] + [""] * 6)
+            sections.append(len(rows) - 1)
         amounts = line_amounts(line["quantity"], line["unit_price"], line.get("discount_percent"), line.get("vat_percent"))
         rows.append([
             _p(_text(line["description"]), "cell"),
@@ -199,7 +206,8 @@ def _lines_table(lines, width):
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 4),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-    ]))
+    ] + [cmd for r in sections for cmd in (("SPAN", (0, r), (-1, r)),
+                                            ("BACKGROUND", (0, r), (-1, r), colors.HexColor("#ecfdf5")))]))
     return table
 
 
@@ -628,16 +636,22 @@ def generate_program_cost_pdf(business, client, program, groups, schedule, rep=(
     style = [("BACKGROUND", (0, 0), (-1, 0), BRAND), ("VALIGN", (0, 0), (-1, -1), "TOP"),
              ("LINEBELOW", (0, 1), (-1, -1), 0.3, RULE), ("TOPPADDING", (0, 0), (-1, -1), 2),
              ("BOTTOMPADDING", (0, 0), (-1, -1), 2)]
-    for step in schedule["steps"]:
-        if not step["products"]:
-            continue
-        when = f"{step['date']:%a %d %b %Y}" if step["date"] else ""
-        label = " · ".join(_text(v) for v in (when, step["stage"]) if v) or "&nbsp;"
-        rows.append([Paragraph(label, _COST["step"])] + [""] * 7)
-        style += [("SPAN", (0, len(rows) - 1), (-1, len(rows) - 1)),
-                  ("BACKGROUND", (0, len(rows) - 1), (-1, len(rows) - 1), colors.HexColor("#ecfdf5"))]
-        rows += [_cost_row(line) for line in step["products"]]
-        rows.append([""] * 6 + [Paragraph("Subtotal", _COST["sum"]), Paragraph(money(step["subtotal"]), _COST["sum"])])
+    steps = {s["id"]: s for s in schedule["steps"]}
+    for section in schedule["sections"]:  # the cost sheet's sections, each with its TOTAAL
+        rows.append([Paragraph(_text(section["name"].upper()), _COST["head"])] + [""] * 7)
+        style += [("SPAN", (0, len(rows) - 1), (-1, len(rows) - 1)), ("BACKGROUND", (0, len(rows) - 1), (-1, len(rows) - 1), BRAND)]
+        for step in (steps[i] for i in section["step_ids"]):
+            when = f"{step['date']:%a %d %b %Y}" if step["date"] else ""
+            label = " · ".join(_text(v) for v in (when, step["stage"]) if v) or "&nbsp;"
+            rows.append([Paragraph(label, _COST["step"])] + [""] * 7)
+            style += [("SPAN", (0, len(rows) - 1), (-1, len(rows) - 1)),
+                      ("BACKGROUND", (0, len(rows) - 1), (-1, len(rows) - 1), colors.HexColor("#ecfdf5"))]
+            rows += [_cost_row(line) for line in step["products"]]
+            if len(step["products"]) > 1:
+                rows.append([""] * 6 + [Paragraph("Subtotal", _COST["num"]), Paragraph(money(step["subtotal"]), _COST["num"])])
+        rows.append([""] * 5 + [Paragraph(f"TOTAAL {_text(section['name'].upper())}", _COST["sum"]), "",
+                                Paragraph(money(section["subtotal"]), _COST["sum"])])
+        style += [("SPAN", (5, len(rows) - 1), (6, len(rows) - 1)), ("LINEABOVE", (5, len(rows) - 1), (-1, len(rows) - 1), 0.8, INK)]
     table = Table(rows, colWidths=widths, repeatRows=1)
     table.setStyle(TableStyle(style))
 

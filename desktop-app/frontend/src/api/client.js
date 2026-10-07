@@ -1,7 +1,10 @@
 import axios from 'axios';
 
+// VITE_API_URL: dev only, e.g. a test backend on another port while the installed app holds 8000.
+const LOCAL_BACKEND = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 const apiClient = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: LOCAL_BACKEND,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -18,6 +21,21 @@ let notifyError = null;
 
 export function setAccessToken(token) {
   currentAccessToken = token;
+}
+
+// Android only: once paired, API calls go to the office PC's LAN address
+// instead of the (nonexistent, on a phone) localhost backend. See
+// utils/pairing.js - the certificate trust for this connection is pinned
+// natively, not here; this just points axios at it and attaches the
+// device token every other platform never needs.
+export function setDeviceConnection(pairing) {
+  if (pairing?.host) {
+    apiClient.defaults.baseURL = `https://${pairing.host}:${pairing.port}`;
+    apiClient.defaults.headers.common['X-Device-Token'] = pairing.token;
+  } else {
+    apiClient.defaults.baseURL = LOCAL_BACKEND;
+    delete apiClient.defaults.headers.common['X-Device-Token'];
+  }
 }
 
 export function setUnauthorizedHandler(handler) {
@@ -45,6 +63,11 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Calls marked `queueable` (see utils/outbox.js) are handled by the
+    // caller itself when the PC is unreachable or the session needs a
+    // fresh sign-in - that's expected there, not a toast-worthy error.
+    const quietly = error.config?.queueable && (!error.response || error.response.status === 401);
+    if (quietly) return Promise.reject(error);
     if (error.response?.status === 401 && onUnauthorized) {
       onUnauthorized();
     } else if (notifyError) {

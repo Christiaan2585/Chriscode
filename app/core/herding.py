@@ -8,6 +8,7 @@ import io
 import math
 import re
 from datetime import date, datetime, timedelta
+from types import SimpleNamespace
 
 from openpyxl import load_workbook
 from sqlmodel import Session, select
@@ -24,6 +25,23 @@ DUE_WITHIN_DAYS = 7
 # The business's cost sheet counts animals in these five groups; a product
 # line names one or more of them ("Ooie, Ramme").
 GROUPS = ("Ooie", "Ramme", "Lammers", "Jong ooitjies", "Jong rammetjies")
+# The cost sheet's sections, in its order; each has its own TOTAAL.
+SECTIONS = ("Lammers", "Jong ooitjies en ramme", "Ooie en ramme", "Medisyne boks")
+OTHER_SECTION = "Ander"  # products for a mix of animals
+_SECTION_GROUPS = {SECTIONS[0]: {"lammers"}, SECTIONS[1]: {"jong ooitjies", "jong rammetjies"},
+                   SECTIONS[2]: {"ooie", "ramme"}}
+
+
+def derive_section(lines) -> str | None:
+    """A step's section from its lines' animals, for steps made before
+    sections existed (or added by hand): the medicine box if it's fixed
+    quantities, else the section all its animals belong to."""
+    if not lines:
+        return None
+    if all(l.fixed_quantity for l in lines):
+        return SECTIONS[3]
+    names = {n for l in lines for n in group_names(l.animal_group)}
+    return next((s for s, groups in _SECTION_GROUPS.items() if names and names <= groups), None)
 
 
 def get_template(session: Session) -> ProgramTemplate:
@@ -94,7 +112,7 @@ def ordered_steps(session: Session, program_id: int | None = None) -> list:
     return session.exec(select(ProgramStep).where(owner).order_by(ProgramStep.sort_order, ProgramStep.id)).all()
 
 
-_COPIED_STEP_FIELDS = ("sort_order", "anchor", "offset_days", *TEXT_FIELDS)
+_COPIED_STEP_FIELDS = ("sort_order", "anchor", "offset_days", "section", *TEXT_FIELDS)
 _COPIED_LINE_FIELDS = ("product_id", "animal_group", "dose", "note", "category", "fixed_quantity")
 
 
@@ -180,11 +198,26 @@ def step_date(step: ProgramStep, anchors: dict):
     return anchors.get(step.anchor, anchors["mating_start"]) + timedelta(days=step.offset_days)
 
 
+def step_labels(session: Session, program: HerdingProgram, step_ids) -> dict:
+    """{step id: (sort key, "Mon 25 May 2026 - stage")} for a program
+    quote's sections, in the program's date order (undated last)."""
+    if not step_ids:
+        return {}
+    anchors = anchor_dates(program, get_template(session)) if program.mating_date else None
+    out = {}
+    for step in session.exec(select(ProgramStep).where(ProgramStep.id.in_(step_ids))).all():
+        day = step_date(step, anchors) if anchors else None
+        when = f"{day:%a %d %b %Y}" if day else "Any time"
+        out[step.id] = ((day is None, day or date.max, step.sort_order, step.id),
+                        " - ".join(v for v in (when, step.stage) if v))
+    return out
+
+
 def schedule(session: Session, program: HerdingProgram, today: date | None = None) -> dict:
     """The client's own program: every step with its date and whether it's
     done/overdue/due/upcoming, each product line's amounts and costs for
     their animals (like the cost sheet), step subtotals and the totals."""
-    empty = {"anchors": None, "steps": [], "progress": {"done": 0, "total": 0},
+    empty = {"anchors": None, "steps": [], "sections": [], "progress": {"done": 0, "total": 0},
              "totals": {"cost_used": 0, "cost_buy": 0, "animals": 0, "per_animal": 0}}
     if program.mating_date is None:
         return empty
@@ -208,7 +241,10 @@ def schedule(session: Session, program: HerdingProgram, today: date | None = Non
                           "pack_size": product.pack_size, "price": product.price, "price_excl_vat": price,
                           "head": head, **costs})
         status = "none" if day is None else _status(day, step.done_at is not None, today)
-        out.append({**step.model_dump(), "date": day, "status": status, "products": lines,
+        section = step.section or derive_section([line for line, _ in products.get(step.id, [])])
+        if section is None and lines:
+            section = OTHER_SECTION
+        out.append({**step.model_dump(), "section": section, "date": day, "status": status, "products": lines,
                     "subtotal": round(sum(l["cost_used"] for l in lines), 2),
                     "subtotal_buy": round(sum(l["cost_buy"] for l in lines), 2)})
     # Dated steps in date order (a client's own dates can reorder them), then the medicine box.
@@ -216,7 +252,16 @@ def schedule(session: Session, program: HerdingProgram, today: date | None = Non
     dated = [s for s in out if s["date"] is not None]
     animals = sum(g.group_size for g in groups)
     cost_used = round(sum(s["subtotal"] for s in out), 2)
-    return {"anchors": anchors, "steps": out,
+    # The sheet's sections, each with its TOTAAL; a step with neither products
+    # nor a section is a note from the Kudde program, shown by its date.
+    sections = []
+    for name in (*SECTIONS[:3], OTHER_SECTION, SECTIONS[3]):
+        members = [s for s in out if s["section"] == name]
+        if members:
+            sections.append({"name": name, "step_ids": [s["id"] for s in members],
+                             "subtotal": round(sum(s["subtotal"] for s in members), 2),
+                             "subtotal_buy": round(sum(s["subtotal_buy"] for s in members), 2)})
+    return {"anchors": anchors, "steps": out, "sections": sections,
             "progress": {"done": sum(1 for s in dated if s["status"] == "done"), "total": len(dated)},
             "totals": {"cost_used": cost_used, "cost_buy": round(sum(s["subtotal_buy"] for s in out), 2),
                        "animals": animals, "per_animal": round(cost_used / animals, 2) if animals else 0,
@@ -511,6 +556,24 @@ def _group_label(text) -> str | None:
     return None
 
 
+def _section_heading(text) -> str | None:
+    """"JONG OOITJIES EN RAMME", "DOSERING OOIE EN RAMME", "Medisyne Boks:"
+    -> the section a heading starts."""
+    t = str(text or "").lower()
+    if "medisyne" in t:
+        return SECTIONS[3]
+    if "jong" in t:
+        return SECTIONS[1]
+    if "ooie" in t and "ram" in t:
+        return SECTIONS[2]
+    if t.strip(" :") == "lammers":
+        return SECTIONS[0]
+    return None
+
+
+_FIXED_FORMULA = re.compile(r"=\s*(IFERROR\(\s*)?\$?F\$?\d+\s*[,)]?", re.IGNORECASE)
+
+
 def _name_key(name) -> str:
     return re.sub(r"[^a-z0-9%]", "", str(name or "").lower())
 
@@ -580,12 +643,15 @@ def parse_cost_sheet(data: bytes, products) -> dict:
 
     by_name = {_name_key(p.name): p for p in products}
     blocks, block, unmatched = [], None, []
+    section = SECTIONS[0]  # the sheet starts with the lambs, without a heading
 
     def open_block(anchor, offset, title):
         nonlocal block
-        block = next((b for b in blocks if (b["anchor"], b["offset_days"]) == (anchor, offset)), None)
+        key = (section, anchor, offset)
+        block = next((b for b in blocks if (b["section"], b["anchor"], b["offset_days"]) == key), None)
         if block is None:
-            block = {"anchor": anchor, "offset_days": offset, "stage": title, "notes": [], "lines": []}
+            block = {"section": section, "anchor": anchor, "offset_days": offset, "stage": title,
+                     "notes": [], "lines": []}
             blocks.append(block)
         elif title and not block["stage"]:
             block["stage"] = title
@@ -600,6 +666,8 @@ def parse_cost_sheet(data: bytes, products) -> dict:
         label = str(b or "").strip().lower()
         if label.startswith("totaal") or label.startswith("totale"):
             continue
+        if not product_name and _section_heading(b):
+            section = _section_heading(b)
         if r in formulas:
             d, via_lambing = days(r)
             anchor, offset = ("lambing_start", d - gestation) if via_lambing else ("mating_start", d)
@@ -627,60 +695,207 @@ def parse_cost_sheet(data: bytes, products) -> dict:
         refs = [int(n) for n in re.findall(r"\$?A\$?(\d+)", str(g or ""))]
         groups = list(dict.fromkeys(group_rows[n] for n in refs if n in group_rows))
         amount = f if isinstance(f, (int, float)) and not isinstance(f, bool) else None
-        fixed = not groups and (block["anchor"] == UNDATED or (isinstance(g, str) and "F" in g.upper()))
+        fixed = not groups and (block["anchor"] == UNDATED or bool(isinstance(g, str) and _FIXED_FORMULA.match(g.replace(" ", ""))))
         block["lines"].append({"product_id": product.id, "category": _tidy(b),
                                "animal_group": ", ".join(groups) or None,
                                "dose": None if fixed else amount, "fixed_quantity": amount if fixed else None})
     if not any(b["lines"] for b in blocks):
         raise TemplateImportError("Found no product lines with products this app knows - check the product names")
-    return {"blocks": blocks, "unmatched": unmatched, "gestation": gestation}
+    for b in blocks:  # the animals on a block's lines say its section best; headings only fill gaps
+        b["section"] = derive_section([SimpleNamespace(**l) for l in b["lines"]]) or b["section"]
+    mating = cell("A", mating_row)
+    return {"blocks": blocks, "unmatched": unmatched, "gestation": gestation,
+            "mating_date": mating.date() if isinstance(mating, datetime) else mating,
+            "counts": {label: int(cell("A", r)) for r, label in group_rows.items()}}
 
 
-def import_cost_sheet(session: Session, data: bytes) -> dict:
-    """Puts the cost sheet's product lines into the master program. A line
-    goes onto the master step with the same date rule (so a Kudde program
-    step and the cost sheet's treatments on that day are one step); a date
-    only the cost sheet has becomes its own step. Re-importing replaces
-    the cost sheet's lines instead of adding them twice. Clients' own
-    copies aren't touched - "Start again from the master" brings it in."""
-    parsed = parse_cost_sheet(data, session.exec(select(Product)).all())
-    for line in session.exec(select(ProgramStepProduct).join(ProgramStep, ProgramStep.id == ProgramStepProduct.step_id)
-                             .where(ProgramStep.program_id.is_(None), ProgramStepProduct.origin == "cost")).all():
-        session.delete(line)
-    session.flush()
-    steps = ordered_steps(session)
-    by_rule = {}
+def _apply_blocks(session: Session, program_id: int | None, blocks, all_lines: bool) -> dict:
+    """Puts parsed cost-sheet blocks into the master (program_id None) or one
+    client's program. A block lands on the step with the same section and
+    date rule - so a client's ticks and the step's id stay - else on a new
+    "cost" step. Kudde program steps are never removed. `all_lines`: the
+    sheet replaces every product line (a client's own sheet), not just the
+    lines an earlier cost sheet made (the master)."""
+    steps = ordered_steps(session, program_id)
+    lines_by_step = {}
+    for line in session.exec(select(ProgramStepProduct).where(
+            ProgramStepProduct.step_id.in_([s.id for s in steps]))).all() if steps else []:
+        lines_by_step.setdefault(line.step_id, []).append(line)
+    by_key = {}
     for step in steps:
-        by_rule.setdefault((step.anchor, step.offset_days), step)
+        section = step.section or derive_section(lines_by_step.get(step.id, []))
+        if section and (step.origin == "cost" or all_lines):
+            by_key.setdefault((section, step.anchor, step.offset_days), step)
+    for step_lines in lines_by_step.values():
+        for line in step_lines:
+            if all_lines or line.origin == "cost":
+                session.delete(line)
+    session.flush()
     next_order = max((s.sort_order for s in steps), default=0) + 1
     created = lines = 0
     touched = set()
-    for block in parsed["blocks"]:
+    for block in blocks:
         if not block["lines"] and not block["stage"]:
             continue
-        step = by_rule.get((block["anchor"], block["offset_days"]))
+        key = (block["section"], block["anchor"], block["offset_days"])
+        step = by_key.get(key)
         if step is None:
-            step = ProgramStep(anchor=block["anchor"], offset_days=block["offset_days"], stage=block["stage"],
-                               sort_order=next_order, origin="cost")
+            step = ProgramStep(program_id=program_id, anchor=block["anchor"], offset_days=block["offset_days"],
+                               stage=block["stage"], sort_order=next_order, origin="cost")
             next_order += 1
             created += 1
             session.add(step)
             session.flush()
-            by_rule[(block["anchor"], block["offset_days"])] = step
+            by_key[key] = step
+        step.section = block["section"]
         if step.origin == "cost":
+            step.stage = block["stage"] or step.stage
             step.management = "\n".join(block["notes"]) or None
-        elif block["notes"]:
-            existing = step.management or ""
-            extra = [n for n in block["notes"] if n.lower() not in existing.lower()]
-            step.management = "\n".join(filter(None, [existing, *extra])) or None
         session.add(step)
         touched.add(step.id)
         for spec in block["lines"]:
             session.add(ProgramStepProduct(step_id=step.id, origin="cost", **spec))
             lines += 1
     session.flush()
-    for step in ordered_steps(session):  # dates only an earlier cost sheet had
+    for step in ordered_steps(session, program_id):  # dates only an earlier sheet had
         if step.origin == "cost" and step.id not in touched:
             delete_step(session, step)
+    return {"steps_created": created, "lines": lines}
+
+
+def import_cost_sheet(session: Session, data: bytes) -> dict:
+    """Puts the cost sheet's product lines into the master program, one step
+    per block in its section, like the sheet (a Kudde program step on the
+    same day stays a step of its own). Re-importing replaces the cost
+    sheet's lines instead of adding them twice. Clients' own copies aren't
+    touched - "Start again from the master" brings it in."""
+    parsed = parse_cost_sheet(data, session.exec(select(Product)).all())
+    result = _apply_blocks(session, None, parsed["blocks"], all_lines=False)
     session.commit()
-    return {"steps_created": created, "lines": lines, "unmatched": parsed["unmatched"]}
+    return {**result, "unmatched": parsed["unmatched"]}
+
+
+def import_client_sheet(session: Session, program: HerdingProgram, data: bytes) -> dict:
+    """A client's own cost sheet (one downloaded from the app, or the
+    business's sheet filled in for them) into their program: DEKTYD, the
+    animal numbers and every product line come from the sheet."""
+    parsed = parse_cost_sheet(data, session.exec(select(Product)).all())
+    mating = parsed["mating_date"]
+    program.mating_date = datetime(mating.year, mating.month, mating.day)
+    session.add(program)
+    groups = {g.animal_type.strip().lower(): g for g in
+              session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program.id)).all()}
+    for label, count in parsed["counts"].items():
+        group = groups.get(label.lower())
+        if group is None:
+            group = AnimalGroup(program_id=program.id, animal_type=label, group_size=count)
+        group.group_size = count
+        session.add(group)
+    session.flush()
+    ensure_client_copy(session, program)
+    result = _apply_blocks(session, program.id, parsed["blocks"], all_lines=True)
+    session.commit()
+    return {**result, "unmatched": parsed["unmatched"]}
+
+
+# --- A client's program out as the business's cost sheet (.xlsx) ---
+
+_COUNT_ROWS = {"ooie": 5, "ramme": 6, "lammers": 7, "jong ooitjies": 8, "jong rammetjies": 9}
+_CLIENT_FIELDS = (("BESIGHEID", "farm_name"), ("NAAM", "name"), ("ADRES", "address"), ("E-POS", "email"),
+                  ("SEL", "phone"), ("BTW NO", "vat_number"))
+
+
+def export_client_sheet(session: Session, program: HerdingProgram, client, rep=(None, None, None)) -> bytes:
+    """The program laid out like the cost sheet, with live formulas (counts
+    in A5:A9, DEKTYD in A12, every date a formula off it, PRODUK TOTAAL and
+    TOTAAL R worked out by Excel) - so it still works in Excel, and
+    import_client_sheet reads it straight back."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+
+    sched = schedule(session, program)
+    if sched["anchors"] is None:
+        raise TemplateImportError("Set the first mating date first")
+    template = get_template(session)
+    mating = sched["anchors"]["mating_start"]
+    groups = {g.animal_type.strip().lower(): g.group_size for g in
+              session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program.id)).all()}
+    bold, green = Font(bold=True), PatternFill("solid", fgColor="FF66FF33")
+    money, day_fmt = '"R" #,##0.00', "dd mmmm yyyy"
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "ENT EN DOSEER KOSTE"
+    for col, width in zip("ABCDEFGH", (23.6, 52.5, 44.6, 9.5, 14.5, 12.8, 12.8, 26)):
+        ws.column_dimensions[col].width = width
+    for row, value in enumerate(rep, start=1):
+        ws[f"A{row}"] = value
+    ws["B1"] = f"VEEARTSENYPROGRAM KOSTE BEREKENING {sched['anchors']['lambing_start'].year}"
+    ws["B1"].font = bold
+    ws["A4"], ws["B4"] = "=SUM(A5:A9)", "TOTALE DIERE"
+    for name, row in _COUNT_ROWS.items():
+        label = next(g for g in GROUPS if g.lower() == name)
+        ws[f"A{row}"], ws[f"B{row}"] = groups.get(name, 0), f"TOTAAL {label.upper()}"
+        ws[f"A{row}"].font = bold
+    for row, (label, field) in enumerate(_CLIENT_FIELDS, start=2):
+        ws[f"C{row}"], ws[f"D{row}"] = label, getattr(client, field, None) if client else None
+    for col, head in zip("ABCDEFGH", ("DATUM", "TYD", "PRODUK", "VERPAK", "PRYS EXCL VAT", "DOSERING ml / Dier",
+                                      "PRODUK TOTAAL", "TOTAAL R EXCL VAT")):
+        ws[f"{col}10"] = head
+        ws[f"{col}10"].font, ws[f"{col}10"].fill = bold, green
+    ws["A11"] = "VERANDER NET HIERDIE DATUM - ALTYD OP 'N MAANDAG"
+    ws["A12"], ws["B12"] = datetime(mating.year, mating.month, mating.day), "DEKTYD"
+    ws["A14"], ws["B14"] = f"=A12+{template.gestation_days}", "LAMTYD"
+    for cell in ("A12", "A14"):
+        ws[cell].number_format, ws[cell].font = day_fmt, bold
+
+    def date_formula(step):
+        if step["date"] is None:
+            return None
+        if step["date_override"] is None and step["anchor"] in ("mating_start", "lambing_start"):
+            return f"={'A12' if step['anchor'] == 'mating_start' else 'A14'}{step['offset_days']:+d}"
+        return f"=A12{(step['date'] - mating).days:+d}"  # ponytail: other anchors and typed-in dates come back as days from DEKTYD
+
+    steps = {s["id"]: s for s in sched["steps"]}
+    row, totals = 16, []
+    for section in sched["sections"]:
+        box = section["name"] == SECTIONS[3]
+        ws[f"B{row}"] = "Medisyne Boks:" if box else section["name"].upper()
+        ws[f"B{row}"].font, ws[f"B{row}"].fill = bold, green
+        first = row + 1 if not box else row
+        for step in (steps[i] for i in section["step_ids"]):
+            if not box:
+                row += 1
+                ws[f"A{row}"], ws[f"B{row}"] = date_formula(step), step["stage"]
+                ws[f"A{row}"].number_format, ws[f"A{row}"].font, ws[f"B{row}"].font = day_fmt, bold, bold
+            notes = [n for n in (step["management"] or "").split("\n") if n.strip()] if step["origin"] == "cost" else []
+            for i, line in enumerate(step["products"]):
+                row += 1
+                if i < len(notes):
+                    ws[f"A{row}"] = notes[i]
+                ws[f"B{row}"], ws[f"C{row}"] = line["category"], line["product_name"]
+                ws[f"D{row}"], ws[f"E{row}"] = line["pack_size"], line["price_excl_vat"]
+                if line["fixed_quantity"]:
+                    ws[f"F{row}"], ws[f"G{row}"] = line["fixed_quantity"], f'=IFERROR(F{row},"")'
+                else:
+                    refs = [_COUNT_ROWS[n] for n in group_names(line["animal_group"]) if n in _COUNT_ROWS] \
+                        or list(_COUNT_ROWS.values())
+                    per_pack = f"/D{row}" if line["pack_size"] else ""
+                    ws[f"F{row}"] = line["dose"]
+                    ws[f"G{row}"] = f'=IFERROR(({"+".join(f"$A${r}" for r in refs)})*F{row}{per_pack},"")'
+                ws[f"H{row}"] = f'=IFERROR(G{row}*E{row},"")'
+                ws[f"E{row}"].number_format, ws[f"H{row}"].number_format = money, money
+                ws[f"G{row}"].number_format = "0.00"
+        row += 1
+        ws[f"B{row}"], ws[f"H{row}"] = "TOTAAL", f"=SUM(H{first}:H{row - 1})"
+        ws[f"B{row}"].font, ws[f"H{row}"].font, ws[f"H{row}"].number_format = bold, bold, money
+        totals.append(f"H{row}")
+        row += 2
+    ws[f"B{row}"], ws[f"H{row}"] = "TOTALE KOSTE:", "=" + ("+".join(totals) or "0")
+    ws[f"B{row}"].font, ws[f"H{row}"].font, ws[f"H{row}"].number_format = bold, bold, money
+    ws[f"D{row + 2}"], ws[f"H{row + 2}"] = "KOSTE PER DIER PER JAAR", f"=IFERROR(H{row}/A4,0)"
+    ws[f"D{row + 2}"].font, ws[f"H{row + 2}"].number_format = bold, money
+    ws.print_area = f"A1:H{row + 2}"
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

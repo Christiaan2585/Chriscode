@@ -110,6 +110,12 @@ def delete_program(program_id: int, session: Session = Depends(get_session)):
             session.delete(row)
     for step in herding.ordered_steps(session, program_id):
         herding.delete_step(session, step)
+    for item in _quote_items(session, program_id):
+        item.program_step_id = None
+        session.add(item)
+    for quote in session.exec(select(Quote).where(Quote.program_id == program_id)).all():
+        quote.program_id = None
+        session.add(quote)
     session.delete(program)
     session.commit()
     return {"ok": True}
@@ -388,6 +394,7 @@ class StepFields(BaseModel):
     offset_days: Optional[int] = Field(default=None, ge=-400, le=800)
     sort_order: Optional[int] = None
     date_override: Optional[date] = None  # a client's own program only
+    section: Optional[Literal[herding.SECTIONS + (herding.OTHER_SECTION,)]] = None
     stage: Optional[str] = Field(default=None, max_length=300)
     management: Optional[str] = Field(default=None, max_length=3000)
     vaccinations: Optional[str] = Field(default=None, max_length=3000)
@@ -616,8 +623,24 @@ def program_calendar(start: date, end: date, session: Session = Depends(get_sess
 def program_schedule(program_id: int, session: Session = Depends(get_session)):
     program = _program_or_404(session, program_id)
     groups = session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program_id)).all()
-    return {"program": program, "groups": groups, "template": herding.get_template(session),
-            "group_names": list(herding.GROUPS), **herding.schedule(session, program)}
+    out = {"program": program, "groups": groups, "template": herding.get_template(session),
+           "group_names": list(herding.GROUPS), **herding.schedule(session, program)}
+    out["quotes"] = _program_quotes(session, program_id)
+    for step in out["steps"]:
+        step["quotes"] = [{k: q[k] for k in ("id", "number", "status")} for q in out["quotes"] if step["id"] in q["step_ids"]]
+    return out
+
+
+def _program_quotes(session: Session, program_id: int) -> list:
+    """The quotes made from this program, with the steps each one covers."""
+    linked = session.exec(select(Quote).where(Quote.program_id == program_id).order_by(Quote.id)).all()
+    steps = {}
+    for quote_id, step_id in session.exec(select(QuoteItem.quote_id, QuoteItem.program_step_id)
+                                          .where(QuoteItem.quote_id.in_([q.id for q in linked]))).all() if linked else []:
+        if step_id:
+            steps.setdefault(quote_id, set()).add(step_id)
+    return [{"id": q.id, "number": q.number, "status": q.status, "total_amount": q.total_amount, "date": q.date,
+             "step_ids": sorted(steps.get(q.id, ()))} for q in linked]
 
 
 # The client's own copy: anyone signed in can change it (it's that client's
@@ -709,15 +732,29 @@ def reset_from_master(program_id: int, session: Session = Depends(get_session)):
     """Throws away this client's changes and copies the master program
     again. Steps already ticked off stay ticked."""
     program = _dated_program(session, program_id)
-    done = {}
+    done, source_of = {}, {}
     for step in herding.ordered_steps(session, program.id):
         if step.done_at and step.source_step_id:
             done[step.source_step_id] = step.done_at
+        source_of[step.id] = step.source_step_id
         herding.delete_step(session, step)
     session.flush()
     herding.copy_master_into(session, program, done)
+    session.flush()
+    # The program's quotes point at the new copy of the same master step; a
+    # step the client added themselves has no copy, so its lines become "Other items".
+    copy_of = {s.source_step_id: s.id for s in herding.ordered_steps(session, program.id)}
+    for item in _quote_items(session, program.id):
+        if item.program_step_id in source_of:
+            item.program_step_id = copy_of.get(source_of[item.program_step_id])
+            session.add(item)
     session.commit()
     return {"ok": True}
+
+
+def _quote_items(session: Session, program_id: int) -> list:
+    return session.exec(select(QuoteItem).join(Quote, Quote.id == QuoteItem.quote_id)
+                        .where(Quote.program_id == program_id)).all()
 
 
 @router.put("/{program_id}/steps/{step_id}/done")
@@ -732,19 +769,13 @@ def set_step_done(program_id: int, step_id: int, data: StepDone, session: Sessio
     return {"ok": True}
 
 
-@router.post("/{program_id}/quote")
-def quote_from_program(program_id: int, data: ProgramQuoteRequest, session: Session = Depends(get_session),
-                       user: User = Depends(get_current_user)):
-    """A draft quote for the ticked product lines: each line's whole packs
-    for this program's headcounts (or the medicine box's fixed number),
-    added up per product."""
-    program = _dated_program(session, program_id)
-    if not program.client_id or not session.get(Client, program.client_id):
-        raise HTTPException(status_code=422, detail="This program isn't linked to a client")
-    groups = session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program_id)).all()
-    totals, skipped, stages = {}, [], []
-    for line_id in dict.fromkeys(data.line_ids):
-        line = herding.own_line(session, program, line_id)
+def _program_quote_items(session: Session, program: HerdingProgram, lines) -> tuple:
+    """({(step id, product id): (product, whole packs)}, skipped): each line's
+    whole packs for the program's headcounts (or the medicine box's fixed
+    number), added up per product within each step."""
+    groups = session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program.id)).all()
+    built, skipped = {}, []
+    for line in lines:
         product = session.get(Product, line.product_id) if line else None
         if product is None:
             skipped.append("A product line that has since been removed from the program")
@@ -755,22 +786,68 @@ def quote_from_program(program_id: int, data: ProgramQuoteRequest, session: Sess
             skipped.append(f"{product.name} for {line.animal_group or 'all animals'}: "
                            + ("no dose set" if not line.dose else "no animals in that group"))
             continue
-        totals[product.id] = (product, totals.get(product.id, (product, 0))[1] + units)
-        step = session.get(ProgramStep, line.step_id)
-        if step and step.stage and step.stage not in stages:
-            stages.append(step.stage)
-    if not totals:
-        raise HTTPException(status_code=422, detail="Nothing to quote: " + "; ".join(skipped))
+        key = (line.step_id, product.id)
+        built[key] = (product, built.get(key, (product, 0))[1] + units)
+    return built, skipped
 
-    notes = f"Herding program: {program.name}" + (f" - {', '.join(stages)}" if stages else "")
-    quote = create_quote(Quote(client_id=program.client_id, reference="Herding program", notes=notes[:1000]),
-                         session, user)
-    for product, units in totals.values():
-        item = QuoteItem(quote_id=quote.id, product_id=product.id, quantity=units, unit_price=0.0)
+
+def _add_quote_items(session: Session, quote: Quote, built: dict) -> None:
+    for (step_id, _), (product, units) in built.items():
+        item = QuoteItem(quote_id=quote.id, product_id=product.id, quantity=units, unit_price=0.0,
+                         program_step_id=step_id)
         price_line(session, item)
         session.add(item)
     session.flush()
     _recalculate_total(session, quote)
+
+
+@router.post("/{program_id}/quote")
+def quote_from_program(program_id: int, data: ProgramQuoteRequest, session: Session = Depends(get_session),
+                       user: User = Depends(get_current_user)):
+    """A draft quote for the ticked product lines, linked to the program:
+    one line per step and product, printed under each step."""
+    program = _dated_program(session, program_id)
+    if not program.client_id or not session.get(Client, program.client_id):
+        raise HTTPException(status_code=422, detail="This program isn't linked to a client")
+    lines = [herding.own_line(session, program, line_id) for line_id in dict.fromkeys(data.line_ids)]
+    built, skipped = _program_quote_items(session, program, lines)
+    if not built:
+        raise HTTPException(status_code=422, detail="Nothing to quote: " + "; ".join(skipped))
+    quote = create_quote(Quote(client_id=program.client_id, reference="Herding program",
+                               notes=f"Herding program: {program.name}"[:1000]), session, user)
+    quote.program_id = program.id
+    _add_quote_items(session, quote, built)
+    session.commit()
+    session.refresh(quote)
+    return {"quote": quote, "skipped": skipped}
+
+
+@router.post("/{program_id}/quotes/{quote_id}/refresh")
+def refresh_program_quote(program_id: int, quote_id: int, session: Session = Depends(get_session)):
+    """Works the quote out again from the program as it is now (doses,
+    headcounts, prices) for the same steps. Lines added to the quote by hand
+    stay. Only while it's a Draft or Sent - an accepted quote is what the
+    farmer agreed to."""
+    program = _dated_program(session, program_id)
+    quote = session.get(Quote, quote_id)
+    if quote is None or quote.program_id != program.id:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    if quote.status not in ("Draft", "Sent"):
+        raise HTTPException(status_code=409, detail="This quote has been accepted - make a new quote instead")
+    items = session.exec(select(QuoteItem).where(QuoteItem.quote_id == quote.id)).all()
+    step_ids = {i.program_step_id for i in items if i.program_step_id}
+    lines = session.exec(select(ProgramStepProduct).join(ProgramStep, ProgramStep.id == ProgramStepProduct.step_id)
+                         .where(ProgramStep.program_id == program.id, ProgramStep.id.in_(step_ids))
+                         .order_by(ProgramStepProduct.id)).all() if step_ids else []
+    built, skipped = _program_quote_items(session, program, lines)
+    if not built:
+        raise HTTPException(status_code=422, detail="The steps on this quote are no longer in the program, "
+                                                    "or have nothing to quote")
+    for item in items:
+        if item.program_step_id:
+            session.delete(item)
+    session.flush()
+    _add_quote_items(session, quote, built)
     session.commit()
     session.refresh(quote)
     return {"quote": quote, "skipped": skipped}
@@ -809,3 +886,36 @@ def program_cost_pdf(program_id: int, session: Session = Depends(get_session),
     pdf = generate_program_cost_pdf(get_business(session), client, program, groups,
                                     herding.schedule(session, program), rep)
     return _pdf_response(pdf, f"program-costs-{name}.pdf")
+
+
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+@router.get("/{program_id}/sheet.xlsx")
+def program_sheet(program_id: int, session: Session = Depends(get_session),
+                  user: Optional[User] = Depends(get_current_user)):
+    """The program as the business's cost sheet, with live formulas."""
+    program, client, _, name = _pdf_parts(session, program_id)
+    rep = (user.name, user.phone, user.email) if isinstance(user, User) else (None, None, None)
+    data = herding.export_client_sheet(session, program, client, rep)
+    return Response(content=data, media_type=XLSX,
+                    headers={"Content-Disposition": f"attachment; filename=kostes-{name}.xlsx"})
+
+
+def import_program_sheet_bytes(program_id: int, data: bytes, session: Session) -> dict:
+    program = _program_or_404(session, program_id)
+    try:
+        return herding.import_client_sheet(session, program, data)
+    except herding.TemplateImportError as exc:
+        session.rollback()
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/{program_id}/sheet")
+async def import_program_sheet(program_id: int, file: UploadFile = File(...), session: Session = Depends(get_session)):
+    """A filled-in cost sheet into this client's program: DEKTYD, the animal
+    numbers and the product lines (the sheet replaces them)."""
+    data = await file.read(MAX_TEMPLATE_UPLOAD_BYTES + 1)
+    if len(data) > MAX_TEMPLATE_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="That file is over 5 MB - it can't be a cost sheet")
+    return import_program_sheet_bytes(program_id, data, session)

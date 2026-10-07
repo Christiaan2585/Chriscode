@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "desktop-app/frontend", "run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "frontend-test-backend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set VITE_API_URL=http://localhost:8001&& npm --prefix desktop-app/frontend run dev"],
+      "port": 5173
     }
   ]
 }

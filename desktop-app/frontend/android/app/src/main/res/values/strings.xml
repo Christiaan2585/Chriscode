@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sandveld Vee Dienste</string>
+    <string name="title_activity_main">Sandveld Vee Dienste</string>
+    <string name="package_name">com.sandveldveedienste.app</string>
+    <string name="custom_url_scheme">com.sandveldveedienste.app</string>
+</resources>

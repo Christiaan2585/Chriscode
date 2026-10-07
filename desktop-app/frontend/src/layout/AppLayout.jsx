@@ -9,6 +9,7 @@ import GlobalSearch from "../components/GlobalSearch";
 import ThemeToggle from "../components/ThemeToggle";
 import PoweredBy from "../components/PoweredBy";
 import Avatar from "../components/Avatar";
+import OutboxBadge from "../components/OutboxBadge";
 
 const NAV = [
   { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
@@ -39,6 +40,7 @@ const AppLayout = () => {
           <img src={logo} alt="" className="w-10 h-10 rounded-full shrink-0" />
           Sandveld Vee Dienste
         </div>
+        <OutboxBadge />
         <p className="nav-label px-7 mt-2 text-xs font-medium uppercase tracking-wider text-emerald-300/70">Menu</p>
         <nav className="flex-1 min-h-0 overflow-y-auto px-4 space-y-1 mt-2">
           {NAV.map(({ to, label, Icon, end }) => (

@@ -4,6 +4,8 @@ import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { applyTheme, getTheme } from './utils/theme'
+import { getPairing } from './utils/pairing'
+import { setDeviceConnection } from './api/client'
 
 // Before the first render, so screens never flash the wrong theme.
 applyTheme(getTheme())
@@ -23,10 +25,16 @@ window.addEventListener('unhandledrejection', (event) => {
   console.error('Unhandled promise rejection:', event.reason);
 });
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </StrictMode>,
-)
+// Android only: point the API client at the paired office PC (instead of
+// the default localhost, which doesn't exist on a phone) before anything
+// renders - elsewhere this resolves to null immediately and changes nothing.
+getPairing().then((pairing) => {
+  setDeviceConnection(pairing)
+  createRoot(document.getElementById('root')).render(
+    <StrictMode>
+      <ErrorBoundary>
+        <App initiallyPaired={Boolean(pairing)} />
+      </ErrorBoundary>
+    </StrictMode>,
+  )
+})

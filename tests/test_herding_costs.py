@@ -130,35 +130,39 @@ class CostSheetImportTests(CostTestCase):
     def test_sheet_becomes_master_steps_with_lines(self):
         result = herding.import_cost_sheet(self.s, cost_sheet())
         self.assertEqual(result["unmatched"], ["Vaccine Z (not in the app)"])
-        steps = {(s.anchor, s.offset_days): s for s in herding.ordered_steps(self.s)}
-        self.assertEqual(set(steps), {("lambing_start", 28), ("lambing_start", 56), ("lambing_start", -42),
-                                      ("lambing_start", 140), ("mating_start", -42), ("none", 0)})
+        # Like the sheet: each block is its own step in its section, even
+        # when two sections treat on the same day (lambing -42 here).
+        steps = {(s.section, s.anchor, s.offset_days): s for s in herding.ordered_steps(self.s)}
+        LAM, JONG, OOI, BOX = herding.SECTIONS
+        self.assertEqual(set(steps), {(LAM, "lambing_start", 28), (LAM, "lambing_start", 56),
+                                      (JONG, "lambing_start", -42), (JONG, "lambing_start", 140),
+                                      (OOI, "mating_start", -42), (OOI, "lambing_start", -42), (BOX, "none", 0)})
         lines = lambda key: [(l.animal_group, l.dose, l.fixed_quantity, l.category) for l in self.s.exec(
             select(ProgramStepProduct).where(ProgramStepProduct.step_id == steps[key].id).order_by(ProgramStepProduct.id)).all()]
-        self.assertEqual(lines(("lambing_start", 28)), [("Lammers", 1.5, None, "Enting"), ("Lammers", 10, None, "Minerale")])
-        self.assertEqual(lines(("lambing_start", 140)), [("Jong ooitjies, Jong rammetjies", 2, None, "Pasteurella + clostridium"),
-                                                         ("Jong rammetjies", 1, None, "Rev1 - ramme")])
-        self.assertEqual(lines(("lambing_start", -42)), [("Jong ooitjies, Jong rammetjies", 2, None, "Enting"),
-                                                         ("Ooie, Ramme", 10, None, "Voor lam dosering")])
-        self.assertEqual(lines(("none", 0)), [(None, None, 2, None)])
-        self.assertEqual(steps[("none", 0)].stage, "Medisyne boks")
-        self.assertIn("Sit sterte af", steps[("lambing_start", 28)].management)
+        self.assertEqual(lines((LAM, "lambing_start", 28)), [("Lammers", 1.5, None, "Enting"), ("Lammers", 10, None, "Minerale")])
+        self.assertEqual(lines((JONG, "lambing_start", 140)), [("Jong ooitjies, Jong rammetjies", 2, None, "Pasteurella + clostridium"),
+                                                               ("Jong rammetjies", 1, None, "Rev1 - ramme")])
+        self.assertEqual(lines((JONG, "lambing_start", -42)), [("Jong ooitjies, Jong rammetjies", 2, None, "Enting")])
+        self.assertEqual(lines((OOI, "lambing_start", -42)), [("Ooie, Ramme", 10, None, "Voor lam dosering")])
+        self.assertEqual(lines((BOX, "none", 0)), [(None, None, 2, None)])
+        self.assertEqual(steps[(BOX, "none", 0)].stage, "Medisyne boks")
+        self.assertIn("Sit sterte af", steps[(LAM, "lambing_start", 28)].management)
 
-    def test_joins_the_kudde_program_step_on_the_same_day(self):
+    def test_kudde_program_step_on_the_same_day_stays_apart(self):
         kudde = ProgramStep(sort_order=1, anchor="mating_start", offset_days=-42, stage="6 weke voor paring", origin="kudde")
         self.s.add(kudde)
         self.s.commit()
         herding.import_cost_sheet(self.s, cost_sheet())
-        merged = [s for s in herding.ordered_steps(self.s) if (s.anchor, s.offset_days) == ("mating_start", -42)]
-        self.assertEqual([s.id for s in merged], [kudde.id])
-        self.assertEqual(merged[0].stage, "6 weke voor paring")
+        same_day = {s.id: s for s in herding.ordered_steps(self.s) if (s.anchor, s.offset_days) == ("mating_start", -42)}
+        self.assertEqual(same_day[kudde.id].stage, "6 weke voor paring")  # untouched, still there
+        self.assertEqual(sorted(s.section or "" for s in same_day.values()), ["", "Ooie en ramme"])
 
     def test_reimport_does_not_duplicate(self):
         herding.import_cost_sheet(self.s, cost_sheet())
         before = len(self.s.exec(select(ProgramStepProduct)).all())
         herding.import_cost_sheet(self.s, cost_sheet())
         self.assertEqual(len(self.s.exec(select(ProgramStepProduct)).all()), before)
-        self.assertEqual(len(herding.ordered_steps(self.s)), 6)
+        self.assertEqual(len(herding.ordered_steps(self.s)), 7)
 
     def test_dated_heading_without_products_is_still_a_step(self):
         wb = load_workbook(io.BytesIO(cost_sheet()))
@@ -189,9 +193,9 @@ class ClientProgramTests(CostTestCase):
 
     def test_client_gets_their_own_copy(self):
         out = self.schedule()
-        self.assertEqual(len(out["steps"]), 6)
+        self.assertEqual(len(out["steps"]), 7)
         self.assertTrue(all(s["program_id"] == self.prog.id for s in out["steps"]))
-        self.assertEqual(len(herding.ordered_steps(self.s)), 6)  # master untouched
+        self.assertEqual(len(herding.ordered_steps(self.s)), 7)  # master untouched
 
     def test_changing_the_client_copy_leaves_the_master_alone(self):
         self.schedule()
@@ -218,7 +222,7 @@ class ClientProgramTests(CostTestCase):
         self.assertIsNone(box["date"])
         self.assertEqual(box["status"], "none")
         self.assertEqual(out["steps"][-1]["anchor"], "none")
-        self.assertEqual(out["progress"]["total"], 5)
+        self.assertEqual(out["progress"]["total"], 6)
 
     def test_typed_in_date_wins(self):
         self.schedule()

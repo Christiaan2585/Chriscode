@@ -2,26 +2,20 @@ import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, Dog, Activity, Scale, Calendar, Plus, Trash2, Check, StickyNote,
+  ArrowLeft, Calendar, Plus, Trash2, Check, StickyNote,
   Phone, MessageCircle, Edit, Briefcase, Mail, MapPin,
   FileText, ShoppingCart, Download, Eye, BookOpen, ChevronRight, Clock, CheckCircle, Ban,
 } from "lucide-react";
-import { clientService, animalService } from "../api/services";
+import { clientService } from "../api/services";
 import apiClient from "../api/client";
 import { toTelLink, toWhatsAppLink } from "../utils/contact";
 import Modal from "../components/Modal";
-import MedicalModal from "../components/MedicalModal";
-import WeightModal from "../components/WeightModal";
 import DocumentPreview from "../components/DocumentPreview";
 import HerdingProgramPanel from "../components/HerdingProgramPanel";
 import { loadedLanguages, useSupplierBook } from "../components/SupplierCatalogue";
 import { DocumentHover } from "../components/PreviewCards";
 import { downloadDocumentPdf, orderFormFor } from "../utils/documents";
 import { money, statusStyle } from "../utils/format";
-
-const SPECIES_OPTIONS = ["Goats", "Sheep", "Cows", "Horses", "Pigs"];
-// Youngest first, so the animal registry reads "young to old".
-const AGE_GROUP_ORDER = ["Young", "Adult"];
 
 
 const ClientDetail = () => {
@@ -31,12 +25,6 @@ const ClientDetail = () => {
   const { data: book } = useSupplierBook();
   const bookLanguages = loadedLanguages(book);
 
-  const [isAnimalModalOpen, setIsAnimalModalOpen] = useState(false);
-  const [newAnimal, setNewAnimal] = useState({ name: "", species: SPECIES_OPTIONS[0], breed: "" });
-  const [editingAnimal, setEditingAnimal] = useState(null); // animal object being edited, or null
-  const [animalForm, setAnimalForm] = useState(null);
-  const [medicalTarget, setMedicalTarget] = useState(null);
-  const [weightTarget, setWeightTarget] = useState(null);
   const [noteContent, setNoteContent] = useState("");
   const [noteReminderDate, setNoteReminderDate] = useState("");
   const [isEditClientOpen, setIsEditClientOpen] = useState(false);
@@ -80,29 +68,6 @@ const ClientDetail = () => {
       queryClient.invalidateQueries({ queryKey: ["client", id] });
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       setIsEditClientOpen(false);
-    },
-  });
-
-  const addAnimalMutation = useMutation({
-    mutationFn: (data) => animalService.create({ ...data, client_id: Number(id) }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["animals", "client", id] });
-      setIsAnimalModalOpen(false);
-      setNewAnimal({ name: "", species: SPECIES_OPTIONS[0], breed: "" });
-    },
-  });
-
-  const deleteAnimalMutation = useMutation({
-    mutationFn: (animalId) => animalService.delete(animalId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["animals", "client", id] }),
-  });
-
-  const updateAnimalMutation = useMutation({
-    mutationFn: ({ animalId, data }) => animalService.update(animalId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["animals", "client", id] });
-      setEditingAnimal(null);
-      setAnimalForm(null);
     },
   });
 
@@ -196,27 +161,6 @@ const ClientDetail = () => {
   const doneNotes = (notes || []).filter((n) => n.is_completed);
   const telLink = toTelLink(client.phone);
   const waLink = toWhatsAppLink(client.phone, `Hi ${client.name?.split(" ")[0] || ""}, `);
-
-  const speciesCounts = clientAnimals.reduce((acc, a) => {
-    acc[a.species] = (acc[a.species] || 0) + 1;
-    return acc;
-  }, {});
-
-  // Animals grouped young-to-old, then by species/type within each age group,
-  // per the "categories (young to old)(breed/type)" layout.
-  const animalGroups = AGE_GROUP_ORDER.map((ageGroup) => {
-    const inGroup = clientAnimals.filter((a) => (a.age_group || "Adult") === ageGroup);
-    const bySpecies = inGroup.reduce((acc, a) => {
-      const key = a.species || "Other";
-      (acc[key] = acc[key] || []).push(a);
-      return acc;
-    }, {});
-    return {
-      ageGroup,
-      count: inGroup.length,
-      species: Object.entries(bySpecies).sort(([a], [b]) => a.localeCompare(b)),
-    };
-  }).filter((g) => g.count > 0);
 
   const upcomingAppointments = (appointments || [])
     .slice()
@@ -395,131 +339,8 @@ const ClientDetail = () => {
           <HerdingProgramPanel clientId={id} clientName={client.name} />
         </div>
 
-        {/* Animals + history */}
+        {/* History */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Animals */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <Dog className="text-emerald-600" /> Registered Animals ({clientAnimals.length})
-              </h3>
-              <button
-                onClick={() => setIsAnimalModalOpen(true)}
-                className="text-sm bg-emerald-600 text-white px-3 py-1 rounded-md hover:bg-emerald-700 transition-colors"
-              >
-                + Add Animal
-              </button>
-            </div>
-
-            {Object.keys(speciesCounts).length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
-                {Object.entries(speciesCounts).map(([species, count]) => (
-                  <span
-                    key={species}
-                    className="bg-slate-100 text-slate-600 text-xs font-medium px-3 py-1 rounded-full"
-                  >
-                    {species}: {count}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {clientAnimals.length === 0 ? (
-              <div className="bg-slate-100 p-12 rounded-2xl border-2 border-dashed border-slate-300 text-center text-slate-500">
-                No animals registered for this client yet.
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {animalGroups.map((group) => (
-                  <div key={group.ageGroup}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-md">
-                        {group.ageGroup}
-                      </span>
-                      <span className="text-xs text-slate-400">{group.count} animal{group.count === 1 ? "" : "s"}</span>
-                    </div>
-                    <div className="space-y-4 pl-1 border-l-2 border-slate-100 ml-1">
-                      {group.species.map(([species, animalsOfType]) => (
-                        <div key={species} className="pl-4">
-                          <div className="text-sm font-semibold text-slate-600 mb-2">
-                            {species} <span className="text-slate-400 font-normal">({animalsOfType.length})</span>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {animalsOfType.map((animal) => (
-                              <div
-                                key={animal.id}
-                                className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-emerald-300 transition-all group"
-                              >
-                                <div className="flex justify-between items-start mb-3">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 group-hover:bg-emerald-200 transition-colors">
-                                      <Dog size={20} />
-                                    </div>
-                                    <div>
-                                      <div className="font-bold text-slate-800">{animal.name}</div>
-                                      <div className="text-xs text-slate-500">{animal.breed || "Breed unknown"}{animal.gender ? ` • ${animal.gender}` : ""}</div>
-                                    </div>
-                                  </div>
-                                  <div className="flex gap-1">
-                                    <button
-                                      onClick={() => setMedicalTarget(animal)}
-                                      className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors"
-                                      title="Medical Log"
-                                    >
-                                      <Activity size={16} />
-                                    </button>
-                                    <button
-                                      onClick={() => setWeightTarget(animal)}
-                                      className="p-1.5 text-slate-400 hover:text-purple-600 transition-colors"
-                                      title="Weight Log"
-                                    >
-                                      <Scale size={16} />
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setEditingAnimal(animal);
-                                        setAnimalForm({
-                                          name: animal.name || "",
-                                          species: animal.species || SPECIES_OPTIONS[0],
-                                          age_group: animal.age_group || "Adult",
-                                          breed: animal.breed || "",
-                                          tag_id: animal.tag_id || "",
-                                          gender: animal.gender || "",
-                                        });
-                                      }}
-                                      className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
-                                      title="Edit"
-                                    >
-                                      <Edit size={16} />
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        if (window.confirm(`Remove ${animal.name}? This can't be undone.`)) {
-                                          deleteAnimalMutation.mutate(animal.id);
-                                        }
-                                      }}
-                                      className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                                      title="Delete"
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs text-slate-400 mt-4 pt-3 border-t border-slate-50">
-                                  <Calendar size={12} /> Tag: {animal.tag_id || "unassigned"}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* Calendar / schedule */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-4">
@@ -781,107 +602,6 @@ const ClientDetail = () => {
         </div>
       </div>
 
-      <Modal isOpen={isAnimalModalOpen} onClose={() => setIsAnimalModalOpen(false)} title={`Add Animal for ${client.name}`}>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Animal Name</label>
-            <input
-              type="text"
-              value={newAnimal.name}
-              onChange={(e) => setNewAnimal({ ...newAnimal, name: e.target.value })}
-              className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Species</label>
-              <select
-                value={newAnimal.species}
-                onChange={(e) => setNewAnimal({ ...newAnimal, species: e.target.value })}
-                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-              >
-                {SPECIES_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Breed</label>
-              <input
-                type="text"
-                value={newAnimal.breed}
-                onChange={(e) => setNewAnimal({ ...newAnimal, breed: e.target.value })}
-                className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
-          </div>
-          <button
-            disabled={!newAnimal.name || addAnimalMutation.isPending}
-            onClick={() => addAnimalMutation.mutate(newAnimal)}
-            className="w-full bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50"
-          >
-            {addAnimalMutation.isPending ? "Saving..." : "Register Animal"}
-          </button>
-        </div>
-      </Modal>
-
-      <Modal isOpen={!!editingAnimal} onClose={() => { setEditingAnimal(null); setAnimalForm(null); }} title={`Edit ${editingAnimal?.name || "Animal"}`}>
-        {animalForm && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Animal Name</label>
-                <input
-                  type="text"
-                  value={animalForm.name}
-                  onChange={(e) => setAnimalForm({ ...animalForm, name: e.target.value })}
-                  className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Species</label>
-                <select
-                  value={animalForm.species}
-                  onChange={(e) => setAnimalForm({ ...animalForm, species: e.target.value })}
-                  className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                >
-                  {SPECIES_OPTIONS.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Breed</label>
-                <input
-                  type="text"
-                  value={animalForm.breed}
-                  onChange={(e) => setAnimalForm({ ...animalForm, breed: e.target.value })}
-                  className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Tag / Ear Tag ID</label>
-                <input
-                  type="text"
-                  value={animalForm.tag_id}
-                  onChange={(e) => setAnimalForm({ ...animalForm, tag_id: e.target.value })}
-                  className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-              </div>
-            </div>
-            <button
-              disabled={!animalForm.name || updateAnimalMutation.isPending}
-              onClick={() => updateAnimalMutation.mutate({ animalId: editingAnimal.id, data: { ...animalForm, client_id: Number(id) } })}
-              className="w-full bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50"
-            >
-              {updateAnimalMutation.isPending ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-        )}
-      </Modal>
-
       <Modal isOpen={isEditClientOpen} onClose={() => setIsEditClientOpen(false)} title="Edit Client">
         {clientForm && (
           <div className="space-y-4">
@@ -985,7 +705,7 @@ const ClientDetail = () => {
               />
             </div>
           </div>
-          <div>
+          {clientAnimals.length > 0 && <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Animal (Optional)</label>
             <select
               value={newAppointment.animal_id}
@@ -997,7 +717,7 @@ const ClientDetail = () => {
                 <option key={a.id} value={a.id}>{a.name} ({a.species})</option>
               ))}
             </select>
-          </div>
+          </div>}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Reason for Visit</label>
             <textarea
@@ -1017,23 +737,6 @@ const ClientDetail = () => {
           </button>
         </div>
       </Modal>
-
-      {medicalTarget && (
-        <MedicalModal
-          isOpen={!!medicalTarget}
-          onClose={() => setMedicalTarget(null)}
-          animalId={medicalTarget.id}
-          animalName={medicalTarget.name}
-        />
-      )}
-      {weightTarget && (
-        <WeightModal
-          isOpen={!!weightTarget}
-          onClose={() => setWeightTarget(null)}
-          animalId={weightTarget.id}
-          animalName={weightTarget.name}
-        />
-      )}
 
       <DocumentPreview doc={preview} onClose={() => setPreview(null)} />
     </div>

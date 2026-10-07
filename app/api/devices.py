@@ -5,6 +5,7 @@ Deliberately NOT behind main.py's router-wide sign-in: POST /devices/pair
 must work for a phone that isn't signed in yet - it's protected by the
 one-time pairing code instead. Every other route here needs an admin, and
 only from the PC itself (require_local), never over the phone connection."""
+import base64
 import json
 import secrets
 from datetime import datetime
@@ -103,8 +104,13 @@ def new_pairing_code():
     if not status["running"]:
         raise HTTPException(status_code=409, detail="Switch on \"Allow phones\" first")
     code = PAIRING_CODES.create()
-    qr = json.dumps({"app": "sandveld", "v": 1, "hosts": status["addresses"], "port": status["port"],
-                     "fp": status["fingerprint"], "code": code["code"]}, separators=(",", ":"))
+    payload = json.dumps({"app": "sandveld", "v": 1, "hosts": status["addresses"], "port": status["port"],
+                          "fp": status["fingerprint"], "code": code["code"]}, separators=(",", ":"))
+    # sandveld://pair?d=<data> rather than bare JSON, so any camera app's
+    # QR reader offers "open in Sandveld" instead of just showing text -
+    # the Android app never needs its own in-app scanner.
+    encoded = base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+    qr = f"sandveld://pair?d={encoded}"
     return {"code": code["code"], "expires_at": code["expires_at"], "qr": qr, **status}
 
 

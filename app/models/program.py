@@ -79,6 +79,7 @@ class ProgramStep(SQLModel, table=True):
     date_override: Optional[datetime] = None  # a date typed in for this client
     done_at: Optional[datetime] = None  # a copy ticked off
     origin: Optional[str] = None  # "kudde" / "cost" - which sheet made a master step
+    section: Optional[str] = None  # the cost sheet's section (herding.SECTIONS); NULL = worked out from the animals
 
 
 class ProgramStepProduct(SQLModel, table=True):

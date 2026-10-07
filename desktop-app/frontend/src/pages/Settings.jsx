@@ -10,6 +10,8 @@ import PhoneSettings from "../components/PhoneSettings";
 import Avatar from "../components/Avatar";
 import { isUpdaterAvailable, checkForUpdates, quitAndInstall, getUpdateStatus, onUpdateStatus } from "../utils/updater";
 import { canChooseFolder, canOpenFolder, chooseFolder, openFolder } from "../utils/desktop";
+import { isNative } from "../utils/pairing";
+import PhonePairingSettings from "../components/PhonePairingSettings";
 import licenceText from "../legal/EULA.txt?raw";
 
 const SoftwareUpdateSettings = ({ currentVersion }) => {
@@ -402,7 +404,8 @@ const Settings = () => {
 
       <SecuritySettings />
 
-      {user?.is_admin && <PhoneSettings />}
+      {user?.is_admin && !isNative() && <PhoneSettings />}
+      {isNative() && <PhonePairingSettings />}
 
       <DataImportSettings />
 

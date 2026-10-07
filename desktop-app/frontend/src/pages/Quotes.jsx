@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
-import { Plus, Search, FileText, Trash2, Edit, Save, X, Download, Eye, FileInput } from "lucide-react";
+import { Plus, Search, FileText, Trash2, Edit, Save, X, Download, Eye, FileInput, ClipboardList } from "lucide-react";
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
+import { isOffline, queueQuoteCreate } from "../utils/outbox";
+import { useToast } from "../context/ToastContext";
 import Modal from "../components/Modal";
 import SearchableSelect from "../components/SearchableSelect";
 import DocumentPreview from "../components/DocumentPreview";
 import OrderFormImport from "../components/OrderFormImport";
+import ProgramQuoteDialog from "../components/ProgramQuoteDialog";
 import { ClientHover, DocumentHover } from "../components/PreviewCards";
 import { downloadDocumentPdf, lineTotal } from "../utils/documents";
 import { newestFirst } from "../utils/format";
@@ -20,6 +23,7 @@ const offNote = (item) => (Number(item.discount_percent) ? `, ${item.discount_pe
 
 const Quotes = () => {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const location = useLocation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -144,29 +148,44 @@ const Quotes = () => {
         return editingId;
       }
 
-      const savedQuote = (
-        await apiClient.post("/quotes/", {
-          client_id: Number(quote.client_id),
-          status: quote.status,
-          reference: quote.reference || null,
-          expiry_date: quote.expiry_date || null,
-          notes: quote.notes || null,
-        })
-      ).data;
-      for (const item of newItems) {
-        await apiClient.post(`/quotes/${savedQuote.id}/items`, {
-          product_id: Number(item.product_id),
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          discount_percent: Number(item.discount_percent) || 0,
-          subtotal: 0, // calculated server-side
-        });
+      const payload = {
+        client_id: Number(quote.client_id),
+        status: quote.status,
+        reference: quote.reference || null,
+        expiry_date: quote.expiry_date || null,
+        notes: quote.notes || null,
+      };
+      const items = newItems.map((item) => ({
+        product_id: Number(item.product_id),
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        discount_percent: Number(item.discount_percent) || 0,
+        subtotal: 0, // calculated server-side
+      }));
+
+      let savedQuote;
+      try {
+        savedQuote = (await apiClient.post("/quotes/", payload, { queueable: true })).data;
+      } catch (error) {
+        // Off the office Wi-Fi: queue the whole quote rather than lose it -
+        // its number is only ever assigned once this actually runs on the
+        // PC, so there's nothing to show in the list until then.
+        if (!isOffline(error)) throw error;
+        queueQuoteCreate(payload, items);
+        return { queued: true };
       }
-      return savedQuote.id;
+      // Items are posted one at a time against the quote the PC just
+      // created - if connectivity drops here, that's a genuine error (not
+      // queued), since retrying the create step again would duplicate it.
+      for (const item of items) {
+        await apiClient.post(`/quotes/${savedQuote.id}/items`, item);
+      }
+      return { id: savedQuote.id, queued: false };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
       closeModal();
+      if (result?.queued) showToast("Quote saved - it'll be created once this phone reaches the office PC.", "success");
     },
   });
 
@@ -199,6 +218,7 @@ const Quotes = () => {
 
   const [preview, setPreview] = useState(null);
   const [importingOrder, setImportingOrder] = useState(false);
+  const [quotingProgram, setQuotingProgram] = useState(false);
 
   if (isLoading) return <div className="p-8 text-center">Loading quotes...</div>;
 
@@ -216,6 +236,13 @@ const Quotes = () => {
             className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:border-emerald-300 hover:text-emerald-600 transition-colors shadow-sm"
           >
             <FileInput size={20} /> Import order form
+          </button>
+          <button
+            type="button"
+            onClick={() => setQuotingProgram(true)}
+            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:border-emerald-300 hover:text-emerald-600 transition-colors shadow-sm"
+          >
+            <ClipboardList size={20} /> From herding program
           </button>
           <button
             onClick={openAddModal}
@@ -470,6 +497,8 @@ const Quotes = () => {
 
       <DocumentPreview doc={preview} onClose={() => setPreview(null)} />
       <OrderFormImport isOpen={importingOrder} onClose={() => setImportingOrder(false)}
+        clients={clients || []} onOpenQuote={openEditModal} />
+      <ProgramQuoteDialog isOpen={quotingProgram} onClose={() => setQuotingProgram(false)}
         clients={clients || []} onOpenQuote={openEditModal} />
     </div>
   );

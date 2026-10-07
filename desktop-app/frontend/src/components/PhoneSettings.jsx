@@ -52,6 +52,14 @@ const PairingDialog = ({ pairing, pairedCount, onClose }) => {
           <p className="text-xs text-slate-500">
             {left === "0:00" ? "This code has expired - close this and make a new one." : `Works once, for ${left}.`}
           </p>
+          <details className="text-left text-xs text-slate-500">
+            <summary className="cursor-pointer text-center font-medium text-slate-600">Can't scan? Details for manual pairing</summary>
+            <dl className="mt-2 space-y-1 rounded-lg bg-slate-50 p-3 font-mono">
+              <div><dt className="inline text-slate-400">Address: </dt><dd className="inline break-all">{pairing?.addresses?.join(" or ")}</dd></div>
+              <div><dt className="inline text-slate-400">Port: </dt><dd className="inline">{pairing?.port}</dd></div>
+              <div><dt className="inline text-slate-400">Fingerprint: </dt><dd className="inline break-all">{pairing?.fingerprint}</dd></div>
+            </dl>
+          </details>
         </div>
       )}
     </Modal>

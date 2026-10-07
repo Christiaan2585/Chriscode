@@ -8,6 +8,7 @@ desktop-app/node_modules/
 desktop-app/frontend/node_modules/
 desktop-app/dist/
 desktop-app/frontend/dist/
+desktop-app/dist-android/
 
 # Database - contains real client data, don't commit it. Broader than just
 # the one filename so a manual backup copy (kyron_agri_backup.db, etc. - see

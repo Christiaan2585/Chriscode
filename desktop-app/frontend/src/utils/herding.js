@@ -14,6 +14,8 @@ export const UNDATED = "none"; // a step with no date - the medicine box
 // The five headcounts every program has, as on the business's cost sheet
 // (app/core/herding.py GROUPS). A product line is for one or more of them.
 export const GROUPS = ["Ooie", "Ramme", "Lammers", "Jong ooitjies", "Jong rammetjies"];
+// The cost sheet's sections (herding.SECTIONS + OTHER_SECTION), in its order.
+export const SECTIONS = ["Lammers", "Jong ooitjies en ramme", "Ooie en ramme", "Ander", "Medisyne boks"];
 export const splitGroups = (text) =>
   String(text || "").split(/[,+&]/).map((s) => s.trim()).filter(Boolean);
 

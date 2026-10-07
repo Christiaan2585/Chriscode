@@ -11,5 +11,6 @@ class QuoteItem(SQLModel, table=True):
     subtotal: float = 0.0  # the line's inclusive total (after discount, plus VAT)
     discount_percent: Optional[float] = None
     vat_percent: Optional[float] = None
+    program_step_id: Optional[int] = None  # the herding program step this line is for (a program quote)
 
     quote: Optional["Quote"] = Relationship(back_populates="items")

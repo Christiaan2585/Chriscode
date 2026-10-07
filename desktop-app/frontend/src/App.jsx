@@ -1,6 +1,9 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { HashRouter as BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { startOutboxAutoFlush } from "./utils/outbox";
+import { isNative } from "./utils/pairing";
+import PairingScreen from "./components/PairingScreen";
 import { AuthProvider } from "./context/AuthContext";
 import { ToastProvider, ToastErrorBridge } from "./context/ToastContext";
 import AuthGate from "./pages/AuthGate";
@@ -20,10 +23,18 @@ import Settings from "./pages/Settings";
 import Programs from "./pages/Programs";
 import Weather from "./pages/Weather";
 import PurchaseOrders from "./pages/PurchaseOrders";
+import ProgramSheet from "./pages/ProgramSheet";
 
 const queryClient = new QueryClient();
 
-const App = () => {
+const App = ({ initiallyPaired = false }) => {
+  const [paired, setPaired] = useState(initiallyPaired);
+  useEffect(() => startOutboxAutoFlush(), []);
+
+  if (isNative() && !paired) {
+    return <PairingScreen onPaired={() => setPaired(true)} />;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
@@ -40,6 +51,7 @@ const App = () => {
                   <Route path="products" element={<Products />} />
                   <Route path="herds" element={<Herds />} />
                   <Route path="programs" element={<Programs />} />
+                  <Route path="programs/:programId" element={<ProgramSheet />} />
                   <Route path="calendar" element={<Calendar />} />
                   <Route path="weather" element={<Weather />} />
                   <Route path="calculator" element={<Calculator />} />
