@@ -2,7 +2,7 @@
 
 All notable changes to Sandveld Vee Dienste. Newest first.
 
-## 1.0.7 - 2026-10-07
+## 1.0.8 - 2026-10-07 (includes everything planned for 1.0.7, which was never released)
 
 ### New
 - **Android app (first version)**: the same app on staff phones, connected to the office PC over the Wi-Fi. Pair a phone under Settings -> Phones on the PC; the phone asks before pairing and only pairs with an office-network address. Ticking program steps and new quotes are kept on the phone while it's away from the office Wi-Fi, and sent when it's back.
