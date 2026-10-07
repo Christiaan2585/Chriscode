@@ -7,6 +7,10 @@ copy of a live SQLite file can capture a half-written page). Snapshots go to
 (a OneDrive / Google Drive folder or a USB drive) so a copy survives the PC
 itself dying. Only files matching our own name pattern are ever pruned, so
 pointing the extra folder at a folder that holds other files is safe.
+
+With a passphrase set (Settings -> Data & Backups) every backup is locked
+(see backup_crypto.py) and named `...db.enc`, so a copy that ends up on a USB
+stick or in OneDrive can't be read by whoever finds it.
 """
 import json
 import logging
@@ -14,18 +18,21 @@ import os
 import re
 import shutil
 import sqlite3
+import tempfile
 import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
+from app.core import backup_crypto
+
 logger = logging.getLogger("uvicorn.error")
 
 EXTRA_SUBFOLDER = "Sandveld Vee Dienste Backups"
 DEFAULT_KEEP = 30
 BACKUP_INTERVAL = timedelta(hours=24)
-_NAME_RE = re.compile(r"^kyron_agri-(\d{8}-\d{6})\.db$")
+_NAME_RE = re.compile(r"^kyron_agri-(\d{8}-\d{6})\.db(\.enc)?$")
 _STAMP_FORMAT = "%Y%m%d-%H%M%S"
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -89,14 +96,14 @@ def _atomic_write(write_to_path, target: str) -> None:
             os.remove(partial)
 
 
-def create_backup(db_path: str, dest_dir: str, now: Optional[datetime] = None) -> str:
+def create_backup(db_path: str, dest_dir: str, now: Optional[datetime] = None, passphrase: Optional[str] = None) -> str:
     # sqlite3.connect() on a missing path silently creates an empty database,
     # which would then be "backed up" as if it were real data.
     if not os.path.isfile(db_path):
         raise FileNotFoundError(f"Database not found: {db_path}")
     os.makedirs(dest_dir, exist_ok=True)
     stamp = (now or datetime.now()).strftime(_STAMP_FORMAT)
-    target = os.path.join(dest_dir, f"kyron_agri-{stamp}.db")
+    target = os.path.join(dest_dir, f"kyron_agri-{stamp}.db" + (".enc" if passphrase else ""))
 
     def snapshot(path):
         src = sqlite3.connect(db_path)
@@ -107,7 +114,17 @@ def create_backup(db_path: str, dest_dir: str, now: Optional[datetime] = None) -
             dst.close()
             src.close()
 
-    _atomic_write(snapshot, target)
+    def locked(path):
+        plain = path + ".plain"  # the snapshot exists unlocked only for a moment, then is removed
+        try:
+            snapshot(plain)
+            with open(plain, "rb") as f, open(path, "wb") as out:
+                out.write(backup_crypto.encrypt(f.read(), passphrase))
+        finally:
+            if os.path.exists(plain):
+                os.remove(plain)
+
+    _atomic_write(locked if passphrase else snapshot, target)
     return target
 
 
@@ -125,6 +142,7 @@ def list_backups(dest_dir: str) -> list:
             "path": path,
             "size": os.path.getsize(path),
             "created_at": datetime.strptime(match.group(1), _STAMP_FORMAT),
+            "encrypted": bool(match.group(2)),
         })
     return sorted(backups, key=lambda b: b["created_at"], reverse=True)
 
@@ -144,6 +162,7 @@ def is_backup_due(last: Optional[datetime], now: datetime, interval: timedelta =
 def load_settings(path: str) -> dict:
     settings = {"extra_folder": None, "keep": DEFAULT_KEEP}
     stored = _read_json(path)
+    settings["encrypted"] = bool(stored.get("encryption"))
     settings["extra_folder"] = stored.get("extra_folder") or None
     try:
         settings["keep"] = max(1, int(stored.get("keep", DEFAULT_KEEP)))
@@ -153,13 +172,35 @@ def load_settings(path: str) -> dict:
 
 
 def save_settings(path: str, settings: dict) -> None:
-    _write_json(path, {"extra_folder": settings.get("extra_folder") or None,
-                       "keep": settings.get("keep", DEFAULT_KEEP)})
+    kept = _read_json(path).get("encryption")  # the saved passphrase isn't a setting this form edits
+    data = {"extra_folder": settings.get("extra_folder") or None, "keep": settings.get("keep", DEFAULT_KEEP)}
+    if kept:
+        data["encryption"] = kept
+    _write_json(path, data)
+
+
+def set_passphrase(path: str, passphrase: Optional[str]) -> None:
+    """Turns locking on (with this passphrase) or off (None). New backups follow; ones already made stay as they are."""
+    data = _read_json(path)
+    if passphrase:
+        backup_crypto.check_passphrase(passphrase)
+        data["encryption"] = backup_crypto.protect(passphrase)
+    else:
+        data.pop("encryption", None)
+    _write_json(path, data)
+
+
+def get_passphrase(path: str) -> Optional[str]:
+    saved = _read_json(path).get("encryption")
+    try:
+        return backup_crypto.unprotect(saved) if saved else None
+    except Exception:  # e.g. the settings file came from another Windows account
+        return None
 
 
 def run_backup(db_path: str, primary_dir: str, extra_folder: Optional[str] = None,
-               keep: int = DEFAULT_KEEP, now: Optional[datetime] = None) -> dict:
-    primary = create_backup(db_path, primary_dir, now=now)
+               keep: int = DEFAULT_KEEP, now: Optional[datetime] = None, passphrase: Optional[str] = None) -> dict:
+    primary = create_backup(db_path, primary_dir, now=now, passphrase=passphrase)
     prune_backups(primary_dir, keep)
 
     extra, extra_error = None, None
@@ -181,7 +222,7 @@ def run_backup(db_path: str, primary_dir: str, extra_folder: Optional[str] = Non
 
 def backup_if_version_changed(db_path: str, version: str, primary_dir: str, state_file: str,
                               extra_folder: Optional[str] = None, keep: int = DEFAULT_KEEP,
-                              now: Optional[datetime] = None) -> Optional[str]:
+                              now: Optional[datetime] = None, passphrase: Optional[str] = None) -> Optional[str]:
     """Snapshot the database the first time a new app version starts,
     BEFORE it runs its schema sync against the data - so if an update ever
     mangles something, the exact pre-update state is one restore away.
@@ -190,14 +231,16 @@ def backup_if_version_changed(db_path: str, version: str, primary_dir: str, stat
         return None
     result = None
     if os.path.isfile(db_path):
-        result = run_backup(db_path, primary_dir, extra_folder, keep, now=now)["primary"]
+        result = run_backup(db_path, primary_dir, extra_folder, keep, now=now, passphrase=passphrase)["primary"]
     _write_json(state_file, {"last_version": version})
     return result
 
 
-def restore_backup(db_path: str, backup_dir: str, name: str, now: Optional[datetime] = None) -> str:
+def restore_backup(db_path: str, backup_dir: str, name: str, now: Optional[datetime] = None,
+                   passphrase: Optional[str] = None) -> str:
     """Replace the live database's contents with a backup's. Snapshots the
-    current state first, so the restore itself can be undone. Returns the
+    current state first, so the restore itself can be undone. A locked backup
+    needs `passphrase`; the safety snapshot is locked with it too. Returns the
     path of that safety snapshot."""
     # The strict name pattern (no separators possible) is what keeps this
     # confined to the backup folder - "../" or absolute paths can't match.
@@ -206,18 +249,36 @@ def restore_backup(db_path: str, backup_dir: str, name: str, now: Optional[datet
     path = os.path.join(backup_dir, name)
     if not os.path.isfile(path):
         raise ValueError("That backup no longer exists.")
-    if not _is_readable_database(path):
-        raise ValueError("That backup file is damaged and can't be restored.")
 
-    safety = create_backup(db_path, backup_dir, now=now)
-    src = sqlite3.connect(path)
-    dst = sqlite3.connect(db_path)
+    unlocked = None
+    if name.endswith(".enc"):
+        if not passphrase:
+            raise ValueError("This backup is locked - enter its passphrase.")
+        with open(path, "rb") as f:
+            blob = f.read()
+        fd, unlocked = tempfile.mkstemp(suffix=".db", dir=backup_dir)
+        try:
+            with os.fdopen(fd, "wb") as out:
+                out.write(backup_crypto.decrypt(blob, passphrase))
+        except backup_crypto.WrongPassphrase as exc:
+            os.remove(unlocked)
+            raise ValueError(str(exc))
     try:
-        src.backup(dst)
+        source = unlocked or path
+        if not _is_readable_database(source):
+            raise ValueError("That backup file is damaged and can't be restored.")
+        safety = create_backup(db_path, backup_dir, now=now, passphrase=passphrase)
+        src = sqlite3.connect(source)
+        dst = sqlite3.connect(db_path)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+        return safety
     finally:
-        dst.close()
-        src.close()
-    return safety
+        if unlocked and os.path.exists(unlocked):
+            os.remove(unlocked)
 
 
 # --- Scheduling -----------------------------------------------------------
@@ -234,7 +295,8 @@ def backup_now(db_path: str) -> dict:
     settings = load_settings(settings_path())
     with _lock:
         try:
-            result = run_backup(db_path, default_backup_dir(), settings["extra_folder"], settings["keep"])
+            result = run_backup(db_path, default_backup_dir(), settings["extra_folder"], settings["keep"],
+                                passphrase=get_passphrase(settings_path()))
         except Exception as exc:
             last_error = str(exc)
             raise
@@ -247,12 +309,13 @@ def backup_on_version_change(db_path: str, version: str) -> Optional[str]:
     settings = load_settings(settings_path())
     with _lock:
         return backup_if_version_changed(db_path, version, default_backup_dir(), state_path(),
-                                         settings["extra_folder"], settings["keep"])
+                                         settings["extra_folder"], settings["keep"], passphrase=get_passphrase(settings_path()))
 
 
-def restore(db_path: str, name: str) -> str:
+def restore(db_path: str, name: str, passphrase: Optional[str] = None) -> str:
+    """`passphrase` as typed by the person; if they typed none, the one saved on this PC is tried."""
     with _lock:
-        return restore_backup(db_path, default_backup_dir(), name)
+        return restore_backup(db_path, default_backup_dir(), name, passphrase=passphrase or get_passphrase(settings_path()))
 
 
 def start_scheduler(db_path: str, check_every_seconds: int = 3600) -> None:

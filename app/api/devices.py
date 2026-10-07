@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
-from app.core import lan
+from app.core import audit, lan
 from app.core.db import get_session
 from app.core.security import require_admin
 from app.models.device import PairedDevice
@@ -52,6 +52,7 @@ def pair_device(data: PairRequest, session: Session = Depends(get_session)):
     session.add(device)
     session.commit()
     session.refresh(device)
+    audit.record(session, None, "Paired a phone", "phone", device.id, summary=device.name, via="phone")
     return {"device_id": device.id, "device_token": token}
 
 

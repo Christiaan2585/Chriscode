@@ -26,6 +26,15 @@ if not exist frontend\node_modules (
 )
 
 echo.
+echo Checking the libraries for known security problems...
+call "%~dp0scripts\security-check.bat"
+if errorlevel 1 (
+    echo.
+    echo WARNING: known security problems were found in the libraries ^(see above^). The build continues,
+    echo but update them before this goes to anyone.
+    echo.
+)
+
 echo ============================================
 echo   Step 1/2: Bundling the Python backend
 echo ============================================

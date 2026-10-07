@@ -110,6 +110,13 @@ class CatalogueTests(unittest.TestCase):
             self.assertIn(needle, text, needle)
         self.assertIn(b"/Subtype /Image", data)
 
+    def test_prices_show_excl_and_incl_vat(self):
+        text = pdf_text(self.pdf())
+        self.assertIn("R250.00", text)   # 287.50 less 15% VAT, worked out
+        self.assertIn("R287.50", text)
+        self.assertIn("excl. VAT", text)
+        self.assertIn("incl. VAT", text)
+
     def test_hidden_products_and_cost_prices_left_out(self):
         text = pdf_text(self.pdf())
         self.assertNotIn("Discontinued drench", text)

@@ -6,6 +6,9 @@ import Modal from "../components/Modal";
 import InlineEdit from "../components/InlineEdit";
 import DocumentPreview from "../components/DocumentPreview";
 import ProductCatalog, { useProductPatch } from "../components/ProductCatalog";
+import CatalogueLibrary from "../components/CatalogueLibrary";
+import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
+import { useSelection } from "../utils/useSelection";
 import SupplierCatalogue, { LANGUAGE_NAMES, LoadBookPrompt, loadedLanguages, useSupplierBook } from "../components/SupplierCatalogue";
 import { useAuth } from "../context/AuthContext";
 import { PictureField, ProductPictureViewer, ProductThumb, savePictureChange, useProductThumbnails } from "../components/ProductPicture";
@@ -37,7 +40,7 @@ const ViewButton = ({ active, onClick, Icon, children }) => (
 );
 
 // Spreadsheet-style table: every cell is editable in place.
-const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete }) => {
+const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, selection }) => {
   const patch = useProductPatch();
   const save = (id, field) => (value) => patch.mutateAsync({ id, changes: { [field]: value } });
   // Cost keeps the standard markup in step, same as the full product form.
@@ -49,6 +52,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete })
       <table className="w-full text-left">
         <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
           <tr>
+            <SelectAllTh selection={selection} />
             {["Product", "Code", "Category", "Pack Size", "Packaging"].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}
             {["Cost", "Excl VAT", "Incl VAT"].map((h) => <th key={h} className="px-4 py-3 font-medium text-right">{h}</th>)}
             <th className="px-4 py-3 font-medium text-right">Actions</th>
@@ -57,6 +61,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete })
         <tbody className="divide-y divide-slate-100">
           {products.map((p) => (
             <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${isActive(p) ? "" : "opacity-60"}`}>
+              <SelectTd selection={selection} id={p.id} label={`Select ${p.name}`} />
               <td className={cell}>
                 <div className="flex items-center gap-3">
                   <ProductThumb product={p} src={thumbnails[p.id]} onOpen={onOpenPicture} />
@@ -89,7 +94,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete })
             </tr>
           ))}
           {products.length === 0 && (
-            <tr><td colSpan={9} className="px-6 py-12 text-center text-slate-400">No products match.</td></tr>
+            <tr><td colSpan={10} className="px-6 py-12 text-center text-slate-400">No products match.</td></tr>
           )}
         </tbody>
       </table>
@@ -230,6 +235,7 @@ const Products = () => {
         String(p.description || "").toLowerCase().includes(q))
     );
   }, [products, search, category, showHidden]);
+  const selection = useSelection(useMemo(() => filtered.map((p) => p.id), [filtered]));
 
   const openCatalogue = () =>
     setCatalogue({
@@ -299,18 +305,31 @@ const Products = () => {
           {categoryNames.map((c) => <option key={c} value={c} />)}
         </datalist>
 
+        {!showBook && (
+          <div className="space-y-2 p-3 empty:hidden">
+            <BulkBar selection={selection} noun="product" describe={(id) => products?.find((p) => p.id === id)?.name || `#${id}`}
+              deleteOne={(id) => apiClient.delete(`/products/${id}`, { silent: true })}
+              onDone={() => {
+                queryClient.invalidateQueries({ queryKey: ["products"] });
+                queryClient.invalidateQueries({ queryKey: ["product-thumbnails"] });
+              }} />
+          </div>
+        )}
+
         {showBook ? (
           <SupplierCatalogue book={book} products={products} canEdit={Boolean(user?.is_admin)} />
         ) : view === "catalog" ? (
           <>
             {book && <LoadBookPrompt canEdit={Boolean(user?.is_admin)} />}
             <ProductCatalog products={filtered} thumbnails={thumbnails} onOpenPicture={setViewing}
-              onEdit={openEditModal} onDelete={handleDelete} />
+              onEdit={openEditModal} onDelete={handleDelete} selection={selection} />
           </>
         ) : (
           <ProductTable products={filtered} thumbnails={thumbnails} onOpenPicture={setViewing}
-            onEdit={openEditModal} onDelete={handleDelete} />
+            onEdit={openEditModal} onDelete={handleDelete} selection={selection} />
         )}
+
+        {view === "catalog" && <CatalogueLibrary canEdit={Boolean(user?.is_admin)} />}
       </div>
 
       <Modal isOpen={isModalOpen} onClose={closeModal} title={editingId ? "Edit Product" : "Add Product"}>

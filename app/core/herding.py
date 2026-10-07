@@ -14,6 +14,7 @@ from openpyxl import load_workbook
 from sqlmodel import Session, select
 
 from app.models.business import BusinessSettings
+from app.models.client import Client
 from app.models.product import Product
 from app.models.program import (AnimalGroup, HerdingProgram, ProgramStep, ProgramStepProduct,
                                 ProgramStepProgress, ProgramTemplate)
@@ -21,6 +22,10 @@ from app.models.program import (AnimalGroup, HerdingProgram, ProgramStep, Progra
 ANCHORS = ("mating_start", "mating_end", "lambing_start", "lambing_end", "weaning")
 UNDATED = "none"  # a step with no date - the medicine box
 TEXT_FIELDS = ("stage", "management", "vaccinations", "dosing", "vitamins", "feeding")
+# The colours a program or a step name can be given. Names, not hex codes: the
+# screen (index.css, .name-color-*) picks a shade that reads on the light and
+# the dark theme. Keep in step with desktop-app/frontend/src/utils/nameColors.js.
+COLORS = ("emerald", "sky", "blue", "violet", "pink", "rose", "orange", "amber", "teal")
 DUE_WITHIN_DAYS = 7
 # The business's cost sheet counts animals in these five groups; a product
 # line names one or more of them ("Ooie, Ramme").
@@ -112,28 +117,64 @@ def ordered_steps(session: Session, program_id: int | None = None) -> list:
     return session.exec(select(ProgramStep).where(owner).order_by(ProgramStep.sort_order, ProgramStep.id)).all()
 
 
-_COPIED_STEP_FIELDS = ("sort_order", "anchor", "offset_days", "section", *TEXT_FIELDS)
+_COPIED_STEP_FIELDS = ("sort_order", "anchor", "offset_days", "section", "color", *TEXT_FIELDS)
 _COPIED_LINE_FIELDS = ("product_id", "animal_group", "dose", "note", "category", "fixed_quantity",
                        "quantity_override", "unit_price", "discount_percent")
 
 
 def copy_master_into(session: Session, program: HerdingProgram, done: dict | None = None) -> None:
     """Gives the client their own copy of the master program. `done` maps a
-    master step id to when that step was ticked off, to carry ticks over."""
+    master step id to when that step was ticked off, to carry ticks over. A
+    `dates_only` program (the standard one) gets the dates and notes but not
+    the master's product lines - products are added per client."""
     done = done or {}
     masters = ordered_steps(session)
     lines = {}
     for line in session.exec(select(ProgramStepProduct).where(
-            ProgramStepProduct.step_id.in_([s.id for s in masters]))).all() if masters else []:
+            ProgramStepProduct.step_id.in_([s.id for s in masters]))).all() if masters and not program.dates_only else []:
         lines.setdefault(line.step_id, []).append(line)
     for master in masters:
         step = ProgramStep(program_id=program.id, source_step_id=master.id, done_at=done.get(master.id),
+                           origin=master.origin if master.origin == "scan" else None,  # so the screen can find the scan date
                            **{f: getattr(master, f) for f in _COPIED_STEP_FIELDS})
         session.add(step)
         session.flush()
         for line in sorted(lines.get(master.id, []), key=lambda l: l.id):
             session.add(ProgramStepProduct(step_id=step.id, source_line_id=line.id,
                                            **{f: getattr(line, f) for f in _COPIED_LINE_FIELDS}))
+
+
+_COPIED_PROGRAM_FIELDS = ("name", "goal", "description", "start_date", "end_date", "mating_date", "mating_weeks",
+                          "weaning_rule", "weaning_months", "weaning_days", "color", "dates_only")
+
+
+def copy_program(session: Session, source: HerdingProgram, client_id: int, with_animal_numbers: bool = False) -> HerdingProgram:
+    """A new program for `client_id` that is a copy of `source`: its dates, step
+    names and colours, notes, products and doses, and the prices and packs
+    agreed on its lines. NOT copied: ticks, invoices, the quote (the new program
+    gets its own once there is something to quote) and - unless asked - the
+    animal numbers, which belong to a farm. A source that has never been opened
+    has no steps of its own yet, so the copy takes the master's when first used."""
+    ensure_client_copy(session, source)
+    copy = HerdingProgram(client_id=client_id, **{f: getattr(source, f) for f in _COPIED_PROGRAM_FIELDS})
+    session.add(copy)
+    session.flush()
+    for step in ordered_steps(session, source.id):
+        new_step = ProgramStep(program_id=copy.id, source_step_id=step.source_step_id, origin=step.origin,
+                               date_override=step.date_override,
+                               **{f: getattr(step, f) for f in _COPIED_STEP_FIELDS})
+        session.add(new_step)
+        session.flush()
+        for line in session.exec(select(ProgramStepProduct).where(ProgramStepProduct.step_id == step.id)
+                                 .order_by(ProgramStepProduct.id)).all():
+            session.add(ProgramStepProduct(step_id=new_step.id, source_line_id=line.source_line_id, origin=line.origin,
+                                           **{f: getattr(line, f) for f in _COPIED_LINE_FIELDS}))
+    if with_animal_numbers:
+        for group in session.exec(select(AnimalGroup).where(AnimalGroup.program_id == source.id)).all():
+            session.add(AnimalGroup(program_id=copy.id, animal_type=group.animal_type, group_size=group.group_size))
+    session.commit()
+    session.refresh(copy)
+    return copy
 
 
 def ensure_client_copy(session: Session, program: HerdingProgram) -> None:
@@ -470,8 +511,10 @@ def parse_template_workbook(data: bytes) -> dict:
         return int(value) if isinstance(value, (int, float)) and low <= value <= high else None
 
     generic_title = re.fullmatch(r"(sheet|blad)\s*\d*", ws.title.strip(), re.I)
+    mating = inputs["mating"].value
     return {
         "name": (name if generic_title else _text(ws.title)) or name,
+        "mating_date": mating.date() if isinstance(mating, datetime) else mating if isinstance(mating, date) else None,
         "settings": {k: v for k, v in {
             "mating_weeks": number("weeks", 1, 52), "weaning_months": number("weaning", 1, 12),
             "gestation_days": constants.get("gestation_days"), "weaning_days": constants.get("weaning_days"),
@@ -488,6 +531,8 @@ def import_template(session: Session, data: bytes) -> dict:
     parsed = parse_template_workbook(data)
     template = get_template(session)
     template.name = (parsed["name"] or template.name)[:200]
+    if parsed["mating_date"]:
+        template.mating_date = datetime(parsed["mating_date"].year, parsed["mating_date"].month, parsed["mating_date"].day)
     for key, value in parsed["settings"].items():
         setattr(template, key, value)
     if "weaning_days" in parsed["settings"]:
@@ -512,11 +557,73 @@ def import_template(session: Session, data: bytes) -> dict:
             setattr(step, key, value)
         session.add(step)
     # Steps only the cost sheet made (see import_cost_sheet) aren't this sheet's to remove.
-    leftover = [s for ss in existing.values() for s in ss if s.origin != "cost"]
+    leftover = [s for ss in existing.values() for s in ss if s.origin not in ("cost", "scan")]
     for step in leftover:
         delete_step(session, step)
     session.commit()
     return {"created": created, "updated": updated, "removed": len(leftover), "name": template.name}
+
+
+# The scan date: the ewes are scanned this many days after the rams go in with
+# the herd (the business's rule). One master step with origin "scan" carries it
+# into every client's program, where its timing can be edited like any other.
+SCAN_STAGE = "Scan date"
+SCAN_DAYS = 77
+
+
+def ensure_scan_step(session: Session) -> bool:
+    """Puts the scan-date step in the master program - once, so deleting it
+    sticks - and in the programs clients already have. Needs a master program
+    to put it in. Returns whether it was added."""
+    template = get_template(session)
+    masters = ordered_steps(session)
+    if template.scan_step_added or not masters:
+        return False
+    fields = {"anchor": "mating_start", "offset_days": SCAN_DAYS, "stage": SCAN_STAGE,
+              "management": "Scan the ewes", "origin": "scan"}
+    master = ProgramStep(sort_order=max(s.sort_order for s in masters) + 1, **fields)
+    session.add(master)
+    session.flush()
+    for program in session.exec(select(HerdingProgram).where(HerdingProgram.client_id.is_not(None))).all():
+        own = ordered_steps(session, program.id)
+        if own:  # a program that has its own copy; the rest copy the master when first used
+            session.add(ProgramStep(program_id=program.id, source_step_id=master.id,
+                                    sort_order=max(s.sort_order for s in own) + 1, **fields))
+    template.scan_step_added = True
+    session.add(template)
+    session.commit()
+    return True
+
+
+def ensure_standard_programs(session: Session, client_id: int | None = None) -> int:
+    """Gives every client (or just `client_id`) that hasn't been looked at yet
+    the standard herding program: the master program, starting on the first
+    mating day written in the imported sheet, which they can then edit like
+    any other. Nothing happens until a master program exists and the sheet
+    that made it has given its date (a master imported before the date was
+    kept waits for the sheet to be imported again). A client who
+    already has a program of their own is left as they are, and each client
+    is only ever done once, so a program someone deleted stays deleted.
+    Returns how many programs were made."""
+    if not ordered_steps(session):
+        return 0
+    ensure_scan_step(session)
+    template = get_template(session)
+    if template.mating_date is None:
+        return 0
+    query = select(Client).where(Client.standard_program_at.is_(None))
+    if client_id is not None:
+        query = query.where(Client.id == client_id)
+    made = 0
+    for client in session.exec(query).all():
+        if session.exec(select(HerdingProgram.id).where(HerdingProgram.client_id == client.id)).first() is None:
+            session.add(HerdingProgram(name=template.name[:200], client_id=client.id, mating_date=template.mating_date,
+                                       dates_only=True))
+            made += 1
+        client.standard_program_at = datetime.utcnow()
+        session.add(client)
+    session.commit()
+    return made
 
 
 def delete_step(session: Session, step: ProgramStep) -> None:

@@ -29,7 +29,7 @@ def _status() -> dict:
         "extra_backup_dir": extra_dir,
         "settings": settings,
         "backups": [
-            {"name": b["name"], "size": b["size"], "created_at": b["created_at"]}
+            {"name": b["name"], "size": b["size"], "created_at": b["created_at"], "encrypted": b["encrypted"]}
             for b in backup.list_backups(backup.default_backup_dir())
         ],
         "last_error": backup.last_error,
@@ -53,12 +53,13 @@ def run_backup_now():
 
 class RestoreRequest(BaseModel):
     name: str
+    passphrase: Optional[str] = Field(default=None, max_length=200)  # for a locked backup, if this PC doesn't have it saved
 
 
 @router.post("/restore")
 def restore_backup(payload: RestoreRequest):
     try:
-        backup.restore(database_file_path(), payload.name)
+        backup.restore(database_file_path(), payload.name, payload.passphrase)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     # Pooled connections may hold cached schema from before the swap, and
@@ -66,6 +67,27 @@ def restore_backup(payload: RestoreRequest):
     # pool and re-run the schema sync against the restored data.
     engine.dispose()
     create_db_and_tables()
+    return _status()
+
+
+class EncryptionRequest(BaseModel):
+    passphrase: str = Field(max_length=200)
+
+
+@router.put("/encryption")
+def set_encryption(payload: EncryptionRequest):
+    """Locks every backup from now on with this passphrase (old ones stay as they were)."""
+    try:
+        backup.set_passphrase(backup.settings_path(), payload.passphrase)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return _status()
+
+
+@router.delete("/encryption")
+def clear_encryption():
+    """Back to unlocked backups. Locked ones already made still need the passphrase."""
+    backup.set_passphrase(backup.settings_path(), None)
     return _status()
 
 

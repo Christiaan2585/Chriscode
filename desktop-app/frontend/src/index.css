@@ -141,88 +141,99 @@ html.theme-dark {
   color: #e4e8f0;
 }
 
-/* GrazingHeaderStrip.jsx's chase animation. This has to live in a real,
-   bundled stylesheet rather than a JSX <style> tag - the packaged app's
-   Content-Security-Policy is `style-src 'self'` with no 'unsafe-inline'
-   (see desktop-app/index.js), which silently blocks inline <style>
-   elements entirely. That's exactly why the animation looked "frozen in
-   one spot" with mangled proportions in the packaged app while working
-   fine in dev mode (Vite's dev server serves no CSP at all): every rule
-   below - the flex layout, the absolute positioning, the keyframes -
-   was simply never applied, leaving the raw SVGs in unstyled document
-   flow instead of the intended running scene. */
-.chase-group {
-  position: absolute;
-  bottom: 6px;
-  left: 0;
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  animation: chase-across 14s linear infinite;
-}
-@keyframes chase-across {
-  from { transform: translateX(-120px); }
-  to { transform: translateX(340px); }
+/* GrazingHeaderStrip.jsx's running scene, drawn as SVG. The animals run on
+   the spot while the hills, trees and grass slide past at different speeds;
+   every leg is a thigh and a shin that swing on their own, offset in time
+   (--ph, a share of the stride --T), which is what makes a gallop. It has to
+   live in a real, bundled stylesheet rather than a JSX <style> tag - the
+   packaged app's Content-Security-Policy is `style-src 'self'` with no
+   'unsafe-inline', which silently blocks inline <style> elements (that is how
+   an earlier version of this animation shipped frozen and unstyled).
+   Deliberately calm: slow, smooth, no sway and nothing that flickers. */
+.chase-thigh, .chase-shin, .chase-bob, .chase-tail, .chase-lunge, .chase-wheel, .chase-truck-body, .chase-rider {
+  transform-box: view-box;
+  transform-origin: 0 0; /* the pivot is the group's own local origin: hip, knee, rump, axle... */
 }
 
-/* Each runner carries its own stride speed (--stride), so the heavy cow
-   lopes, the sheep scampers and the collie's legs are a blur. */
-.runner { --stride: 0.3s; }
-.runner-dog { --stride: 0.22s; animation: dog-lunge 3.4s ease-in-out infinite; }
-.runner-cow { --stride: 0.38s; }
-.runner-sheep { --stride: 0.27s; animation: sheep-spurt 2.9s ease-in-out infinite; }
-
-/* The collie closes on the cow's heels, then drops back to hold the line -
-   how a working dog actually pressures stock instead of trailing at a
-   fixed distance. The sheep bolts ahead and gets reeled back in. */
-@keyframes dog-lunge {
-  0%, 100% { transform: translateX(0); }
-  45% { transform: translateX(9px); }
-  60% { transform: translateX(7px); }
+.chase-thigh { animation: chase-thigh var(--T) ease-in-out infinite; animation-delay: calc(var(--T) * var(--ph) * -1); }
+@keyframes chase-thigh {
+  0%, 100% { transform: rotate(32deg); }
+  48% { transform: rotate(-40deg); }
 }
-@keyframes sheep-spurt {
-  0%, 100% { transform: translateX(0); }
-  35% { transform: translateX(7px); }
-  55% { transform: translateX(8px); }
+.chase-shin { animation: chase-shin var(--T) ease-in-out infinite; animation-delay: calc(var(--T) * var(--ph) * -1); }
+@keyframes chase-shin {
+  0%, 100% { transform: rotate(4deg); }
+  22% { transform: rotate(52deg); }
+  48% { transform: rotate(16deg); }
+  60% { transform: rotate(0deg); }
 }
 
-/* SVG elements default to transform-origin 0 0 of the whole viewport;
-   fill-box makes rotate/scale pivot around each shape's own centre. */
-.gallop-body, .run-shadow, .dust { transform-box: fill-box; transform-origin: center; }
-
-/* Bounce plus a forward/back pitch each stride - the body rocking over
-   the front legs then the hind legs is what sells a gallop over a hop. */
-.gallop-body { animation: gallop-bounce var(--stride) ease-in-out infinite; }
-@keyframes gallop-bounce {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  25% { transform: translateY(-1.8px) rotate(-3deg); }
-  50% { transform: translateY(-0.6px) rotate(0deg); }
-  75% { transform: translateY(-1.2px) rotate(2.5deg); }
+/* The body rises as the legs reach and drops as they land, twice per stride. */
+.chase-bob { animation: chase-bob var(--T) ease-in-out infinite; --lift: -2.4px; }
+.chase-bob-dog { --lift: -2.8px; }
+.chase-bob-sheep { --lift: -2.6px; }
+@keyframes chase-bob {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(var(--lift)); }
+  50% { transform: translateY(0.5px); }
+  75% { transform: translateY(calc(var(--lift) * 0.7)); }
 }
+.chase-tail { animation: chase-tail calc(var(--T) * 1.5) ease-in-out infinite alternate; }
+.chase-tail-dog { animation-duration: var(--T); }
+@keyframes chase-tail { from { transform: rotate(-9deg); } to { transform: rotate(11deg); } }
 
-.legs-a, .legs-b { animation: gallop-toggle var(--stride) steps(1) infinite; }
-.legs-b { animation-delay: calc(var(--stride) / -2); }
-@keyframes gallop-toggle {
-  0%, 49.9% { opacity: 1; }
-  50%, 100% { opacity: 0; }
-}
+.chase-shadow { transform-box: fill-box; transform-origin: center; animation: chase-shadow calc(var(--T) / 2) ease-in-out infinite; }
+@keyframes chase-shadow { 0%, 100% { transform: scaleX(1); opacity: 0.35; } 50% { transform: scaleX(0.9); opacity: 0.28; } }
 
-.run-shadow { animation: shadow-pulse var(--stride) ease-in-out infinite; }
-@keyframes shadow-pulse {
-  0%, 100% { transform: scaleX(1); opacity: 0.3; }
-  25% { transform: scaleX(0.75); opacity: 0.15; }
-}
+/* The collie pulls ahead then eases back; the sheep bolts and is reeled in. */
+.chase-lunge-dog { animation: chase-lunge-dog 5.2s ease-in-out infinite; }
+.chase-lunge-sheep { animation: chase-lunge-sheep 4.4s ease-in-out infinite; }
+@keyframes chase-lunge-dog { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(7px); } }
+@keyframes chase-lunge-sheep { 0%, 100% { transform: translateX(0); } 45% { transform: translateX(-6px); } }
 
-/* Dust kicked up behind the hind feet, drifting back and fading. */
-.dust { opacity: 0; animation: dust-puff calc(var(--stride) * 2.4) ease-out infinite; }
-.dust-2 { animation-delay: calc(var(--stride) * -1.2); }
-@keyframes dust-puff {
-  0% { opacity: 0.7; transform: translate(0, 0) scale(0.5); }
-  100% { opacity: 0; transform: translate(-5px, -2.5px) scale(1.6); }
-}
+/* The bakkie rides the paddock: a gentle bounce, the collie in the back nodding with it, wheels turning. */
+.chase-truck-body { animation: chase-truck 1.9s ease-in-out infinite; }
+@keyframes chase-truck { 0%, 100% { transform: translateY(0) rotate(0deg); } 40% { transform: translateY(-1.3px) rotate(-0.25deg); } 70% { transform: translateY(0.4px) rotate(0.2deg); } }
+.chase-rider { transform-origin: -40px -62px; animation: chase-rider 1.9s ease-in-out infinite; animation-delay: -0.3s; }
+@keyframes chase-rider { 0%, 100% { transform: rotate(0deg); } 40% { transform: rotate(-3deg); } 70% { transform: rotate(2deg); } }
+.chase-wheel { animation: chase-spin 1.05s linear infinite; }
+@keyframes chase-spin { to { transform: rotate(360deg); } }
+.chase-headlamp { animation: chase-lamp 6s ease-in-out infinite; }
+.chase-beam { animation: chase-lamp 6s ease-in-out infinite; }
+@keyframes chase-lamp { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
 
-/* A frozen mid-gallop pose just looks broken, so with reduced motion the
-   scene is left out entirely rather than paused. */
+/* The world sliding past: far hills barely move, the grass at the pace of the feet. */
+.chase-layer { animation: chase-slide var(--slide) linear infinite; }
+.chase-layer-far { --slide: 140s; }
+.chase-layer-mid { --slide: 64s; }
+.chase-layer-grass { --slide: 8s; }
+@keyframes chase-slide { to { transform: translateX(720px); } }
+.chase-mist { animation: chase-mist 30s linear infinite; }
+@keyframes chase-mist { to { transform: translateX(1000px); } }
+
+/* With reduced motion the scene is shown as a still picture. */
 @media (prefers-reduced-motion: reduce) {
-  .chase-strip { display: none; }
+  .chase-strip *, .chase-strip { animation: none !important; }
 }
+
+/* Colours for herding program and step names (utils/nameColors.js, herding.COLORS): a dark shade on the
+   light theme, a light one on the dark theme, so every colour stays readable. Also recolours the
+   text inside the name (InlineEdit's button). */
+.name-color-emerald, .name-color-emerald * { color: #047857; }
+.theme-dark .name-color-emerald, .theme-dark .name-color-emerald * { color: #6ee7b7; }
+.name-color-sky, .name-color-sky * { color: #0369a1; }
+.theme-dark .name-color-sky, .theme-dark .name-color-sky * { color: #7dd3fc; }
+.name-color-blue, .name-color-blue * { color: #1d4ed8; }
+.theme-dark .name-color-blue, .theme-dark .name-color-blue * { color: #93c5fd; }
+.name-color-violet, .name-color-violet * { color: #6d28d9; }
+.theme-dark .name-color-violet, .theme-dark .name-color-violet * { color: #c4b5fd; }
+.name-color-pink, .name-color-pink * { color: #be185d; }
+.theme-dark .name-color-pink, .theme-dark .name-color-pink * { color: #f9a8d4; }
+.name-color-rose, .name-color-rose * { color: #be123c; }
+.theme-dark .name-color-rose, .theme-dark .name-color-rose * { color: #fda4af; }
+.name-color-orange, .name-color-orange * { color: #c2410c; }
+.theme-dark .name-color-orange, .theme-dark .name-color-orange * { color: #fdba74; }
+.name-color-amber, .name-color-amber * { color: #b45309; }
+.theme-dark .name-color-amber, .theme-dark .name-color-amber * { color: #fcd34d; }
+.name-color-teal, .name-color-teal * { color: #0f766e; }
+.theme-dark .name-color-teal, .theme-dark .name-color-teal * { color: #5eead4; }

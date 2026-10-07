@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardList, FileText, Trash2 } from "lucide-react";
+import { ClipboardCheck, ClipboardList, Copy, FileText, Trash2 } from "lucide-react";
 import apiClient from "../api/client";
 import Modal from "./Modal";
 import SearchableSelect from "./SearchableSelect";
 import { money, statusStyle } from "../utils/format";
+import { nameColorClass } from "../utils/nameColors";
+import { clearCopiedProgram, copyProgram, useCopiedProgram } from "../utils/programClipboard";
 import { GROUPS, STEP_STATUS, dayLabel, isMonday, ruleText, toInputDate } from "../utils/herding";
 
 export const inputClass =
@@ -43,11 +45,16 @@ const Field = ({ label, hint, children }) => (
 
 // The five headcounts (plus any other group a program already has).
 export const HeadCountFields = ({ counts, onChange }) => (
-  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+  // As many columns as fit the space it's in (a side panel or a wide page),
+  // never narrower than "Jong rammetjies" needs, so every label sits on one
+  // line and every box lines up. The spinner arrows are hidden: they only
+  // show on hover and shift the number.
+  <div className="grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] items-end gap-3">
     {Object.keys(counts).map((name) => (
-      <label key={name} className="block">
-        <span className="mb-1 block text-xs font-medium text-slate-600">{name}</span>
-        <input type="number" min="0" inputMode="numeric" className={inputClass} value={counts[name]} placeholder="0"
+      <label key={name} className="block min-w-0">
+        <span className="mb-1 block truncate text-xs font-medium text-slate-600" title={name}>{name}</span>
+        <input type="number" min="0" inputMode="numeric" value={counts[name]} placeholder="0"
+          className={`${inputClass} tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
           onChange={(e) => onChange({ ...counts, [name]: e.target.value })} />
       </label>
     ))}
@@ -226,7 +233,7 @@ const ProgramInvoicing = ({ program, data }) => {
   );
 };
 
-const ProgramCard = ({ program, onOpen, onDelete }) => {
+const ProgramCard = ({ program, onOpen, onDelete, onCopy }) => {
   const { data } = useSchedule(program.id);
   const next = nextStep(data?.steps);
   const progress = data?.progress;
@@ -235,7 +242,7 @@ const ProgramCard = ({ program, onOpen, onDelete }) => {
     <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
       <div className="flex items-start justify-between gap-2">
         <button type="button" onClick={onOpen} className="min-w-0 text-left">
-          <span className="block font-medium text-slate-700 hover:text-emerald-700">{program.name}</span>
+          <span className={`block font-medium text-slate-700 hover:text-emerald-700 ${nameColorClass(program.color)}`}>{program.name}</span>
           {program.mating_date ? (
             <span className="mt-0.5 block text-xs text-slate-500">First mating {dayLabel(program.mating_date)}</span>
           ) : (
@@ -260,10 +267,16 @@ const ProgramCard = ({ program, onOpen, onDelete }) => {
             </span>
           )}
         </button>
-        <button type="button" onClick={onDelete} title="Delete program" aria-label={`Delete ${program.name}`}
-          className="p-1.5 text-slate-400 transition-colors hover:text-red-600">
-          <Trash2 size={16} />
-        </button>
+        <div className="flex shrink-0 items-center">
+          <button type="button" onClick={onCopy} title="Copy this program (then paste it into another client)" aria-label={`Copy ${program.name}`}
+            className="p-1.5 text-slate-400 transition-colors hover:text-emerald-600">
+            <Copy size={16} />
+          </button>
+          <button type="button" onClick={onDelete} title="Delete program" aria-label={`Delete ${program.name}`}
+            className="p-1.5 text-slate-400 transition-colors hover:text-red-600">
+            <Trash2 size={16} />
+          </button>
+        </div>
       </div>
       {data && <ProgramInvoicing program={program} data={data} />}
       {(program.groups || []).length > 0 && (
@@ -325,8 +338,46 @@ export const NewProgramDialog = ({ isOpen, onClose, clientId = null, clients = [
   );
 };
 
+// Paste the copied program into this client: their own copy, to change freely.
+const PasteProgramDialog = ({ copied, clientId, onClose }) => {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [withNumbers, setWithNumbers] = useState(false);
+  const paste = useMutation({
+    mutationFn: async () => (await apiClient.post(`/programs/${copied.id}/copy`, { client_id: Number(clientId), include_animal_numbers: withNumbers })).data,
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ["programs", "client", String(clientId)] });
+      queryClient.invalidateQueries({ queryKey: ["program-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["clients", String(clientId), "summary"] });
+      onClose();
+      navigate(`/programs/${created.id}`);
+    },
+  });
+  return (
+    <Modal isOpen onClose={onClose} title="Paste the program here">
+      <div className="space-y-4">
+        <p className="text-sm text-slate-600">
+          Make a copy of <b>{copied.name}</b>{copied.clientName ? <> (from {copied.clientName})</> : null} for this client:
+          its dates, steps, products and doses. Ticks and invoices are not copied, and the copy gets its own quote.
+        </p>
+        <label className="flex items-start gap-2 text-sm text-slate-700">
+          <input type="checkbox" checked={withNumbers} onChange={(e) => setWithNumbers(e.target.checked)} className="mt-0.5" />
+          <span>Also copy the animal numbers <span className="text-slate-500">(they belong to a farm, so they are normally left out)</span></span>
+        </label>
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:text-slate-800">Cancel</button>
+          <button type="button" disabled={paste.isPending} onClick={() => paste.mutate()} className={primary}>
+            {paste.isPending ? "Pasting…" : "Paste program"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 // The client page's "Herding Programs" card.
-const HerdingProgramPanel = ({ clientId }) => {
+const HerdingProgramPanel = ({ clientId, clientName }) => {
   const queryClient = useQueryClient();
   const key = ["programs", "client", String(clientId)];
   const { data: programs } = useQuery({
@@ -334,6 +385,8 @@ const HerdingProgramPanel = ({ clientId }) => {
     queryFn: async () => (await apiClient.get(`/programs/client/${clientId}`)).data,
   });
   const [creating, setCreating] = useState(false);
+  const [pasting, setPasting] = useState(false);
+  const copied = useCopiedProgram();
   const navigate = useNavigate();
   const remove = useMutation({
     mutationFn: (programId) => apiClient.delete(`/programs/${programId}`),
@@ -350,22 +403,37 @@ const HerdingProgramPanel = ({ clientId }) => {
         <h3 className="flex items-center gap-2 text-lg font-semibold">
           <ClipboardList size={18} className="text-emerald-600" /> Herding Programs
         </h3>
-        <button type="button" onClick={() => setCreating(true)}
-          className="rounded-md bg-emerald-600 px-3 py-1 text-sm text-white transition-colors hover:bg-emerald-700">
-          + New Program
-        </button>
+        <div className="flex items-center gap-2">
+          {copied && (
+            <button type="button" onClick={() => setPasting(true)} title={`Paste a copy of "${copied.name}" here`}
+              className="flex items-center gap-1 rounded-md border border-emerald-600 px-3 py-1 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50">
+              <ClipboardCheck size={14} /> Paste
+            </button>
+          )}
+          <button type="button" onClick={() => setCreating(true)}
+            className="rounded-md bg-emerald-600 px-3 py-1 text-sm text-white transition-colors hover:bg-emerald-700">
+            + New Program
+          </button>
+        </div>
       </div>
+      {copied && (
+        <p className="-mt-2 mb-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          Copied: <b className="text-slate-700">{copied.name}</b>{copied.clientName ? ` (${copied.clientName})` : ""}
+          <button type="button" onClick={clearCopiedProgram} className="text-emerald-700 hover:underline">Clear</button>
+        </p>
+      )}
       {!programs?.length ? (
         <p className="text-sm text-slate-400">No herding programs for this client yet.</p>
       ) : (
         <div className="space-y-3">
           {programs.map((p) => (
-            <ProgramCard key={p.id} program={p} onOpen={() => navigate(`/programs/${p.id}`)}
+            <ProgramCard key={p.id} program={p} onOpen={() => navigate(`/programs/${p.id}`)} onCopy={() => copyProgram(p, clientName)}
               onDelete={() => { if (window.confirm(`Delete program "${p.name}"? Its quote goes too while it's still a draft. This can't be undone.`)) remove.mutate(p.id); }} />
           ))}
         </div>
       )}
       <NewProgramDialog isOpen={creating} onClose={() => setCreating(false)} clientId={clientId} />
+      {pasting && copied && <PasteProgramDialog copied={copied} clientId={clientId} onClose={() => setPasting(false)} />}
     </div>
   );
 };

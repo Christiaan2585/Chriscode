@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
+import { useSelection } from "../utils/useSelection";
+import { useOpenNew } from "../utils/useOpenNew";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Plus, Search, FileText, Trash2, Edit, Save, X, Download, Eye, FileInput, ClipboardList } from "lucide-react";
@@ -64,6 +67,7 @@ const Quotes = () => {
       q.number?.toLowerCase().includes(query)
     );
   }).sort(newestFirst);
+  const selection = useSelection((filteredQuotes).map((r) => r.id));
 
   // Arriving from the Calculator's "Create Quote" button: open the builder
   // pre-loaded with the line item it worked out, instead of an empty form.
@@ -221,6 +225,8 @@ const Quotes = () => {
   const [newProgram, setNewProgram] = useState(false);
   const navigate = useNavigate();
 
+  useOpenNew(() => openAddModal()); // from the dashboard's quick actions (?new=1)
+
   if (isLoading) return <div className="p-8 text-center">Loading quotes...</div>;
 
   return (
@@ -273,10 +279,16 @@ const Quotes = () => {
             />
           </div>
         </div>
+        <div className="space-y-2 p-3 empty:hidden">
+          <BulkBar selection={selection} noun="quote" describe={(id) => quotes?.find((r) => r.id === id)?.number || `#${id}`}
+            deleteOne={(id) => apiClient.delete(`/quotes/${id}`, { silent: true })}
+            onDone={() => queryClient.invalidateQueries({ queryKey: ["quotes"] })} />
+        </div>
         <div className="relative overflow-x-auto">
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
             <tr>
+              <SelectAllTh selection={selection} />
               <th className="px-6 py-3 font-medium">Quote</th>
               <th className="px-6 py-3 font-medium">Date</th>
               <th className="px-6 py-3 font-medium">Client</th>
@@ -288,6 +300,7 @@ const Quotes = () => {
           <tbody className="divide-y divide-slate-100">
             {filteredQuotes.map(q => (
               <tr key={q.id} className="hover:bg-slate-50 transition-colors">
+                <SelectTd selection={selection} id={q.id} label={`Select ${((id) => quotes?.find((r) => r.id === id)?.number || `#${id}`)(q.id)}`} />
                 <td className="px-6 py-4 text-slate-600">
                   <DocumentHover kind="quote" doc={q} clientName={clientName(q.client_id)}>{q.number || `#${q.id}`}</DocumentHover>
                   {q.program_id && (
@@ -350,7 +363,7 @@ const Quotes = () => {
             ))}
             {filteredQuotes.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
+                <td colSpan={7} className="px-6 py-8 text-center text-slate-400">
                   {quotes?.length ? "No quotes match your search." : "No quotes yet. Create your first one above."}
                 </td>
               </tr>

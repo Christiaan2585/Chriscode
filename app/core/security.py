@@ -20,6 +20,10 @@ _JWT_SECRET = secrets.token_urlsafe(48)
 _JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_LIFETIME = timedelta(hours=12)
 REMEMBER_TOKEN_LIFETIME = timedelta(days=45)
+# A phone is easier to lose than the office PC, so its sessions are shorter:
+# it asks for the PIN again sooner and a remembered phone is forgotten sooner.
+PHONE_ACCESS_TOKEN_LIFETIME = timedelta(hours=6)
+PHONE_REMEMBER_LIFETIME = timedelta(days=14)
 
 # 5 wrong PIN guesses locks the remembered device out for 5 minutes and
 # forces a full sign-in again - a 5-digit PIN only has 100,000 combinations,
@@ -43,21 +47,26 @@ def verify_secret(raw: str, hashed: Optional[str]) -> bool:
         return False
 
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(user_id: int, version: int = 0, phone: bool = False) -> str:
+    """`version` is the user's token_version: changing a password or "sign out
+    everywhere" raises it, which makes every token issued before it useless."""
+    now = datetime.utcnow()
     payload = {
         "sub": str(user_id),
-        "exp": datetime.utcnow() + ACCESS_TOKEN_LIFETIME,
-        "iat": datetime.utcnow(),
+        "v": int(version or 0),
+        "exp": now + (PHONE_ACCESS_TOKEN_LIFETIME if phone else ACCESS_TOKEN_LIFETIME),
+        "iat": now,
     }
     return jwt.encode(payload, _JWT_SECRET, algorithm=_JWT_ALGORITHM)
 
 
-def decode_access_token(token: str) -> int:
+def decode_access_token(token: str) -> tuple:
+    """(user id, token version)"""
     try:
         payload = jwt.decode(token, _JWT_SECRET, algorithms=[_JWT_ALGORITHM])
-    except jwt.PyJWTError:
+        return int(payload["sub"]), int(payload.get("v", 0))
+    except (jwt.PyJWTError, KeyError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired, please sign in again")
-    return int(payload["sub"])
 
 
 def generate_remember_token() -> str:
@@ -77,9 +86,9 @@ def get_current_user(
 ) -> User:
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign-in required")
-    user_id = decode_access_token(credentials.credentials)
+    user_id, version = decode_access_token(credentials.credentials)
     user = session.get(User, user_id)
-    if not user or not user.is_active:
+    if not user or not user.is_active or (user.token_version or 0) != version:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign-in required")
     return user
 

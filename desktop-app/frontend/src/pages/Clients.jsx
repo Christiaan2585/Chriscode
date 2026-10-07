@@ -1,8 +1,12 @@
 import React, { useState } from "react";
+import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
+import { useSelection } from "../utils/useSelection";
+import { useOpenNew } from "../utils/useOpenNew";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, User, Trash2, Edit, Phone, MessageCircle } from "lucide-react";
 import { clientService } from "../api/services";
+import apiClient from "../api/client";
 import { toTelLink, toWhatsAppLink } from "../utils/contact";
 import Modal from "../components/Modal";
 import { ClientHover } from "../components/PreviewCards";
@@ -100,6 +104,9 @@ const Clients = () => {
       c.phone?.toLowerCase().includes(q)
     );
   });
+  const selection = useSelection((filtered).map((r) => r.id));
+
+  useOpenNew(() => openAddModal()); // from the dashboard's quick actions (?new=1)
 
   if (isLoading) return <div className="p-8 text-center">Loading clients...</div>;
 
@@ -131,10 +138,16 @@ const Clients = () => {
             />
           </div>
         </div>
+        <div className="space-y-2 p-3 empty:hidden">
+          <BulkBar selection={selection} noun="client" describe={(id) => farmLabel(clients?.find((r) => r.id === id)) || `#${id}`}
+            deleteOne={(id) => apiClient.delete(`/clients/${id}`, { silent: true })}
+            onDone={() => queryClient.invalidateQueries({ queryKey: ["clients"] })} />
+        </div>
         <div className="relative overflow-x-auto">
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
             <tr>
+              <SelectAllTh selection={selection} />
               <th className="px-6 py-3 font-medium">Farm</th>
               <th className="px-6 py-3 font-medium">Contact</th>
               <th className="px-6 py-3 font-medium">Location</th>
@@ -151,6 +164,7 @@ const Clients = () => {
                   onClick={() => navigate(`/clients/${client.id}`)}
                   className="hover:bg-slate-50 transition-colors cursor-pointer"
                 >
+                <SelectTd selection={selection} id={client.id} label={`Select ${((id) => farmLabel(clients?.find((r) => r.id === id)) || `#${id}`)(client.id)}`} />
                   <td className="px-6 py-4 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 shrink-0">
                       <User size={16} />
@@ -212,7 +226,7 @@ const Clients = () => {
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
                   {clients?.length ? "No clients match your search." : "No clients yet - add your first one above."}
                 </td>
               </tr>

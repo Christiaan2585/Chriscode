@@ -1,6 +1,20 @@
 import unittest
 
-from app.core.documents import document_totals, format_number, line_amounts, next_number
+from types import SimpleNamespace
+
+from app.core.documents import document_totals, format_number, line_amounts, next_number, price_pair
+
+
+class PricePairTests(unittest.TestCase):
+    def test_the_stored_price_excl_vat_is_used(self):
+        self.assertEqual(price_pair(SimpleNamespace(price=455.69, price_excl_vat=396.25)), (396.25, 455.69))
+
+    def test_without_one_it_is_worked_out_from_the_price_incl_vat(self):
+        self.assertEqual(price_pair(SimpleNamespace(price=287.5, price_excl_vat=None)), (250.0, 287.5))
+        self.assertEqual(price_pair(SimpleNamespace(price=110.0, price_excl_vat=None), vat_rate=10), (100.0, 110.0))
+
+    def test_a_zero_vat_rate_means_the_same_price_twice(self):
+        self.assertEqual(price_pair(SimpleNamespace(price=100.0, price_excl_vat=None), vat_rate=0), (100.0, 100.0))
 
 
 class LineAmountTests(unittest.TestCase):

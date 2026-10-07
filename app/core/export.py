@@ -11,7 +11,7 @@ from openpyxl import Workbook
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 
 # productimage / userphoto: binary pictures, meaningless in a spreadsheet cell.
-EXCLUDED_TABLES = frozenset({"user", "remembertoken", "productimage", "userphoto"})
+EXCLUDED_TABLES = frozenset({"user", "remembertoken", "productimage", "userphoto", "clientdocument"})
 
 
 def _clean(value):

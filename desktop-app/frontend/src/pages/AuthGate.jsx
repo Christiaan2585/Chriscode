@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.png';
 import PoweredBy from '../components/PoweredBy';
 import Avatar from '../components/Avatar';
+import PasswordHint from '../components/PasswordHint';
 
 const CARD = 'w-full max-w-sm bg-white rounded-2xl shadow-lg border border-slate-200 p-8';
 const SHELL = 'app-bg min-h-screen flex items-center justify-center bg-slate-50 px-4';
@@ -112,7 +113,8 @@ function SetupScreen() {
           </div>
           <div>
             <label className="text-xs font-medium text-slate-600">Password</label>
-            <input type="password" className={INPUT} required minLength={8} value={form.password} onChange={(e) => { clearError(); setForm({ ...form, password: e.target.value }); }} />
+            <input type="password" className={INPUT} required minLength={10} autoComplete="new-password" value={form.password} onChange={(e) => { clearError(); setForm({ ...form, password: e.target.value }); }} />
+            <PasswordHint password={form.password} email={form.email} name={form.name} />
           </div>
           <button type="submit" className={BUTTON} disabled={busy}>
             <UserPlus size={16} /> {busy ? 'Creating account...' : 'Create admin account'}
@@ -125,17 +127,17 @@ function SetupScreen() {
 }
 
 function LoginScreen() {
-  const { login, error, clearError, googleEnabled } = useAuth();
-  const [form, setForm] = useState({ email: '', password: '' });
+  const { login, error, clearError, googleEnabled, twoStepRequired, cancelTwoStep } = useAuth();
+  const [form, setForm] = useState({ email: '', password: '', code: '' });
   const [busy, setBusy] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
     try {
-      await login(form.email, form.password);
+      await login(form.email, form.password, form.code.trim());
     } catch {
-      // surfaced via error state
+      // surfaced via error state (or, for the code, the extra box below)
     } finally {
       setBusy(false);
     }
@@ -163,9 +165,22 @@ function LoginScreen() {
             <label className="text-xs font-medium text-slate-600">Password</label>
             <input type="password" className={INPUT} required value={form.password} onChange={(e) => { clearError(); setForm({ ...form, password: e.target.value }); }} />
           </div>
+          {twoStepRequired && (
+            <div>
+              <label className="text-xs font-medium text-slate-600">Code from your authenticator app</label>
+              <input className={`${INPUT} tracking-widest`} required autoFocus autoComplete="one-time-code" inputMode="text" placeholder="6 digits (or a recovery code)"
+                value={form.code} onChange={(e) => { clearError(); setForm({ ...form, code: e.target.value }); }} />
+              <p className="mt-1 text-xs text-slate-500">Open the app on your phone and type the 6 digits it shows. Lost your phone? Use one of your recovery codes.</p>
+            </div>
+          )}
           <button type="submit" className={BUTTON} disabled={busy}>
-            <LogIn size={16} /> {busy ? 'Signing in...' : 'Sign in'}
+            <LogIn size={16} /> {busy ? 'Signing in...' : twoStepRequired ? 'Verify and sign in' : 'Sign in'}
           </button>
+          {twoStepRequired && (
+            <button type="button" className="w-full text-xs text-slate-500 hover:underline" onClick={() => { cancelTwoStep(); setForm({ ...form, code: '' }); }}>
+              Back
+            </button>
+          )}
         </form>
         </div>
       </div>
@@ -365,11 +380,71 @@ function UnlockScreen() {
   );
 }
 
+// After an admin has set a temporary password: the person chooses their own before anything else.
+function ChangePasswordScreen() {
+  const { changePassword, user, forgetDevice } = useAuth();
+  const [form, setForm] = useState({ current: '', next: '', again: '' });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (form.next !== form.again) {
+      setMessage("The two new passwords aren't the same.");
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      await changePassword(form.current, form.next);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setMessage(typeof detail === 'string' ? detail : 'Could not change the password.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={SHELL}>
+      <div className="w-full max-w-sm">
+        <LogoHeader />
+        <div className={CARD}>
+          <div className="flex items-center gap-2 mb-1 text-emerald-800">
+            <ShieldCheck size={22} />
+            <h1 className="text-xl font-bold">Choose your own password</h1>
+          </div>
+          <p className="text-sm text-slate-500 mb-5">{user?.name}, you signed in with a temporary password. Choose one only you know.</p>
+          <ErrorBanner error={message} />
+          <form className="space-y-3" onSubmit={submit}>
+            <div>
+              <label className="text-xs font-medium text-slate-600">Temporary password</label>
+              <input type="password" className={INPUT} required autoComplete="current-password" value={form.current} onChange={(e) => setForm({ ...form, current: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600">New password</label>
+              <input type="password" className={INPUT} required minLength={10} autoComplete="new-password" value={form.next} onChange={(e) => setForm({ ...form, next: e.target.value })} />
+              <PasswordHint password={form.next} email={user?.email} name={user?.name} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600">New password again</label>
+              <input type="password" className={INPUT} required autoComplete="new-password" value={form.again} onChange={(e) => setForm({ ...form, again: e.target.value })} />
+            </div>
+            <button type="submit" className={BUTTON} disabled={busy}>{busy ? 'Saving...' : 'Save my password'}</button>
+          </form>
+          <button type="button" className="mt-4 w-full text-xs text-slate-500 hover:underline" onClick={forgetDevice}>Sign out</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const SCREENS = {
   setup: SetupScreen,
   login: LoginScreen,
   'pin-setup': SetupPinScreen,
   unlock: UnlockScreen,
+  'change-password': ChangePasswordScreen,
 };
 
 export default function AuthGate({ children }) {

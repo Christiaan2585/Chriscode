@@ -3,9 +3,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Camera, Edit, Eye, EyeOff, Package, Trash2 } from "lucide-react";
 import apiClient from "../api/client";
 import InlineEdit from "./InlineEdit";
+import { SelectBox } from "./BulkSelect";
 import { checkPictureFile, savePictureChange } from "./ProductPicture";
 import { money } from "../utils/format";
-import { categoryOf, isActive, isInStock } from "../utils/products";
+import { categoryOf, isActive, isInStock, priceExcl } from "../utils/products";
 
 // Saves one or more product fields straight away; the list updates at once
 // and rolls back if the save fails.
@@ -82,14 +83,15 @@ const CardPicture = ({ product, src, onOpen }) => {
   );
 };
 
-const ProductCard = ({ product, thumb, onOpenPicture, onEdit, onDelete, priceLabel }) => {
+const ProductCard = ({ product, thumb, onOpenPicture, onEdit, onDelete, priceLabel, selection }) => {
   const patch = useProductPatch();
   const save = (field) => (value) => patch.mutateAsync({ id: product.id, changes: { [field]: value } });
   const hidden = !isActive(product);
 
   return (
     <article aria-label={product.name}
-      className={`flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm ${hidden ? "opacity-60" : ""}`}>
+      className={`relative flex flex-col rounded-xl border bg-white shadow-sm ${selection?.has(product.id) ? "border-emerald-500 ring-2 ring-emerald-200" : "border-slate-200"} ${hidden ? "opacity-60" : ""}`}>
+      {selection && <SelectBox selection={selection} id={product.id} label={`Select ${product.name}`} className="absolute left-2 top-2 z-10 bg-white" />}
       <CardPicture product={product} src={thumb} onOpen={onOpenPicture} />
       <div className="flex-1 space-y-1.5 p-3 text-sm">
         <InlineEdit value={product.name} onSave={save("name")} label="Name" required className="font-semibold text-slate-800" />
@@ -100,9 +102,19 @@ const ProductCard = ({ product, thumb, onOpenPicture, onEdit, onDelete, priceLab
         </div>
         <InlineEdit value={product.description} onSave={save("description")} label="Description" multiline
           placeholder="Add a description" className="text-slate-600" />
-        <div className="flex items-baseline justify-between gap-2 pt-1">
-          <InlineEdit value={product.price} onSave={save("price")} label={priceLabel} type="number" required format={money}
-            className="text-base font-bold text-slate-800" />
+        <div className="flex items-end justify-between gap-2 pt-1">
+          <div className="space-y-0.5">
+            <div className="flex items-baseline gap-1.5">
+              <InlineEdit value={product.price} onSave={save("price")} label={`${priceLabel} incl VAT`} type="number" required format={money}
+                className="text-base font-bold text-slate-800" />
+              <span className="text-xs text-slate-500">incl. VAT</span>
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <InlineEdit value={priceExcl(product)} onSave={save("price_excl_vat")} label={`${priceLabel} excl VAT`} type="number" format={money}
+                className="text-sm text-slate-600" />
+              <span className="text-xs text-slate-500">excl. VAT</span>
+            </div>
+          </div>
           <InlineEdit value={product.category} onSave={save("category")} label="Category" placeholder="No category"
             listId="product-categories" className="text-xs text-slate-500" />
         </div>
@@ -127,7 +139,7 @@ const ProductCard = ({ product, thumb, onOpenPicture, onEdit, onDelete, priceLab
 
 // Products grouped under category headings. `products` is already filtered
 // by the page's search/category/hidden controls.
-const ProductCatalog = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, priceLabel = "Price" }) => {
+const ProductCatalog = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, priceLabel = "Price", selection }) => {
   const groups = useMemo(() => {
     const map = new Map();
     [...products]
@@ -147,7 +159,7 @@ const ProductCatalog = ({ products, thumbnails, onOpenPicture, onEdit, onDelete,
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {items.map((p) => (
               <ProductCard key={p.id} product={p} thumb={thumbnails[p.id]} onOpenPicture={onOpenPicture}
-                onEdit={onEdit} onDelete={onDelete} priceLabel={priceLabel} />
+                onEdit={onEdit} onDelete={onDelete} priceLabel={priceLabel} selection={selection} />
             ))}
           </div>
         </section>

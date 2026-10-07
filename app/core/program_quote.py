@@ -49,7 +49,13 @@ def sync(session: Session, program: HerdingProgram, user_id: int | None = None) 
     if program.mating_date is None or not program.client_id:
         return None
     quote = program_quote(session, program)
+    if quote is not None and quote.status == LOCKED:
+        return quote
+    sched = herding.schedule(session, program)
+    want = [(step["id"], line) for step in sched["steps"] for line in step["products"] if line["buy"] > 0]
     if quote is None:
+        if not want:
+            return None  # nothing to quote yet (no animals counted): no empty quote using up a number
         now = datetime.utcnow()
         quote = Quote(client_id=program.client_id, program_id=program.id, date=now, status="Draft",
                       expiry_date=default_expiry_date(session, now), number=next_document_number(session, Quote),
@@ -58,12 +64,8 @@ def sync(session: Session, program: HerdingProgram, user_id: int | None = None) 
         session.flush()
         program.quote_id = quote.id
         session.add(program)
-    elif quote.status == LOCKED:
-        return quote
     if quote.created_by is None and user_id:
         quote.created_by = user_id
-    sched = herding.schedule(session, program)
-    want = [(step["id"], line) for step in sched["steps"] for line in step["products"] if line["buy"] > 0]
     have = session.exec(select(QuoteItem).where(QuoteItem.quote_id == quote.id,
                                                 QuoteItem.program_line_id.is_not(None))).all()
     key = lambda line, step, product, qty, price, disc: (line, step, product, float(qty), round(price or 0, 2), disc or 0)

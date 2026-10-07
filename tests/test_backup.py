@@ -161,9 +161,9 @@ class BackupTests(unittest.TestCase):
 
     def test_settings_default_when_missing_and_round_trip(self):
         path = os.path.join(self.root, "backup_settings.json")
-        self.assertEqual(backup.load_settings(path), {"extra_folder": None, "keep": 30})
+        self.assertEqual(backup.load_settings(path), {"extra_folder": None, "keep": 30, "encrypted": False})
         backup.save_settings(path, {"extra_folder": "D:\\Backups", "keep": 14})
-        self.assertEqual(backup.load_settings(path), {"extra_folder": "D:\\Backups", "keep": 14})
+        self.assertEqual(backup.load_settings(path), {"extra_folder": "D:\\Backups", "keep": 14, "encrypted": False})
 
 
 if __name__ == "__main__":

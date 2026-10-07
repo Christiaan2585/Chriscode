@@ -24,8 +24,10 @@ from pypdf.generic import (ArrayObject, BooleanObject, DecodedStreamObject, Dict
                            NameObject, NumberObject, RectangleObject, TextStringObject)
 from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader, simpleSplit
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
 
+from app.core.documents import price_pair
 from app.core.pdf import (BRAND, INK, MUTED, ORDER_CLIENT_FIELD, ORDER_NOTES_FIELD, ORDER_PICK_PREFIX,
                           ORDER_QTY_PREFIX, money)
 
@@ -38,11 +40,13 @@ _BULLET = re.compile(r"^\s*[•·●▪∙‣\x7f]\s*(.+?)\s+(\d{1,3})\s*$", re.
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 LABELS = {
-    "en": {"prices": "Prices", "incl": "incl. VAT", "request": "Price on request", "out": "Out of stock",
+    "en": {"prices": "Prices", "incl": "incl. VAT", "excl": "excl. VAT", "vat_note": "Prices shown excl. and incl. VAT",
+           "request": "Price on request", "out": "Out of stock",
            "qty": "Qty", "as_at": "Prices as at", "order_for": "Order form for", "supplier": "Your supplier",
            "how": "Tick what you want and type how many in the Qty boxes, then save this PDF and send it back to us.",
            "other": "Other products", "notes": "Notes for your order (delivery, collection, anything else)"},
-    "af": {"prices": "Pryse", "incl": "BTW ingesluit", "request": "Prys op aanvraag", "out": "Uit voorraad",
+    "af": {"prices": "Pryse", "incl": "BTW ingesl.", "excl": "BTW uitgesl.", "vat_note": "Pryse BTW uitgesluit en ingesluit",
+           "request": "Prys op aanvraag", "out": "Uit voorraad",
            "qty": "Hoev.", "as_at": "Pryse soos op", "order_for": "Bestelvorm vir", "supplier": "U verskaffer",
            "how": "Merk wat u wil hê en tik hoeveel in die Hoev.-blokkies, stoor dan hierdie PDF en stuur dit terug na ons.",
            "other": "Ander produkte", "notes": "Notas vir u bestelling (aflewering, afhaal, enigiets anders)"},
@@ -165,8 +169,9 @@ class _Column:
     """Draws the added column on one overlay page and remembers where the
     form fields go (they're added with pypdf afterwards)."""
 
-    def __init__(self, c, x, width, height, labels):
+    def __init__(self, c, x, width, height, labels, vat_rate=15.0):
         self.c, self.x, self.w, self.h, self.L = c, x, width, height, labels
+        self.vat_rate = vat_rate
         self.fields = []  # (name, rect, kind, value)
 
     def panel(self):
@@ -217,10 +222,13 @@ QTY_LINE = 17  # the Qty box sits on its own line under the price
 TICK_SIZE = 9
 
 
+PRICE_LINES = 21  # each pack size: its price incl VAT, then excl VAT underneath
+
+
 def _entry_height(products, order_form, name_lines):
     h = name_lines * 11 + 4
     for p in products:
-        h += 11 + (9 if p.in_stock is False else 0) + (QTY_LINE if order_form else 0)
+        h += PRICE_LINES + (9 if p.in_stock is False else 0) + (QTY_LINE if order_form else 0)
     return h + (11 if not products else 0)
 
 
@@ -233,11 +241,29 @@ def _draw_entry(col, y, name, products, order_form):
         if order_form:
             col.tick_box(label_x, y, f"{ORDER_PICK_PREFIX}{p.id}")
             label_x += TICK_SIZE + 4
+        excl, incl = price_pair(p, col.vat_rate)
+        right = col.x + col.w - 10
+        # Price incl VAT in bold, the price excl VAT under it, each with its small label.
+        tag = stringWidth(col.L["incl"], "Helvetica", 6)
+        col.c.setFillColor(MUTED)
+        col.c.setFont("Helvetica", 6)
+        col.c.drawRightString(right, y, col.L["incl"])
         col.c.setFillColor(INK)
-        col.c.setFont("Helvetica", 7.5)
-        col.c.drawString(label_x, y, _pack_label(p)[:26])
         col.c.setFont("Helvetica-Bold", 8.5)
-        col.c.drawRightString(col.x + col.w - 10, y, money(p.price))
+        col.c.drawRightString(right - tag - 3, y, money(incl))
+        room = right - tag - 3 - stringWidth(money(incl), "Helvetica-Bold", 8.5) - 6 - label_x
+        label = _pack_label(p)
+        while len(label) > 1 and stringWidth(label, "Helvetica", 7.5) > room:
+            label = label[:-1]
+        col.c.setFont("Helvetica", 7.5)
+        col.c.drawString(label_x, y, label)
+        y -= 10
+        tag = stringWidth(col.L["excl"], "Helvetica", 6)
+        col.c.setFillColor(MUTED)
+        col.c.setFont("Helvetica", 6)
+        col.c.drawRightString(right, y, col.L["excl"])
+        col.c.setFont("Helvetica", 7.5)
+        col.c.drawRightString(right - tag - 3, y, money(excl))
         y -= 11
         if p.in_stock is False:
             col.c.setFillColor(colors.HexColor("#b91c1c"))
@@ -262,8 +288,7 @@ def _cover(col, business, logo, order_for, today):
         if value:
             y = col.lines(y, value, "Helvetica", 8)
     y = col.lines(y - 8, f"{col.L['as_at']} {today}", "Helvetica", 7.5, MUTED)
-    if business.vat_registered:
-        y = col.lines(y, col.L["incl"], "Helvetica", 7.5, MUTED)
+    y = col.lines(y, col.L["vat_note"], "Helvetica", 7.5, MUTED)
     if order_for is not None:
         y = col.lines(y - 10, f"{col.L['order_for']}:", "Helvetica", 8, MUTED)
         y = col.lines(y, order_for.name, "Helvetica-Bold", 10, INK, 12)
@@ -275,6 +300,9 @@ def _footer(col, business):
     text = " · ".join(v for v in (business.trading_name, business.phone) if v)
     if text:
         col.lines(18, text, "Helvetica", 6.5, MUTED, 8)
+
+
+EXCL_X, INCL_X = 0.80, 0.94  # right edges of the two price columns on the extra pages
 
 
 def _extra_pages(c, size, labels, business, others, order_form, fields_out):
@@ -297,6 +325,9 @@ def _extra_pages(c, size, labels, business, others, order_form, fields_out):
         c.setFillColor(colors.white)
         c.setFont("Helvetica-Bold", 11)
         c.drawString(margin + 8, y + 1, text)
+        c.setFont("Helvetica-Bold", 7.5)
+        c.drawRightString(width * EXCL_X, y + 1, labels["excl"])
+        c.drawRightString(width * INCL_X, y + 1, labels["incl"])
         y -= 30
 
     if others:
@@ -327,8 +358,11 @@ def _extra_pages(c, size, labels, business, others, order_form, fields_out):
             c.drawString(name_x, y, p.name[:60])
             c.setFont("Helvetica", 8)
             c.drawString(width * 0.55, y, _pack_label(p)[:24] if (p.packaging or p.pack_size) else "")
+            excl, incl = price_pair(p, business.vat_rate)
+            c.setFont("Helvetica", 9)
+            c.drawRightString(width * EXCL_X, y, money(excl))
             c.setFont("Helvetica-Bold", 9)
-            c.drawRightString(width * 0.78, y, money(p.price))
+            c.drawRightString(width * INCL_X, y, money(incl))
             if p.in_stock is False:
                 c.setFillColor(colors.HexColor("#b91c1c"))
                 c.setFont("Helvetica-Bold", 6.5)
@@ -467,13 +501,13 @@ def build_pdf(lang, business, entries, linked, others, logo=None, order_for=None
     for index, page in enumerate(writer.pages):
         width, height = float(page.mediabox.width), float(page.mediabox.height)
         c.setPageSize((width + COLUMN_WIDTH, height))
-        col = _Column(c, width, COLUMN_WIDTH, height, labels)
+        col = _Column(c, width, COLUMN_WIDTH, height, labels, business.vat_rate)
         col.panel()
         catalogue_page = index + 1 - meta["offset"]
         if index == 0:
             _cover(col, business, logo, order_for, today)
         elif catalogue_page in by_page:
-            col.header(labels["prices"], labels["incl"] if business.vat_registered else None)
+            col.header(labels["prices"], labels["vat_note"])
             _footer(col, business)
             top, bottom = height - 52, 34
             items = [(e, linked.get((e["page"], e["order"]), [])) for e in by_page[catalogue_page]]

@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
+import { useSelection } from "../utils/useSelection";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Trash2, Edit, Eye, Download, X, Truck, Building2 } from "lucide-react";
 import apiClient from "../api/client";
@@ -118,6 +120,7 @@ const PurchaseOrders = () => {
       return !q || [o.number, o.reference, o.status, supplierName(o.supplier_id)].some((v) => v?.toLowerCase().includes(q));
     })
     .sort(newestFirst);
+  const selection = useSelection((filtered).map((r) => r.id));
 
   const openNew = () => {
     setEditing("new");
@@ -205,10 +208,16 @@ const PurchaseOrders = () => {
               className="w-full rounded-lg border border-slate-200 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
         </div>
+        <div className="space-y-2 p-3 empty:hidden">
+          <BulkBar selection={selection} noun="purchase order" describe={(id) => orders?.find((r) => r.id === id)?.number || `#${id}`}
+            deleteOne={(id) => apiClient.delete(`/purchase-orders/${id}`, { silent: true })}
+            onDone={() => queryClient.invalidateQueries({ queryKey: ["purchase-orders"] })} />
+        </div>
         <div className="relative overflow-x-auto">
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-sm uppercase text-slate-500">
             <tr>
+              <SelectAllTh selection={selection} />
               {["Number", "Date", "Supplier", "Delivery", "Total", "Status"].map((h) => <th key={h} className="px-6 py-3 font-medium">{h}</th>)}
               <th className="px-6 py-3 text-right font-medium">Actions</th>
             </tr>
@@ -216,6 +225,7 @@ const PurchaseOrders = () => {
           <tbody className="divide-y divide-slate-100">
             {filtered.map((o) => (
               <tr key={o.id} className="transition-colors hover:bg-slate-50">
+                <SelectTd selection={selection} id={o.id} label={`Select ${((id) => orders?.find((r) => r.id === id)?.number || `#${id}`)(o.id)}`} />
                 <td className="px-6 py-4 font-medium text-slate-600">{o.number || `#${o.id}`}</td>
                 <td className="px-6 py-4 text-slate-600">{shortDate(o.date)}</td>
                 <td className="px-6 py-4 text-slate-600">{supplierName(o.supplier_id)}</td>
@@ -235,7 +245,7 @@ const PurchaseOrders = () => {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-6 py-8 text-center text-slate-400">
+              <tr><td colSpan={8} className="px-6 py-8 text-center text-slate-400">
                 {orders?.length ? "No purchase orders match your search." : "No purchase orders yet. Add a supplier, then create your first order."}
               </td></tr>
             )}

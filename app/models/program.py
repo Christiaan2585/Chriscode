@@ -33,6 +33,8 @@ class HerdingProgram(SQLModel, table=True):
     # before this field existed still load fine.
     client_id: Optional[int] = Field(default=None, foreign_key="client.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    color: Optional[str] = None  # the program name's colour (herding.COLORS)
+    dates_only: Optional[bool] = None  # the standard program: the master's dates and notes, without its product lines
     # The client's run of the master program (ProgramTemplate): every step's
     # date is worked out from the first mating date. NULL on programs from
     # before 2026-09-29, which just show their headcounts as before. The other
@@ -58,6 +60,10 @@ class ProgramTemplate(SQLModel, table=True):
     weaning_rule: str = "fixed"
     weaning_months: int = 4
     weaning_days: int = 240
+    # The first mating day written in the imported sheet: the standard program
+    # every client starts with (herding.ensure_standard_programs). NULL = none yet.
+    mating_date: Optional[datetime] = None
+    scan_step_added: Optional[bool] = None  # the scan-date step was put in the master once (see herding.ensure_scan_step)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -84,6 +90,7 @@ class ProgramStep(SQLModel, table=True):
     origin: Optional[str] = None  # "kudde" / "cost" - which sheet made a master step
     section: Optional[str] = None  # the cost sheet's section (herding.SECTIONS); NULL = worked out from the animals
     invoice_id: Optional[int] = Field(default=None, foreign_key="invoice.id")  # this date's invoice, once the quote is accepted
+    color: Optional[str] = None  # the step name's colour (herding.COLORS); NULL = the normal text colour
 
 
 class ProgramStepProduct(SQLModel, table=True):

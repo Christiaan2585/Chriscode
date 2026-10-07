@@ -68,6 +68,8 @@ apiClient.interceptors.response.use(
     // fresh sign-in - that's expected there, not a toast-worthy error.
     const quietly = error.config?.queueable && (!error.response || error.response.status === 401);
     if (quietly) return Promise.reject(error);
+    // Calls marked `silent` (bulk deletes) report a refusal themselves, next to the record it was about.
+    if (error.config?.silent && error.response && error.response.status !== 401) return Promise.reject(error);
     if (error.response?.status === 401 && onUnauthorized) {
       onUnauthorized();
     } else if (notifyError) {

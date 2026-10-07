@@ -5,6 +5,8 @@ import { Link } from "react-router-dom";
 import apiClient from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import InlineEdit from "../components/InlineEdit";
+import NameColorPicker from "../components/NameColorPicker";
+import { nameColorClass } from "../utils/nameColors";
 import ProgramLineForm from "../components/ProgramLineForm";
 import { ANCHOR_LABELS, TEXT_COLUMNS, UNDATED, amount, dayLabel, ruleText } from "../utils/herding";
 
@@ -183,6 +185,7 @@ const Programs = () => {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: TEMPLATE_KEY });
     queryClient.invalidateQueries({ queryKey: ["program-schedule"] });
+    queryClient.invalidateQueries({ queryKey: ["programs"] });
     queryClient.invalidateQueries({ queryKey: ["program-calendar"] });
   };
   // Failures already show as a toast (api/client.js); true when it worked.
@@ -233,8 +236,8 @@ const Programs = () => {
             <ClipboardList size={28} className="text-emerald-600" /> Master herding program
           </h2>
           <p className="text-slate-500">
-            The master program every new client program is copied from. Dates are worked out from each client's first mating day;
-            each client's copy can then be changed on its own.
+            The standard program: every client starts with a copy of it (new clients too), dated from the first mating day in the
+            imported sheet. Dates are worked out from each client's first mating day; each client's copy can then be changed on its own.
           </p>
         </div>
         {canEdit && (
@@ -250,10 +253,17 @@ const Programs = () => {
         )}
       </div>
 
+      {canEdit && data.steps.length > 0 && !data.settings.mating_date && (
+        <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Import the program sheet again to give every client the standard program - the sheet's first mating day is
+          what each client's program starts with.
+        </p>
+      )}
       {importResult?.kind === "program" && (
         <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           Imported "{importResult.name}": {importResult.steps.length} steps ({importResult.created} new, {importResult.updated} updated
           {importResult.removed ? `, ${importResult.removed} removed` : ""}). Steps that kept their timing kept their products.
+          {importResult.standard_programs > 0 && <> {importResult.standard_programs} {importResult.standard_programs === 1 ? "client was" : "clients were"} given the standard program (open it from their page).</>}
         </p>
       )}
       {importResult?.kind === "costs" && (
@@ -262,6 +272,7 @@ const Programs = () => {
             Imported the cost sheet: {importResult.lines} product lines ({importResult.steps_created} new steps; the rest joined
             the program's steps on the same day). Clients' programs made before this keep their own copy - use "Start again
             from the master program" on a client's program to bring these in.
+            {importResult.standard_programs > 0 && <> {importResult.standard_programs} {importResult.standard_programs === 1 ? "client was" : "clients were"} given the standard program.</>}
           </p>
           {importResult.unmatched.length > 0 && (
             <p className="mt-1 text-amber-700">
@@ -294,10 +305,13 @@ const Programs = () => {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 space-y-1">
                 <StepTiming key={`${step.anchor}${step.offset_days}`} step={step} canEdit={canEdit} onSave={(changes) => patchStep(step.id, changes)} />
-                <div className="text-slate-700">
-                  {canEdit ? (
-                    <InlineEdit label="Stage" value={step.stage} placeholder="Stage…" onSave={(v) => patchStep(step.id, { stage: v })} />
-                  ) : step.stage}
+                <div className="flex flex-wrap items-center gap-1 text-slate-700">
+                  <span className={nameColorClass(step.color)}>
+                    {canEdit ? (
+                      <InlineEdit label="Stage" value={step.stage} placeholder="Stage…" onSave={(v) => patchStep(step.id, { stage: v })} />
+                    ) : step.stage}
+                  </span>
+                  {canEdit && <NameColorPicker label="this step's name" value={step.color} onChange={(color) => patchStep(step.id, { color })} />}
                 </div>
               </div>
               {canEdit && (

@@ -19,3 +19,7 @@ export const recomputeFromCost = (cost) => {
 // plus whatever is already selected so an old line still shows its name.
 export const pickerProducts = (products, selectedId) =>
   (products || []).filter((p) => isActive(p) || p.id === Number(selectedId));
+
+// The selling price excl VAT shown on a catalog card: the stored one, or the price incl VAT less the standard 15%.
+export const priceExcl = (product) =>
+  product.price_excl_vat ?? (product.price == null ? null : Math.round((product.price / 1.15) * 100) / 100);

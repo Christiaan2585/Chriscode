@@ -26,8 +26,12 @@ from app.models.user import User
 router = APIRouter(prefix="/programs", tags=["Herding Programs"])
 
 
+ColorName = Optional[Literal[herding.COLORS]]  # None clears it
+
+
 class ProgramFields(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    color: ColorName = None
     goal: Optional[str] = Field(default=None, max_length=1000)
     description: Optional[str] = Field(default=None, max_length=2000)
     start_date: Optional[datetime] = None
@@ -96,6 +100,24 @@ def read_programs_by_client(client_id: int, session: Session = Depends(get_sessi
         ).all()
         result.append({**program.dict(), "groups": [g.dict() for g in groups]})
     return result
+
+class CopyProgram(BaseModel):
+    client_id: int
+    include_animal_numbers: bool = False  # a farm's own headcounts are normally left behind
+
+
+@router.post("/{program_id}/copy", response_model=HerdingProgram)
+def copy_program(program_id: int, data: CopyProgram, session: Session = Depends(get_session),
+                 user: Optional[User] = Depends(get_current_user)):
+    """Paste a program into a client (the same one or another): see herding.copy_program."""
+    source = _program_or_404(session, program_id)
+    if not session.get(Client, data.client_id):
+        raise HTTPException(status_code=404, detail="Client not found")
+    copy = herding.copy_program(session, source, data.client_id, data.include_animal_numbers)
+    program_quote.sync(session, copy, user.id if isinstance(user, User) else None)
+    session.refresh(copy)
+    return copy
+
 
 @router.delete("/{program_id}")
 def delete_program(program_id: int, session: Session = Depends(get_session)):
@@ -409,6 +431,7 @@ class StepFields(BaseModel):
     date_override: Optional[date] = None  # a client's own program only
     section: Optional[Literal[herding.SECTIONS + (herding.OTHER_SECTION,)]] = None
     stage: Optional[str] = Field(default=None, max_length=300)
+    color: ColorName = None
     management: Optional[str] = Field(default=None, max_length=3000)
     vaccinations: Optional[str] = Field(default=None, max_length=3000)
     dosing: Optional[str] = Field(default=None, max_length=3000)
@@ -491,6 +514,7 @@ async def import_template(file: UploadFile = File(...), session: Session = Depen
     except herding.TemplateImportError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc))
+    result["standard_programs"] = herding.ensure_standard_programs(session)  # clients who had none get theirs
     return {**result, **_template_out(session)}
 
 
@@ -507,6 +531,7 @@ async def import_cost_sheet(file: UploadFile = File(...), session: Session = Dep
     except herding.TemplateImportError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc))
+    result["standard_programs"] = herding.ensure_standard_programs(session)
     return {**result, **_template_out(session)}
 
 

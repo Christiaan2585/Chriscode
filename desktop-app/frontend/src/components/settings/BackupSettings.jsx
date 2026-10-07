@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Database, CheckCircle2, AlertTriangle, FolderOpen } from "lucide-react";
+import { Database, CheckCircle2, AlertTriangle, FolderOpen, Lock } from "lucide-react";
+import Modal from "../Modal";
+import { detailOf } from "./security/shared";
 import apiClient from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 import { canChooseFolder, canOpenFolder, chooseFolder, openFolder } from "../../utils/desktop";
@@ -15,6 +17,9 @@ const BackupSettings = ({ databasePath }) => {
   const queryClient = useQueryClient();
   const [folderInput, setFolderInput] = useState("");
   const [message, setMessage] = useState(null);
+  const [passphrase, setPassphrase] = useState({ one: "", two: "" });
+  const [lockMessage, setLockMessage] = useState(null);
+  const [unlocking, setUnlocking] = useState(null); // {backup, passphrase} - restoring a locked backup
 
   const isAdmin = !!user?.is_admin;
   const { data: status, isLoading } = useQuery({
@@ -42,11 +47,30 @@ const BackupSettings = ({ databasePath }) => {
     },
   });
 
+  const lock = useMutation({
+    mutationFn: async (value) => (await apiClient.put("/backups/encryption", { passphrase: value })).data,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["backups"], data);
+      setPassphrase({ one: "", two: "" });
+      setLockMessage("Backups are locked from now on. Write the passphrase down somewhere safe - you need it to restore on another PC.");
+      runNow.mutate();
+    },
+    onError: (err) => setLockMessage(detailOf(err, "Could not lock the backups.")),
+  });
+  const unlock = useMutation({
+    mutationFn: async () => (await apiClient.delete("/backups/encryption")).data,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["backups"], data);
+      setLockMessage("New backups will not be locked. Locked ones already made still need the passphrase.");
+    },
+  });
+
   const restore = useMutation({
-    mutationFn: async (name) => (await apiClient.post("/backups/restore", { name })).data,
+    mutationFn: async ({ name, passphrase: typed }) => (await apiClient.post("/backups/restore", { name, passphrase: typed || null })).data,
     // Everything cached in the app (and possibly the signed-in account
     // itself) now reflects the restored data, so start fresh.
     onSuccess: () => window.location.reload(),
+    onError: (err) => { if (unlocking) setUnlocking({ ...unlocking, error: detailOf(err, "Could not restore that backup.") }); },
   });
 
   const confirmRestore = (b) => {
@@ -55,7 +79,9 @@ const BackupSettings = ({ databasePath }) => {
       "Everything entered after that time will be replaced. A copy of your current data is saved first, " +
       "so you can undo this by restoring that copy.\n\nThe app will reload and you may need to sign in again."
     );
-    if (ok) restore.mutate(b.name);
+    if (!ok) return;
+    if (b.encrypted) setUnlocking({ backup: b, passphrase: "" }); // locked: ask for the passphrase first
+    else restore.mutate({ name: b.name });
   };
 
   const exportData = useMutation({
@@ -185,13 +211,46 @@ const BackupSettings = ({ databasePath }) => {
             )}
           </div>
 
+          <div className="space-y-2 border-t border-slate-100 pt-3 text-sm">
+            <p className="flex items-center gap-2 font-medium text-slate-700"><Lock size={14} /> Lock backups with a passphrase</p>
+            <p className="text-xs text-slate-400">
+              Locked backups are unreadable to anyone without the passphrase - so a copy on a USB stick or in OneDrive that is lost or
+              stolen gives nothing away. This PC remembers the passphrase for the daily backups (only for your Windows account).
+              <b className="text-slate-600"> Write it down somewhere safe: it is the only way to restore on another PC.</b>
+            </p>
+            {status.settings.encrypted ? (
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1 text-emerald-700"><CheckCircle2 size={14} /> Backups are locked</span>
+                <button type="button" onClick={() => { if (window.confirm("Stop locking new backups? Backups already locked will still need the passphrase.")) unlock.mutate(); }}
+                  className="text-xs text-slate-400 hover:text-red-500">Turn off</button>
+              </div>
+            ) : (
+              <form className="space-y-2" onSubmit={(e) => {
+                e.preventDefault();
+                if (passphrase.one !== passphrase.two) return setLockMessage("The two passphrases are not the same.");
+                setLockMessage(null);
+                lock.mutate(passphrase.one);
+              }}>
+                <input type="password" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Passphrase (at least 12 characters)" autoComplete="new-password"
+                  value={passphrase.one} onChange={(e) => setPassphrase({ ...passphrase, one: e.target.value })} />
+                <input type="password" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Passphrase again" autoComplete="new-password"
+                  value={passphrase.two} onChange={(e) => setPassphrase({ ...passphrase, two: e.target.value })} />
+                <button type="submit" disabled={lock.isPending || passphrase.one.length < 12}
+                  className="rounded-lg border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-50 disabled:opacity-50">
+                  {lock.isPending ? "Locking..." : "Lock backups"}
+                </button>
+              </form>
+            )}
+            {lockMessage && <p role="status" className="text-xs text-slate-600">{lockMessage}</p>}
+          </div>
+
           {status.backups.length > 0 && (
             <details className="text-sm">
               <summary className="cursor-pointer text-slate-600">Recent backups ({status.backups.length})</summary>
               <ul className="mt-2 space-y-1 text-xs text-slate-500">
                 {status.backups.slice(0, 10).map((b) => (
                   <li key={b.name} className="flex items-center justify-between gap-4">
-                    <span>{formatWhen(b.created_at)}</span>
+                    <span className="flex items-center gap-1">{formatWhen(b.created_at)}{b.encrypted && <Lock size={11} aria-label="Locked" />}</span>
                     <span className="flex items-center gap-3">
                       {formatSize(b.size)}
                       <button type="button" onClick={() => confirmRestore(b)} disabled={restore.isPending}
@@ -217,6 +276,20 @@ const BackupSettings = ({ databasePath }) => {
           {restore.isPending && <p className="text-xs text-slate-500">Restoring...</p>}
         </>
       )}
+      <Modal isOpen={!!unlocking} onClose={() => setUnlocking(null)} title="This backup is locked">
+        {unlocking && (
+          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); restore.mutate({ name: unlocking.backup.name, passphrase: unlocking.passphrase }); }}>
+            <p className="text-sm text-slate-600">Type the backup passphrase. Leave it empty to use the one saved on this PC.</p>
+            <input type="password" autoFocus className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={unlocking.passphrase}
+              onChange={(e) => setUnlocking({ ...unlocking, passphrase: e.target.value, error: null })} />
+            {unlocking.error && <p role="alert" className="text-sm text-red-600">{unlocking.error}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" className="rounded-lg border border-slate-300 px-4 py-2 text-sm" onClick={() => setUnlocking(null)}>Cancel</button>
+              <button type="submit" disabled={restore.isPending} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50">Restore</button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 };

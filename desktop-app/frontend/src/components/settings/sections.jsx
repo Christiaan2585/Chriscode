@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Calculator, Calendar, CloudSun, Database, FileText, Info, Landmark, Package, Scale, Settings as GearIcon,
+  Calculator, Calendar, CloudSun, Database, FileText, History, Info, Landmark, Package, Scale, Settings as GearIcon,
   ShieldCheck, ShoppingCart, Smartphone, Truck, UserRound, Users, ClipboardList,
 } from "lucide-react";
 import apiClient from "../../api/client";
@@ -12,6 +12,7 @@ import BusinessSettings from "../BusinessSettings";
 import PhoneSettings from "../PhoneSettings";
 import PhonePairingSettings from "../PhonePairingSettings";
 import ThemeToggle from "../ThemeToggle";
+import ActivityLog from "./ActivityLog";
 import AutoLockSetting from "./AutoLockSetting";
 import BackupSettings from "./BackupSettings";
 import {
@@ -122,6 +123,7 @@ export const GROUPS = [
     title: "System",
     items: [
       { id: "phones", label: "Phones", subtitle: "Pair staff phones", Icon: Smartphone, color: "bg-green-500", Panel: PhonesPanel, show: ({ user }) => isNative() || Boolean(user?.is_admin) },
+      { id: "activity", label: "Activity log", subtitle: "Who changed what", Icon: History, color: "bg-slate-600", Panel: ActivityLog, show: ({ user }) => Boolean(user?.is_admin) },
       { id: "backups", label: "Data & Backups", subtitle: "Backups, restore, export", Icon: Database, color: "bg-amber-500", Panel: BackupsPanel },
       { id: "legal", label: "Legal", subtitle: "Licence and privacy notice", Icon: Scale, color: "bg-slate-400", Panel: LegalSettings },
     ],

@@ -1,4 +1,7 @@
 import React, { useState } from "react";
+import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
+import { useSelection } from "../utils/useSelection";
+import { useOpenNew } from "../utils/useOpenNew";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, FileText, Trash2, Download, X, Edit, Eye } from "lucide-react";
 import apiClient from "../api/client";
@@ -60,6 +63,7 @@ const Invoices = () => {
       inv.number?.toLowerCase().includes(q)
     );
   }).sort(newestFirst);
+  const selection = useSelection((filteredInvoices).map((r) => r.id));
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -214,6 +218,8 @@ const Invoices = () => {
     ? Boolean(invoice.client_id) && (keptExistingCount + items.length) > 0
     : Boolean(invoice.client_id) && items.length > 0;
 
+  useOpenNew(() => openAddModal()); // from the dashboard's quick actions (?new=1)
+
   if (isLoading) return <div className="p-8 text-center">Loading invoices...</div>;
 
   return (
@@ -244,10 +250,16 @@ const Invoices = () => {
             />
           </div>
         </div>
+        <div className="space-y-2 p-3 empty:hidden">
+          <BulkBar selection={selection} noun="invoice" describe={(id) => invoices?.find((r) => r.id === id)?.number || `#${id}`}
+            deleteOne={(id) => apiClient.delete(`/invoices/${id}`, { silent: true })}
+            onDone={() => queryClient.invalidateQueries({ queryKey: ["invoices"] })} />
+        </div>
         <div className="relative overflow-x-auto">
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
             <tr>
+              <SelectAllTh selection={selection} />
               <th className="px-6 py-3 font-medium">Invoice</th>
               <th className="px-6 py-3 font-medium">Date</th>
               <th className="px-6 py-3 font-medium">Client</th>
@@ -259,6 +271,7 @@ const Invoices = () => {
           <tbody className="divide-y divide-slate-100">
             {filteredInvoices.map((inv) => (
               <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                <SelectTd selection={selection} id={inv.id} label={`Select ${((id) => invoices?.find((r) => r.id === id)?.number || `#${id}`)(inv.id)}`} />
                 <td className="px-6 py-4 text-slate-600 font-medium">
                   <DocumentHover kind="invoice" doc={inv} clientName={clientName(inv.client_id)}>{inv.number || `#${inv.id}`}</DocumentHover>
                 </td>
@@ -318,7 +331,7 @@ const Invoices = () => {
             ))}
             {filteredInvoices.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
+                <td colSpan={7} className="px-6 py-8 text-center text-slate-400">
                   {invoices?.length ? "No invoices match your search." : "No invoices yet. Create your first one above."}
                 </td>
               </tr>

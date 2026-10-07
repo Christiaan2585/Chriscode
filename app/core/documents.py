@@ -10,6 +10,17 @@ def _money(value) -> Decimal:
     return Decimal(str(value)).quantize(_CENT, rounding=ROUND_HALF_UP)
 
 
+def price_pair(product, vat_rate=15.0) -> tuple:
+    """(selling price excl VAT, incl VAT) for a catalogue. The excl price is the
+    one stored on the product, or worked out from the incl price at `vat_rate`."""
+    incl = _money(product.price or 0)
+    if product.price_excl_vat is not None:
+        excl = _money(product.price_excl_vat)
+    else:
+        excl = _money(incl / (1 + Decimal(str(vat_rate or 0)) / 100))
+    return float(excl), float(incl)
+
+
 def line_amounts(quantity, unit_price, discount_percent=0, vat_percent=0) -> dict:
     """Discount comes off first, VAT is charged on what's left. The net line
     total is rounded to cents (as printed); the discount is what it took off."""

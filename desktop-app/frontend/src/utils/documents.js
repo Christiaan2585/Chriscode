@@ -5,7 +5,8 @@ const API_PATH = { invoice: "invoices", quote: "quotes", "purchase-order": "purc
 // `url` overrides the usual /{kind}s/{id}/pdf address (e.g. the product catalogue).
 export async function fetchDocumentPdf(kind, id, url) {
   const response = await apiClient.get(url || `/${API_PATH[kind]}/${id}/pdf`, { responseType: "blob" });
-  return new Blob([response.data], { type: "application/pdf" });
+  // Keep the type the server sent (a tax certificate may be a picture); everything else is a PDF.
+  return new Blob([response.data], { type: response.data?.type || "application/pdf" });
 }
 
 export function saveBlob(blob, filename) {

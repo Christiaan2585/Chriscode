@@ -2,7 +2,7 @@ import React, { Fragment, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, CalendarDays, CheckCircle2, FileDown, FileSpreadsheet, FileText, Pencil, Plus, Receipt, RotateCcw,
+  ArrowLeft, CalendarDays, CheckCircle2, Copy, FileDown, FileSpreadsheet, FileText, Pencil, Plus, Receipt, RotateCcw,
   Trash2, Upload, X,
 } from "lucide-react";
 import apiClient from "../api/client";
@@ -12,6 +12,7 @@ import { isOffline, queueRequest } from "../utils/outbox";
 import Modal from "../components/Modal";
 import DocumentPreview from "../components/DocumentPreview";
 import InlineEdit from "../components/InlineEdit";
+import NameColorPicker from "../components/NameColorPicker";
 import ProgramLineForm from "../components/ProgramLineForm";
 import {
   HeadCountFields, ProgramForm, StatusChip, StepDate, countsFrom, countsPayload, fileName, formFrom, linkButton,
@@ -19,6 +20,8 @@ import {
 } from "../components/HerdingProgramPanel";
 import { saveBlob } from "../utils/documents";
 import { money, statusStyle } from "../utils/format";
+import { nameColorClass } from "../utils/nameColors";
+import { copyProgram } from "../utils/programClipboard";
 import { GROUPS, SECTIONS, TEXT_COLUMNS, amount, dayLabel } from "../utils/herding";
 
 const COLUMNS = ["DATUM", "TYD", "PRODUK", "VERPAK", "PRYS EXCL VAT", "DOSERING ml / Dier", "PRODUK TOTAAL", "TOTAAL R"];
@@ -71,6 +74,7 @@ const ProgramSheet = () => {
   const [newStep, setNewStep] = useState(null);
   const [result, setResult] = useState(null); // last import / invoice result
   const [preview, setPreview] = useState(null);
+  const [copiedNote, setCopiedNote] = useState(false);
   const fileInput = useRef(null);
 
   const base = `/programs/${programId}`;
@@ -94,6 +98,7 @@ const ProgramSheet = () => {
     }
   };
   const patchStep = (stepId, changes) => run(apiClient.patch(`${base}/steps/${stepId}`, changes));
+  const patchProgram = (changes) => run(apiClient.patch(base, changes));
 
   const toggleDone = useMutation({
     mutationFn: ({ stepIds, done }) =>
@@ -179,6 +184,7 @@ const ProgramSheet = () => {
   const noteSteps = steps.filter((s) => !s.section && !s.products.length);
   const sheetDates = new Set(steps.filter((s) => s.section && s.date).map((s) => s.date));
   const notesFor = (step) => [step, ...(step.date ? noteSteps.filter((n) => n.date === step.date && n.id !== step.id) : [])];
+  const scanStep = steps.find((s) => s.origin === "scan"); // 77 days after the rams go in
   const otherDates = noteSteps.filter((n) => !n.date || !sheetDates.has(n.date));
   const count = (name) => groups.find((g) => g.animal_type.trim().toLowerCase() === name.toLowerCase())?.group_size ?? 0;
   const title = `${client?.name || ""} - ${program.name}`;
@@ -195,10 +201,11 @@ const ProgramSheet = () => {
           </td>
           <td colSpan={COLUMNS.length - 2} className="px-2 py-1.5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold text-slate-800">
+              <span className={`font-semibold text-slate-800 ${nameColorClass(step.color)}`}>
                 <InlineEdit label="Step name" value={step.stage} placeholder={ruleLabel(step)}
                   onSave={(v) => patchStep(step.id, { stage: v })} />
               </span>
+              <NameColorPicker label="this step's name" value={step.color} onChange={(color) => patchStep(step.id, { color })} />
               {step.status !== "none" && <StatusChip status={step.status} />}
               {step.invoice ? (
                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusStyle(step.invoice.status)}`}>
@@ -305,13 +312,21 @@ const ProgramSheet = () => {
             </Link>
           )}
           <div>
-            <h2 className="text-3xl font-bold text-slate-800">{program.name}</h2>
+            <h2 className={`flex flex-wrap items-center gap-2 text-3xl font-bold text-slate-800 ${nameColorClass(program.color)}`}>
+              <InlineEdit label="Program name" required value={program.name} inputClassName="text-2xl font-bold"
+                onSave={(v) => patchProgram({ name: v })} />
+              <NameColorPicker label="the program name" value={program.color} onChange={(color) => patchProgram({ color })} />
+            </h2>
             <p className="text-slate-500">Herding program costs for {client?.name || "…"}{program.goal ? ` · ${program.goal}` : ""}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
           {anchors && (
             <>
+              <button type="button" className={secondary} title="Copy this program, then paste it into another client's page"
+                onClick={() => { copyProgram(program, client ? (client.farm_name || client.name) : ""); setCopiedNote(true); }}>
+                <Copy size={16} /> {copiedNote ? "Copied - open a client and Paste" : "Copy program"}
+              </button>
               <button type="button" className={secondary} onClick={() => setPreview({
                 kind: "program-costs", id: programId, title: `${program.name} - costs`, url: `${base}/costs.pdf`,
                 filename: fileName(`Program costs - ${title}.pdf`), hint: "The costs laid out like the cost sheet, amounts excluding VAT.",
@@ -430,6 +445,7 @@ const ProgramSheet = () => {
           {anchors ? (
             <dl className="grid grid-cols-[9rem_1fr] gap-y-0.5 text-sm">
               {[["DEKTYD (first mating)", anchors.mating_start], ["Mating ends", anchors.mating_end],
+                ...(scanStep?.date ? [["Scan date", scanStep.date]] : []),
                 ["LAMTYD (lambing)", anchors.lambing_start], ["Weaning", anchors.weaning]].map(([label, day]) => (
                 <Fragment key={label}><dt className="text-slate-500">{label}</dt><dd className="font-semibold text-slate-800">{dayLabel(day, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</dd></Fragment>
               ))}

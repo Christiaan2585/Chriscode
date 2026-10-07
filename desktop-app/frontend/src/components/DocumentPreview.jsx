@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Download, Mail, MessageCircle } from "lucide-react";
+import { Download, Mail, MessageCircle, Printer } from "lucide-react";
 import Modal from "./Modal";
 import { fetchDocumentPdf, pdfFilename, saveBlob } from "../utils/documents";
 import { sendDocument, sendLink } from "../utils/sending";
@@ -49,7 +49,7 @@ const SendButtons = ({ blob, filename, send }) => {
   );
 };
 
-const LABEL = { invoice: "Invoice", quote: "Quote", "purchase-order": "Purchase order", catalogue: "Product", program: "Herding program", "program-costs": "Herding program" };
+const LABEL = { invoice: "Invoice", quote: "Quote", "purchase-order": "Purchase order", catalogue: "Product", program: "Herding program", "program-costs": "Herding program", "tax-certificate": "Tax certificate", "catalogue-library": "Catalogue" };
 
 // Shows the real PDF (the same file Download saves) in Electron's built-in
 // PDF viewer. The packaged CSP allows this via frame-src blob: - see
@@ -65,6 +65,9 @@ const DocumentPreview = ({ doc, onClose }) => {
   });
 
   const [url, setUrl] = useState(null);
+  const frame = useRef(null);
+  const [printProblem, setPrintProblem] = useState(null);
+  useEffect(() => setPrintProblem(null), [doc]);
   useEffect(() => {
     if (!blob) return undefined;
     const objectUrl = URL.createObjectURL(blob);
@@ -75,6 +78,24 @@ const DocumentPreview = ({ doc, onClose }) => {
     };
   }, [blob]);
 
+  // The desktop app's built-in PDF viewer has no working Print button, so the
+  // app prints the PDF itself (main process, Windows print dialog). In a plain
+  // browser the PDF viewer's own print is used.
+  const printIt = async () => {
+    setPrintProblem(null);
+    try {
+      if (window.electronAPI?.printPdf) {
+        const result = await window.electronAPI.printPdf(await blob.arrayBuffer());
+        if (result?.error) setPrintProblem(result.error);
+      } else {
+        frame.current.contentWindow.focus();
+        frame.current.contentWindow.print();
+      }
+    } catch {
+      setPrintProblem("Couldn't start printing. Download the PDF and print it from there.");
+    }
+  };
+
   const title = doc ? `${LABEL[doc.kind]} ${doc.title || `#${doc.id}`}` : "";
   const filename = doc ? doc.filename || pdfFilename(doc.kind, doc.id, doc.title) : "";
 
@@ -84,22 +105,28 @@ const DocumentPreview = ({ doc, onClose }) => {
         <div className="flex flex-wrap items-center justify-end gap-3">
           {doc?.hint && <p className="mr-auto text-sm text-slate-600">{doc.hint}</p>}
           {doc?.send && <SendButtons key={doc.url} blob={blob} filename={filename} send={doc.send} />}
+          {!doc?.noPrint && (
+            <button type="button" disabled={!blob} onClick={printIt} className={sendButton}>
+              <Printer size={16} /> Print
+            </button>
+          )}
           <button
             type="button"
             disabled={!blob}
             onClick={() => saveBlob(blob, filename)}
             className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
           >
-            <Download size={16} /> Download PDF
+            <Download size={16} /> Download
           </button>
         </div>
+        {printProblem && <p role="alert" className="text-sm text-red-600">{printProblem}</p>}
         <div className="h-[70vh] overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
           {isError ? (
             <p className="p-8 text-center text-sm text-red-600">Couldn't load the PDF for {title}.</p>
           ) : isLoading || !url ? (
             <p className="p-8 text-center text-sm text-slate-500">Loading {title}…</p>
           ) : (
-            <iframe src={url} title={`${title} PDF`} className="h-full w-full border-0" />
+            <iframe ref={frame} src={url} title={`${title} PDF`} className="h-full w-full border-0" />
           )}
         </div>
       </div>

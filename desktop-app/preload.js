@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // attach and show it in Explorer; open WhatsApp (wa.me) or email (mailto:) only.
   saveForSending: (name, data) => ipcRenderer.invoke('save-for-sending', { name, data }),
   openSendLink: (url) => ipcRenderer.invoke('open-send-link', url),
+  // The document preview's Print button (the built-in PDF viewer's own one does nothing).
+  printPdf: (data) => ipcRenderer.invoke('print-pdf', data),
   onUpdateStatus: (callback) => {
     const listener = (_event, status) => callback(status);
     ipcRenderer.on('update-status', listener);

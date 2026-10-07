@@ -66,7 +66,7 @@ class ClientSummaryTests(unittest.TestCase):
             summary,
             {"animal_count": 0, "unpaid_invoice_count": 0, "outstanding": 0,
              "last_invoice_date": None, "open_quote_count": 0,
-             "farm_animals": [], "farm_animal_total": 0},
+             "farm_animals": [], "farm_animal_total": 0, "has_tax_certificate": False},
         )
 
     def test_farm_animals_come_from_the_newest_program_with_headcounts(self):

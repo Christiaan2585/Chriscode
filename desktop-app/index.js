@@ -3,7 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
+const localSecret = require('./local-secret');
 const { autoUpdater } = require('electron-updater');
 
 // Not using the `electron-is-dev` package: its current release is ESM-only
@@ -25,6 +26,8 @@ const isDev = !app.isPackaged;
 app.setName('Sandveld Vee Dienste');
 
 const BACKEND_HOST = '127.0.0.1';
+// Proves to the backend that requests come from this app's own window (see local-secret.js).
+const LOCAL_SECRET = localSecret.createSecret();
 const BACKEND_PORT = 8000;
 
 // Dev mode (`npm run dev` / `electron .`): this file lives in `desktop-app/`,
@@ -103,10 +106,29 @@ function waitForBackend(maxWaitMs = 20000, intervalMs = 400) {
   });
 }
 
+// A backend left running by an earlier launch (a crash, a killed app) doesn't
+// know this launch's secret. In the installed app it is ours to stop; in
+// development it is someone's own server, so just say so.
+async function stopOrphanBackend() {
+  await new Promise((resolve) => execFile('taskkill', ['/IM', 'sandveld-backend.exe', '/F'], () => resolve()));
+  for (let i = 0; i < 20 && (await isBackendUp()); i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+}
+
 async function startBackend() {
   if (await isBackendUp()) {
-    console.log(`Backend already running on port ${BACKEND_PORT} - reusing it.`);
-    return;
+    const state = await localSecret.checkBackend(BACKEND_HOST, BACKEND_PORT, LOCAL_SECRET);
+    if (state === 'ok') {
+      console.log(`Backend already running on port ${BACKEND_PORT} - reusing it.`);
+      return;
+    }
+    if (!app.isPackaged) {
+      dialog.showErrorBox('Sandveld Vee Dienste', `Something else is already running on port ${BACKEND_PORT} and won't accept this app. Stop it and start the app again.`);
+      return;
+    }
+    logToBackendFile('An older backend was still running; stopping it so this launch can start its own.');
+    await stopOrphanBackend();
   }
 
   if (app.isPackaged) {
@@ -145,7 +167,7 @@ async function startBackend() {
     backendProcess = spawn(
       PYTHON_BIN,
       ['-m', 'uvicorn', 'app.main:app', '--host', BACKEND_HOST, '--port', String(BACKEND_PORT)],
-      { cwd: PROJECT_ROOT, windowsHide: true }
+      { cwd: PROJECT_ROOT, windowsHide: true, env: { ...process.env, SANDVELD_LOCAL_SECRET: LOCAL_SECRET } }
     );
 
     backendProcess.on('error', (err) => {
@@ -206,6 +228,7 @@ function spawnPackagedBackend(attempt) {
         SANDVELD_DATA_DIR: PACKAGED_DATA_DIR,
         SANDVELD_BACKEND_HOST: BACKEND_HOST,
         SANDVELD_BACKEND_PORT: String(BACKEND_PORT),
+        SANDVELD_LOCAL_SECRET: LOCAL_SECRET,
       },
     }
   );
@@ -438,6 +461,40 @@ ipcMain.handle('save-for-sending', async (_event, { name, data }) => {
   return { path: file };
 });
 
+// Printing a PDF from the preview. Electron's built-in PDF viewer has no
+// working Print button, so the app prints it itself: the PDF is shown in a
+// hidden window and sent to Windows' normal print dialog (printer choice,
+// copies, page range). PDFs this app made only, at most 60 MB. If printing
+// can't start, the PDF opens in the PC's own PDF program instead, which can print.
+ipcMain.handle('print-pdf', async (_event, data) => {
+  if (!(data instanceof ArrayBuffer || ArrayBuffer.isView(data))) return { error: 'Only a PDF can be printed' };
+  const bytes = Buffer.from(data instanceof ArrayBuffer ? data : data.buffer);
+  if (bytes.length > MAX_SEND_BYTES || bytes.subarray(0, 4).toString() !== '%PDF') {
+    return { error: 'That file is not a PDF this app made' };
+  }
+  const file = path.join(app.getPath('temp'), `sandveld-print-${crypto.randomUUID()}.pdf`);
+  fs.writeFileSync(file, bytes);
+  const win = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  const remove = () => {
+    if (!win.isDestroyed()) win.destroy();
+    fs.rm(file, { force: true }, () => {});
+  };
+  try {
+    await win.loadFile(file);
+    await new Promise((resolve) => setTimeout(resolve, 800)); // let the viewer lay the pages out
+    const result = await new Promise((resolve) => {
+      win.webContents.print({ silent: false, printBackground: true }, (success, reason) =>
+        resolve(success || reason === 'cancelled' ? { ok: true } : { error: reason || 'Printing failed' }));
+    });
+    remove();
+    return result;
+  } catch (error) {
+    if (!win.isDestroyed()) win.destroy();
+    const failed = await shell.openPath(file); // the PC's own PDF program; the file stays for it
+    return failed ? { error: `Couldn't print: ${failed}` } : { ok: true, openedElsewhere: true };
+  }
+});
+
 // Opens WhatsApp (wa.me, in the user's browser, which hands over to the
 // WhatsApp app) or the email program (mailto:). Nothing else - the renderer
 // must never be able to make this open arbitrary links or programs.
@@ -628,11 +685,24 @@ function registerContentSecurityPolicy() {
   });
 }
 
-app.whenReady().then(() => {
-  registerPermissionHandler();
-  registerContentSecurityPolicy();
-  createWindow();
-});
+// One copy of the app at a time: a second launch just brings the first one forward.
+// (Two copies would share one backend, and only the one that started it knows the secret.)
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+  app.whenReady().then(() => {
+    registerPermissionHandler();
+    registerContentSecurityPolicy();
+    localSecret.installHeader(session.defaultSession, LOCAL_SECRET, [`http://${BACKEND_HOST}:${BACKEND_PORT}/*`, `http://localhost:${BACKEND_PORT}/*`]);
+    createWindow();
+  });
+}
 
 app.on('window-all-closed', () => {
   stopBackend();

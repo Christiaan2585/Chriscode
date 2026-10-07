@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
+import { useSelection } from "../utils/useSelection";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, ShoppingCart, Trash2, Edit } from "lucide-react";
 import apiClient from "../api/client";
@@ -43,6 +45,7 @@ const Orders = () => {
       String(order.id).includes(q)
     );
   });
+  const selection = useSelection((filteredOrders).map((r) => r.id));
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -156,10 +159,16 @@ const Orders = () => {
             />
           </div>
         </div>
+        <div className="space-y-2 p-3 empty:hidden">
+          <BulkBar selection={selection} noun="order" describe={(id) => `Order #${id}`}
+            deleteOne={(id) => apiClient.delete(`/orders/${id}`, { silent: true })}
+            onDone={() => queryClient.invalidateQueries({ queryKey: ["orders"] })} />
+        </div>
         <div className="relative overflow-x-auto">
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
             <tr>
+              <SelectAllTh selection={selection} />
               <th className="px-6 py-3 font-medium">Order ID</th>
               <th className="px-6 py-3 font-medium">Client ID</th>
               <th className="px-6 py-3 font-medium">Total Amount</th>
@@ -170,13 +179,14 @@ const Orders = () => {
           <tbody className="divide-y divide-slate-100">
             {filteredOrders.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
                   {orders?.length ? "No orders match your search." : "No orders yet."}
                 </td>
               </tr>
             )}
             {filteredOrders.map(order => (
               <tr key={order.id} className="hover:bg-slate-50 transition-colors">
+                <SelectTd selection={selection} id={order.id} label={`Select ${((id) => `Order #${id}`)(order.id)}`} />
                 <td className="px-6 py-4 text-slate-600 font-medium">#{order.id}</td>
                 <td className="px-6 py-4 text-slate-600">{clientName(order.client_id)}</td>
                 <td className="px-6 py-4 font-medium text-slate-800">R {order.total_amount.toLocaleString()}</td>

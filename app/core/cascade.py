@@ -14,6 +14,7 @@ from sqlmodel import Session, select
 from app.models.animal import Animal
 from app.models.appointment import Appointment
 from app.models.client import Client
+from app.models.client_document import ClientDocument
 from app.models.herd import Herd
 from app.models.invoice import Invoice, InvoiceItem
 from app.models.medical import MedicalRecord
@@ -85,7 +86,7 @@ def delete_client(session: Session, client: Client) -> None:
         for step in herding.ordered_steps(session, program.id):  # the client's own copy
             herding.delete_step(session, step)
         session.delete(program)
-    for model in (Appointment, ClientNote, Herd):
+    for model in (Appointment, ClientNote, Herd, ClientDocument):
         for row in _rows(session, model, model.client_id, client.id):
             session.delete(row)
     session.delete(client)

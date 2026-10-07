@@ -145,6 +145,9 @@ class BuildTests(CatalogueTestCase):
         self.assertIn("Prices", text)
         self.assertIn("R450.00", text)
         self.assertIn("R1,900.00", text)
+        self.assertIn("R391.30", text)    # 450.00 excl. 15% VAT
+        self.assertIn("R1,652.17", text)  # 1,900.00 excl. 15% VAT
+        self.assertIn("excl. VAT", text)
         self.assertIn("Out of stock", text)
         self.assertNotIn("R7,000.00", text)  # hidden product
         self.assertIn("Price on request", text)  # MaxiCyp isn't linked
@@ -153,6 +156,8 @@ class BuildTests(CatalogueTestCase):
         text = PdfReader(io.BytesIO(self.pdf("af"))).pages[4].extract_text()
         self.assertIn("Pryse", text)
         self.assertIn("R450.00", text)
+        self.assertIn("R391.30", text)
+        self.assertIn("BTW uitgesl.", text)
         self.assertIn("Prys op aanvraag", text)
 
     def test_your_details_on_the_cover(self):

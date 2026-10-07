@@ -5,10 +5,13 @@ import os
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.core.db import create_db_and_tables, database_file_path
+from sqlmodel import Session
+from app.core import audit, herding
+from app.core.db import create_db_and_tables, database_file_path, engine
 from app.core.backup import backup_on_version_change, start_scheduler
+from app.core.local_secret import LocalSecretGuard, configured_secret
 from app.core.security import get_current_user
-from app.api import auth, clients, animals, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups, exports, business, purchase_orders, devices, catalogue
+from app.api import audit as audit_api, auth, clients, animals, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups, exports, business, purchase_orders, devices, catalogue
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -61,6 +64,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# The activity log: who changed what (see app/core/audit.py). Inside the phone
+# listener's guard (lan.DeviceGuard), so it knows when a change came from a phone.
+app.add_middleware(audit.AuditMiddleware)
+# The desktop window proves it is the Sandveld app with a per-launch secret
+# (see app/core/local_secret.py); a no-op unless the launcher set one.
+app.add_middleware(LocalSecretGuard)
 
 app.include_router(auth.router)
 # Phones (Settings -> Phones): not behind the router-wide sign-in because a
@@ -93,6 +102,7 @@ app.include_router(exports.router, dependencies=_protected)
 app.include_router(business.router, dependencies=_protected)
 app.include_router(purchase_orders.router, dependencies=_protected)
 app.include_router(catalogue.router, dependencies=_protected)
+app.include_router(audit_api.router, dependencies=_protected)
 
 def _version_info() -> dict:
     # Bundled into the packaged backend by build_and_package.bat's
@@ -114,6 +124,16 @@ def on_startup():
     except Exception:
         logger.exception("Pre-update backup failed")
     create_db_and_tables()
+    try:
+        with Session(engine) as session:
+            herding.ensure_standard_programs(session)  # clients from before the master program existed
+    except Exception:
+        logger.exception("Couldn't give the clients the standard herding program")
+    try:
+        with Session(engine) as session:
+            audit.prune(session)  # the activity log keeps a year, at most 100,000 lines
+    except Exception:
+        logger.exception("Couldn't tidy the activity log")
     start_scheduler(database_file_path())
     try:
         devices.start_if_enabled(app)  # the phone connection, if Settings -> Phones had it on
@@ -124,6 +144,16 @@ def on_startup():
 @app.on_event("shutdown")
 def on_shutdown():
     devices.SERVER.stop()
+
+@app.get("/local-check")
+def local_check(request: Request):
+    """For the launcher: does this backend want the per-launch secret, and is the one sent the right one?
+    (Open to everyone - it only answers about the secret it was given, never reveals it.)"""
+    import hmac
+    wanted = configured_secret()
+    given = request.headers.get("x-local-secret", "")
+    return {"secret_required": bool(wanted), "match": (not wanted) or hmac.compare_digest(given.encode(), wanted.encode())}
+
 
 @app.get("/")
 def read_root():

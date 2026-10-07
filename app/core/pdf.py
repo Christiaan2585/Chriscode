@@ -16,7 +16,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas as pdf_canvas
 from reportlab.platypus import Flowable, Image, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from app.core.documents import document_totals, line_amounts
+from app.core.documents import document_totals, line_amounts, price_pair
 
 CURRENCY = "R"  # ZAR
 
@@ -392,7 +392,7 @@ def _fit_image(data, box):
     return Image(io.BytesIO(data), width=w * scale, height=h * scale)
 
 
-def _catalogue_card(product, picture, width, price_note, order_form=False):
+def _catalogue_card(product, picture, width, vat_rate, order_form=False):
     box = 24 * mm
     pic = _fit_image(picture, box) if picture else ""
     meta = " · ".join(_text(v) for v in (
@@ -405,7 +405,9 @@ def _catalogue_card(product, picture, width, price_note, order_form=False):
         text.append(Paragraph(meta, _CAT["meta"]))
     if product.description:
         text.append(Paragraph(_text(product.description), _CAT["desc"]))
-    text.append(Paragraph(f"{money(product.price)} <font size=7 color='#6b7280'>{price_note}</font>", _CAT["price"]))
+    excl, incl = price_pair(product, vat_rate)
+    text.append(Paragraph(f"{money(incl)} <font size=7 color='#6b7280'>incl. VAT</font>", _CAT["price"]))
+    text.append(Paragraph(f"{money(excl)} excl. VAT", _CAT["meta"]))
     if product.in_stock is False:
         text.append(Paragraph("Out of stock", _CAT["stock"]))
     if order_form:
@@ -447,7 +449,6 @@ def generate_catalogue_pdf(business, groups, order_for=None):
                    colWidths=[28 * mm, width - 28 * mm])
     header.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (0, 0), 0)]))
 
-    price_note = "incl. VAT" if business.vat_registered else ""
     story = [header, Spacer(1, 6 * mm)]
     if order_for is not None:
         send_to = " or ".join(v for v in (
@@ -467,7 +468,7 @@ def generate_catalogue_pdf(business, groups, order_for=None):
         bar = Table([[Paragraph(_text(category), _CAT["section"])]], colWidths=[width])
         bar.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), BRAND), ("TOPPADDING", (0, 0), (-1, -1), 4),
                                  ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
-        cards = [_catalogue_card(p, pic, half, price_note, order_for is not None) for p, pic in items]
+        cards = [_catalogue_card(p, pic, half, business.vat_rate, order_for is not None) for p, pic in items]
         rows = [cards[i:i + 2] + [""] * (2 - len(cards[i:i + 2])) for i in range(0, len(cards), 2)]
         grid = Table(rows, colWidths=[half + 3, half + 3])
         grid.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),

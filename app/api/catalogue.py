@@ -5,12 +5,13 @@ get the priced book (and a client's order form)."""
 import re
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import Response
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from app.api.business import get_business
+from app.core import catalogue_library as lib
 from app.core import kyron_catalogue as kc
 from app.core.db import get_session
 from app.core.pdf import _logo_bytes
@@ -158,3 +159,52 @@ def kyron_pdf(lang: Language, client_id: Optional[int] = None, session: Session 
     name = f"order-form-{re.sub(r'[^a-z0-9]+', '-', client.name.lower()).strip('-')}" if client else "catalogue"
     return Response(content=pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f"attachment; filename={name}-{lang}.pdf"})
+
+
+# --- More than one catalogue: extra PDFs, each added below the others ---
+
+class RenameRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+@router.get("/library")
+def read_library():
+    return lib.list_catalogues()
+
+
+@router.post("/library", dependencies=[Depends(require_admin)])
+async def add_to_library(file: UploadFile = File(...), name: Optional[str] = Form(None)):
+    data = await file.read(MAX_BOOK_BYTES + 1)
+    if len(data) > MAX_BOOK_BYTES:
+        raise HTTPException(status_code=413, detail="That PDF is over 60 MB")
+    try:
+        return lib.add_catalogue(data, file.filename, name)
+    except lib.LibraryError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/library/{catalogue_id}.pdf")
+def library_pdf(catalogue_id: str):
+    path = lib.pdf_path(catalogue_id)
+    entry = next((e for e in lib.list_catalogues() if e["id"] == catalogue_id), None)
+    if path is None or entry is None:
+        raise HTTPException(status_code=404, detail="That catalogue isn't in the list")
+    safe = re.sub(r"[^\w .,()&'-]+", "", entry["name"]).strip() or "Catalogue"
+    return FileResponse(path, media_type="application/pdf", filename=f"{safe}.pdf")
+
+
+@router.patch("/library/{catalogue_id}", dependencies=[Depends(require_admin)])
+def rename_in_library(catalogue_id: str, data: RenameRequest):
+    try:
+        return lib.rename_catalogue(catalogue_id, data.name)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="That catalogue isn't in the list")
+    except lib.LibraryError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.delete("/library/{catalogue_id}", dependencies=[Depends(require_admin)])
+def delete_from_library(catalogue_id: str):
+    if not lib.remove_catalogue(catalogue_id):
+        raise HTTPException(status_code=404, detail="That catalogue isn't in the list")
+    return {"ok": True}

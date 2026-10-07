@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session, select, func
 from typing import Dict
 from app.core.db import get_session
+from app.core import dashboard
 from app.models.invoice import Invoice
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
@@ -38,8 +39,9 @@ def get_revenue_by_month(months: int = 12, session: Session = Depends(get_sessio
     now = datetime.utcnow()
     start = _add_months(now.replace(day=1), -(months - 1))
 
+    # A year further back too, so every month can be shown beside the same month last year.
     paid_invoices = session.exec(
-        select(Invoice).where(Invoice.status == "paid", Invoice.date >= start)
+        select(Invoice).where(Invoice.status == "paid", Invoice.date >= _add_months(start, -12))
     ).all()
 
     totals_by_key = {}
@@ -55,5 +57,13 @@ def get_revenue_by_month(months: int = 12, session: Session = Depends(get_sessio
             "month": key,
             "label": month_date.strftime("%b %Y"),
             "revenue": round(totals_by_key.get(key, 0.0), 2),
+            "previous_year": round(totals_by_key.get(_add_months(month_date, -12).strftime("%Y-%m"), 0.0), 2),
         })
     return result
+
+
+@router.get("/dashboard")
+def get_dashboard(session: Session = Depends(get_session)):
+    """Money owed, quotes waiting, the "needs attention" list, program money and
+    the top clients and products - see app/core/dashboard.py."""
+    return dashboard.build_dashboard(session)

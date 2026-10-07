@@ -30,6 +30,7 @@ export function AuthProvider({ children }) {
   const [googleClientId, setGoogleClientId] = useState(null);
   const [googleEnabled, setGoogleEnabled] = useState(false);
   const [error, setError] = useState(null);
+  const [twoStepRequired, setTwoStepRequired] = useState(false); // the password was right; the app's 6-digit code is next
 
   const rememberedToken = () => localStorage.getItem(REMEMBER_TOKEN_KEY);
 
@@ -49,7 +50,8 @@ export function AuthProvider({ children }) {
     localStorage.setItem(REMEMBER_TOKEN_KEY, result.remember_token);
     rememberUser(result.user);
     setUser(result.user);
-    setScreen(result.user.has_pin ? 'app' : 'pin-setup');
+    // An admin-set temporary password has to be replaced before anything else.
+    setScreen(result.user.must_change_password ? 'change-password' : result.user.has_pin ? 'app' : 'pin-setup');
   }, []);
 
   const goToSignedOut = useCallback(() => {
@@ -87,7 +89,8 @@ export function AuthProvider({ children }) {
     try {
       return await fn(...args);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Something went wrong. Please try again.');
+      const detail = err.response?.data?.detail;
+      setError((typeof detail === 'string' ? detail : detail?.message) || 'Something went wrong. Please try again.');
       throw err;
     }
   };
@@ -97,10 +100,35 @@ export function AuthProvider({ children }) {
     persistSession(result);
   });
 
-  const login = withErrorHandling(async (email, password) => {
-    const result = await authService.login(email, password);
+  const login = async (email, password, code) => {
+    setError(null);
+    try {
+      const result = await authService.login(email, password, code);
+      setTwoStepRequired(false);
+      persistSession(result);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      if (detail && typeof detail === 'object' && detail.code === 'two_step_required') {
+        setTwoStepRequired(true); // not a failure: just ask for the code
+      } else {
+        setError((typeof detail === 'string' ? detail : detail?.message) || 'Something went wrong. Please try again.');
+      }
+      throw err;
+    }
+  };
+
+  // Changing the password signs every other computer and phone out; this one
+  // gets fresh tokens and carries on.
+  const changePassword = async (currentPassword, newPassword) => {
+    const result = await authService.changePassword(currentPassword, newPassword);
     persistSession(result);
-  });
+  };
+
+  // Signs this account out on every computer and phone, this one included.
+  const signOutEverywhere = async () => {
+    await authService.signOutEverywhere();
+    await forgetDevice();
+  };
 
   const googleSignIn = withErrorHandling(async () => {
     if (!googleClientId) throw new Error('Google sign-in is not configured yet.');
@@ -165,7 +193,11 @@ export function AuthProvider({ children }) {
       googleEnabled,
       isElectron: isElectron(),
       error,
+      twoStepRequired,
+      cancelTwoStep: () => { setTwoStepRequired(false); setError(null); },
       clearError: () => setError(null),
+      changePassword,
+      signOutEverywhere,
       setupFirstAccount,
       login,
       googleSignIn,
@@ -175,7 +207,7 @@ export function AuthProvider({ children }) {
       forgetDevice,
       refreshMe,
     }),
-    [screen, user, rememberedUser, googleEnabled, error]
+    [screen, user, rememberedUser, googleEnabled, error, twoStepRequired]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

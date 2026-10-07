@@ -12,6 +12,8 @@ import { toTelLink, toWhatsAppLink } from "../utils/contact";
 import Modal from "../components/Modal";
 import DocumentPreview from "../components/DocumentPreview";
 import HerdingProgramPanel from "../components/HerdingProgramPanel";
+import TaxCertificate from "../components/TaxCertificate";
+import ClientPrivacy from "../components/ClientPrivacy";
 import { loadedLanguages, useSupplierBook } from "../components/SupplierCatalogue";
 import { DocumentHover } from "../components/PreviewCards";
 import { downloadDocumentPdf, orderFormFor } from "../utils/documents";
@@ -326,6 +328,9 @@ const ClientDetail = () => {
             </div>
           </div>
 
+          <TaxCertificate clientId={id} clientName={farmLabel(client)} />
+          <ClientPrivacy client={client} />
+
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="text-lg font-semibold mb-4 border-b pb-2 flex items-center gap-2">
               <StickyNote size={18} className="text-emerald-600" /> Notes & Reminders
@@ -404,7 +409,7 @@ const ClientDetail = () => {
             </div>
           </div>
 
-          <HerdingProgramPanel clientId={id} clientName={client.name} />
+          <HerdingProgramPanel clientId={id} clientName={farmLabel(client)} />
         </div>
 
         {/* History */}
