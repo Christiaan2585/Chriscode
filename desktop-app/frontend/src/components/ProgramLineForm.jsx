@@ -17,6 +17,10 @@ const draftFrom = (line) => ({
   fixed_quantity: line?.fixed_quantity ?? "",
   category: line?.category || "",
   note: line?.note || "",
+  // What's agreed with the client - shared with the program's quote.
+  quantity_override: line?.quantity_override ?? "",
+  unit_price: line?.unit_price ?? "",
+  discount_percent: line?.discount_percent ?? "",
 });
 
 // A herding program's product line: which product, per animal (for which
@@ -47,6 +51,9 @@ const ProgramLineForm = ({ line, products, submitLabel = "Save", onSubmit, onCan
         fixed_quantity: fixed ? number(draft.fixed_quantity) : null,
         category: draft.category.trim() || null,
         note: draft.note.trim() || null,
+        quantity_override: number(draft.quantity_override),
+        unit_price: number(draft.unit_price),
+        discount_percent: number(draft.discount_percent),
       });
     } finally {
       setSaving(false);
@@ -98,6 +105,26 @@ const ProgramLineForm = ({ line, products, submitLabel = "Save", onSubmit, onCan
           ))}
         </fieldset>
       )}
+
+      <fieldset className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+        <legend className="sr-only">Agreed with the client (on the quote)</legend>
+        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">On the quote</span>
+        <label className="flex items-center gap-2">
+          Packs
+          <input type="number" min="0" step="any" placeholder="worked out" className={`${inputClass} w-28`}
+            value={draft.quantity_override} onChange={set("quantity_override")} />
+        </label>
+        <label className="flex items-center gap-2">
+          Price per pack excl VAT
+          <input type="number" min="0" step="0.01" placeholder={chosen ? String(chosen.price_excl_vat ?? chosen.price ?? "") : "product price"}
+            className={`${inputClass} w-32`} value={draft.unit_price} onChange={set("unit_price")} />
+        </label>
+        <label className="flex items-center gap-2">
+          Discount %
+          <input type="number" min="0" max="100" step="any" placeholder="0" className={`${inputClass} w-20`}
+            value={draft.discount_percent} onChange={set("discount_percent")} />
+        </label>
+      </fieldset>
 
       <div className="flex flex-wrap items-center gap-2">
         <input aria-label="Note" placeholder="Note, e.g. onderhuids" className={`${inputClass} min-w-[12rem] flex-1`}

@@ -11,13 +11,14 @@ import { useAuth } from "../context/AuthContext";
 import { PictureField, ProductPictureViewer, ProductThumb, savePictureChange, useProductThumbnails } from "../components/ProductPicture";
 import { money } from "../utils/format";
 import { categoryOf, isActive, isInStock, recomputeFromCost } from "../utils/products";
+import { PREF_KEYS } from "../utils/preferences";
 
 const emptyProduct = {
   name: "", price: "", unit: "unit", dosage: 0, description: "", in_stock: true, is_active: true,
   code: "", category: "", pack_size: "", packaging: "", cost: "", price_excl_vat: "",
 };
 
-const VIEW_KEY = "sandveld_products_view";
+const VIEW_KEY = PREF_KEYS.productsView;
 const savedView = () => {
   try {
     return localStorage.getItem(VIEW_KEY) === "table" ? "table" : "catalog";

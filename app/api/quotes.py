@@ -8,7 +8,7 @@ from app.core.dates import coerce_datetime
 from app.models.quote import Quote
 from app.models.quote_item import QuoteItem
 from app.models.program import HerdingProgram
-from app.core import herding
+from app.core import herding, program_quote
 from app.models.client import Client
 from app.core.security import get_current_user
 from app.models.user import User
@@ -131,6 +131,9 @@ def delete_quote(quote_id: int, session: Session = Depends(get_session)):
     quote = session.get(Quote, quote_id)
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found")
+    if program_quote.program_for_quote(session, quote):
+        raise HTTPException(status_code=409, detail="This is a herding program's own quote - it goes with the "
+                                                    "program (delete the program to remove it)")
     # Remove line items first so we don't leave orphaned rows behind
     # (matches how delete_invoice handles InvoiceItem).
     statement = select(QuoteItem).where(QuoteItem.quote_id == quote_id)
@@ -146,7 +149,10 @@ def add_quote_item(quote_id: int, item: QuoteItem, session: Session = Depends(ge
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found")
     item.quote_id = quote_id
-    item.program_step_id = None  # a line added by hand prints under "Other items" on a program quote
+    item.program_step_id = item.program_line_id = None  # only the program sets these
+    program = program_quote.program_for_quote(session, quote)
+    if program is not None:  # the program's own quote: the line goes into the program too
+        return program_quote.add_line(session, program, item)
     price_line(session, item)
     session.add(item)
     session.flush()
@@ -166,6 +172,10 @@ def delete_quote_item(item_id: int, session: Session = Depends(get_session)):
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     quote = session.get(Quote, item.quote_id)
+    program = program_quote.program_for_quote(session, quote) if quote else None
+    if program is not None:  # the program's own quote: the line leaves the program too
+        program_quote.remove_line(session, program, item)
+        return {"ok": True}
     session.delete(item)
     session.flush()
     if quote:

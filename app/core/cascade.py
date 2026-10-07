@@ -55,10 +55,15 @@ def delete_animal(session: Session, animal: Animal) -> None:
 
 
 def delete_client(session: Session, client: Client) -> None:
+    programs = _rows(session, HerdingProgram, HerdingProgram.client_id, client.id)
+    # A herding program's own quote that's still a Draft was never sent, so it
+    # goes with the program rather than counting as a financial record.
+    draft_program_quotes = {q.id for p in programs if p.quote_id and (q := session.get(Quote, p.quote_id)) and q.status == "Draft"}
     financial = [
         _plural(len(rows), label)
         for model, label in ((Invoice, "invoice"), (Quote, "quote"), (Order, "order"))
-        if (rows := _rows(session, model, model.client_id, client.id))
+        if (rows := [r for r in _rows(session, model, model.client_id, client.id)
+                     if not (model is Quote and r.id in draft_program_quotes)])
     ]
     if financial:
         raise InUseError(
@@ -68,7 +73,12 @@ def delete_client(session: Session, client: Client) -> None:
 
     for animal in _rows(session, Animal, Animal.client_id, client.id):
         delete_animal(session, animal)
-    for program in _rows(session, HerdingProgram, HerdingProgram.client_id, client.id):
+    for quote_id in draft_program_quotes:
+        for row in _rows(session, QuoteItem, QuoteItem.quote_id, quote_id):
+            session.delete(row)
+        session.delete(session.get(Quote, quote_id))
+    for program in programs:
+        program.quote_id = None
         for model in (AnimalGroup, ProgramAssignment, ProgramStepProgress):
             for row in _rows(session, model, model.program_id, program.id):
                 session.delete(row)

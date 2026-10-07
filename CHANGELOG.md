@@ -7,12 +7,11 @@ All notable changes to Sandveld Vee Dienste. Newest first.
 ### New
 - **Android app (first version)**: the same app on staff phones, connected to the office PC over the Wi-Fi. Pair a phone under Settings -> Phones on the PC; the phone asks before pairing and only pairs with an office-network address. Ticking program steps and new quotes are kept on the phone while it's away from the office Wi-Fi, and sent when it's back.
 - **Works on small screens**: on a phone or narrow window the menu slides in from a ☰ button, and wide lists scroll sideways instead of being cut off.
-- **Herding programs and quotes work together**:
-  - "Quote the whole program" in a client's program, or tick products as before.
-  - Quotes page -> **From herding program**: pick the client, the program and the steps.
-  - A program's quote stays linked to it: the program lists its quotes, and each step shows which quote it's on and whether it's Draft, Sent or Accepted.
-  - The quote PDF lists the products under each program step and date.
-  - **Update from program** works a Draft or Sent quote out again after doses, animal numbers or prices change. Accepted quotes are never changed.
+- **Herding programs and quotes are one**: every client's herding program is also their quote for the year - one menu item, **Programs & Quotes**.
+  - The quote is made automatically and always matches the program: change a dose, an animal number, a price or a product on either side and both change.
+  - Agreed packs, price and discount per product, shown on the program and on the quote.
+  - Accepting the quote locks the program; each treatment date is then invoiced from the agreed lines with one click.
+  - The quote PDF lists the products under each program date.
 - **A client's herding program now looks like the "Ent en doseer kostes" sheet**, on its own page:
   - animals, client details and DEKTYD/LAMTYD at the top;
   - the sheet's columns (DATUM, TYD, PRODUK, VERPAK, PRYS EXCL VAT, DOSERING, PRODUK TOTAAL, TOTAAL R);
@@ -21,8 +20,11 @@ All notable changes to Sandveld Vee Dienste. Newest first.
   - the Kudde program's notes as a small fold-open line under each date.
 - **Excel per client**: download a client's program as an Excel sheet in the same layout (it still calculates in Excel), and import a filled-in sheet back into that client's program.
 - The Costs PDF is grouped in the same sections.
+- **Auto-lock**: the app locks itself (PIN to carry on) after 2, 3, 5, 10, 15, 20, 25 or 30 minutes of nobody using it, or Off. Set under Settings -> Security & Auto-Lock; kept per computer/phone, on at 10 minutes to begin with.
+- **Settings looks like the iPhone's Settings app**: a list (with search and your profile on top) and the page beside it - on a phone, the list first and a "Settings" back button. General, Security & Auto-Lock and Company details, then one entry per department (Clients, Programs & Quotes, Products, Orders, Invoices, Purchase Orders, Calendar, Weather, Product Calc), then Phones, Data & Backups and Legal.
 
 ### Changed
+- Quote validity, VAT, payment terms and document numbering moved from one big company form to the department they belong to.
 - The client page no longer shows Registered Animals (animal records are kept).
 
 ### Security

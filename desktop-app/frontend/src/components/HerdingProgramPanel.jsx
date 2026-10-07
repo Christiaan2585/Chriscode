@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClipboardList, Trash2 } from "lucide-react";
 import apiClient from "../api/client";
 import Modal from "./Modal";
-import { money } from "../utils/format";
+import SearchableSelect from "./SearchableSelect";
+import { money, statusStyle } from "../utils/format";
 import { GROUPS, STEP_STATUS, dayLabel, isMonday, ruleText, toInputDate } from "../utils/herding";
 
 export const inputClass =
@@ -211,6 +212,13 @@ const ProgramCard = ({ program, onOpen, onDelete }) => {
               <StatusChip status={next.status} /> {next.stage || ruleLabel(next)} - {dayLabel(next.date)}
             </span>
           )}
+          {data?.quote && (
+            <span className="mt-1 flex flex-wrap items-center gap-1 text-xs text-slate-600">
+              Quote {data.quote.number}
+              <span className={`rounded-full px-2 py-0.5 font-medium ${statusStyle(data.quote.status)}`}>{data.quote.status}</span>
+              {money(data.quote.grand_total)} incl VAT
+            </span>
+          )}
           {progress?.total > 0 && (
             <span className="mt-1 block text-xs text-slate-500">
               {progress.done} of {progress.total} steps done
@@ -236,6 +244,52 @@ const ProgramCard = ({ program, onOpen, onDelete }) => {
   );
 };
 
+// "New herding program" - from a client's page (clientId given) or from
+// Programs & Quotes (pick the client). The program comes with its own quote,
+// so it opens straight on its page.
+export const NewProgramDialog = ({ isOpen, onClose, clientId = null, clients = [] }) => {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { data: template } = useTemplate();
+  const [pickedClient, setPickedClient] = useState("");
+  const forClient = clientId || pickedClient;
+  const create = useMutation({
+    mutationFn: async ({ form, counts }) => {
+      const created = (await apiClient.post("/programs/", { ...programPayload(form), client_id: Number(forClient) })).data;
+      await apiClient.put(`/programs/${created.id}/counts`, countsPayload(counts));
+      return created;
+    },
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ["programs", "client", String(forClient)] });
+      queryClient.invalidateQueries({ queryKey: ["program-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      onClose();
+      navigate(`/programs/${created.id}`); // pages/ProgramSheet.jsx
+    },
+  });
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="New herding program" size="lg">
+      {isOpen && (
+        <div className="space-y-4">
+          {!clientId && (
+            <div>
+              <span className="mb-1 block text-sm font-medium text-slate-700">Client</span>
+              <SearchableSelect value={pickedClient} onChange={setPickedClient} placeholder="Choose a client…"
+                searchPlaceholder="Search clients…" options={clients.map((c) => ({ value: c.id, label: c.name, sublabel: c.farm_name }))} />
+            </div>
+          )}
+          {forClient ? (
+            <ProgramForm initial={formFrom(null)} settings={template?.settings} withCounts
+              submitting={create.isPending} onSubmit={(form, counts) => create.mutate({ form, counts })} onCancel={onClose} />
+          ) : (
+            <p className="text-sm text-slate-500">Choose the client first.</p>
+          )}
+        </div>
+      )}
+    </Modal>
+  );
+};
+
 // The client page's "Herding Programs" card.
 const HerdingProgramPanel = ({ clientId }) => {
   const queryClient = useQueryClient();
@@ -244,29 +298,14 @@ const HerdingProgramPanel = ({ clientId }) => {
     queryKey: key,
     queryFn: async () => (await apiClient.get(`/programs/client/${clientId}`)).data,
   });
-  const { data: template } = useTemplate();
   const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
-  const open = (programId) => navigate(`/programs/${programId}`); // pages/ProgramSheet.jsx
-
-  const create = useMutation({
-    mutationFn: async ({ form, counts }) => {
-      const created = (await apiClient.post("/programs/", { ...programPayload(form), client_id: Number(clientId) })).data;
-      await apiClient.put(`/programs/${created.id}/counts`, countsPayload(counts));
-      return created;
-    },
-    onSuccess: (created) => {
-      queryClient.invalidateQueries({ queryKey: key });
-      queryClient.invalidateQueries({ queryKey: ["program-calendar"] });
-      setCreating(false);
-      open(created.id);
-    },
-  });
   const remove = useMutation({
     mutationFn: (programId) => apiClient.delete(`/programs/${programId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: key });
       queryClient.invalidateQueries({ queryKey: ["program-calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["quotes"] });
     },
   });
 
@@ -286,19 +325,12 @@ const HerdingProgramPanel = ({ clientId }) => {
       ) : (
         <div className="space-y-3">
           {programs.map((p) => (
-            <ProgramCard key={p.id} program={p} onOpen={() => open(p.id)}
-              onDelete={() => { if (window.confirm(`Delete program "${p.name}"? This can't be undone.`)) remove.mutate(p.id); }} />
+            <ProgramCard key={p.id} program={p} onOpen={() => navigate(`/programs/${p.id}`)}
+              onDelete={() => { if (window.confirm(`Delete program "${p.name}"? Its quote goes too while it's still a draft. This can't be undone.`)) remove.mutate(p.id); }} />
           ))}
         </div>
       )}
-
-      <Modal isOpen={creating} onClose={() => setCreating(false)} title="New herding program" size="lg">
-        {creating && (
-          <ProgramForm initial={formFrom(null)} settings={template?.settings} withCounts
-            submitting={create.isPending} onSubmit={(form, counts) => create.mutate({ form, counts })}
-            onCancel={() => setCreating(false)} />
-        )}
-      </Modal>
+      <NewProgramDialog isOpen={creating} onClose={() => setCreating(false)} clientId={clientId} />
     </div>
   );
 };

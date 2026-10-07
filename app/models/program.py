@@ -42,6 +42,9 @@ class HerdingProgram(SQLModel, table=True):
     weaning_rule: Optional[str] = None  # "age" (lambing + weaning_months) or "fixed" (mating + weaning_days)
     weaning_months: Optional[int] = None
     weaning_days: Optional[int] = None
+    # The program's own quote (2026-10-07): one per program, kept in step with
+    # it by app/core/program_quote.py - the program and its quote are one thing.
+    quote_id: Optional[int] = Field(default=None, foreign_key="quote.id")
 
 
 class ProgramTemplate(SQLModel, table=True):
@@ -80,6 +83,7 @@ class ProgramStep(SQLModel, table=True):
     done_at: Optional[datetime] = None  # a copy ticked off
     origin: Optional[str] = None  # "kudde" / "cost" - which sheet made a master step
     section: Optional[str] = None  # the cost sheet's section (herding.SECTIONS); NULL = worked out from the animals
+    invoice_id: Optional[int] = Field(default=None, foreign_key="invoice.id")  # this date's invoice, once the quote is accepted
 
 
 class ProgramStepProduct(SQLModel, table=True):
@@ -98,6 +102,12 @@ class ProgramStepProduct(SQLModel, table=True):
     fixed_quantity: Optional[float] = None
     source_line_id: Optional[int] = None  # a copy's master line
     origin: Optional[str] = None
+    # What's agreed with the client, shared with the program's quote: packs to
+    # sell (blank = worked out from dose x animals), price per pack excl VAT
+    # (blank = the product's price) and a discount.
+    quantity_override: Optional[float] = None
+    unit_price: Optional[float] = None
+    discount_percent: Optional[float] = None
 
 
 class ProgramStepProgress(SQLModel, table=True):

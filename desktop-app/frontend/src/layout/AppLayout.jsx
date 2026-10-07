@@ -10,14 +10,14 @@ import ThemeToggle from "../components/ThemeToggle";
 import PoweredBy from "../components/PoweredBy";
 import Avatar from "../components/Avatar";
 import OutboxBadge from "../components/OutboxBadge";
+import AutoLock from "../components/AutoLock";
 
 const NAV = [
   { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
   { to: "/clients", label: "Clients", Icon: Users },
-  { to: "/programs", label: "Herding Program", Icon: ClipboardList },
   { to: "/calendar", label: "System Calendar", Icon: Calendar },
   { to: "/weather", label: "Weather", Icon: CloudSun },
-  { to: "/quotes", label: "Quotes", Icon: FileText },
+  { to: "/programs", label: "Programs & Quotes", Icon: ClipboardList },
   { to: "/orders", label: "Orders", Icon: ShoppingCart },
   { to: "/products", label: "Products", Icon: Package },
   { to: "/calculator", label: "Product Calc", Icon: Calculator },
@@ -43,6 +43,7 @@ const AppLayout = () => {
 
   return (
     <div className="app-bg flex h-screen bg-slate-50 text-slate-900 font-sans">
+      <AutoLock />
       {navOpen && (
         <button type="button" aria-label="Close the menu" onClick={() => setNavOpen(false)}
           className="fixed inset-0 z-30 bg-slate-900/50 md:hidden" />

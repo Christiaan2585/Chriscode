@@ -50,7 +50,8 @@ const App = ({ initiallyPaired = false }) => {
                   <Route path="animals" element={<Animals />} />
                   <Route path="products" element={<Products />} />
                   <Route path="herds" element={<Herds />} />
-                  <Route path="programs" element={<Programs />} />
+                  <Route path="programs" element={<Quotes />} />
+                  <Route path="programs/master" element={<Programs />} />
                   <Route path="programs/:programId" element={<ProgramSheet />} />
                   <Route path="calendar" element={<Calendar />} />
                   <Route path="weather" element={<Weather />} />
@@ -60,6 +61,7 @@ const App = ({ initiallyPaired = false }) => {
                   <Route path="invoices" element={<Invoices />} />
                   <Route path="purchase-orders" element={<PurchaseOrders />} />
                   <Route path="settings" element={<Settings />} />
+                  <Route path="settings/:section" element={<Settings />} />
                 </Route>
               </Routes>
             </BrowserRouter>

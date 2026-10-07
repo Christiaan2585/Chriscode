@@ -113,7 +113,8 @@ def ordered_steps(session: Session, program_id: int | None = None) -> list:
 
 
 _COPIED_STEP_FIELDS = ("sort_order", "anchor", "offset_days", "section", *TEXT_FIELDS)
-_COPIED_LINE_FIELDS = ("product_id", "animal_group", "dose", "note", "category", "fixed_quantity")
+_COPIED_LINE_FIELDS = ("product_id", "animal_group", "dose", "note", "category", "fixed_quantity",
+                       "quantity_override", "unit_price", "discount_percent")
 
 
 def copy_master_into(session: Session, program: HerdingProgram, done: dict | None = None) -> None:
@@ -235,8 +236,14 @@ def schedule(session: Session, program: HerdingProgram, today: date | None = Non
         lines = []
         for line, product in products.get(step.id, []):
             head = headcount(groups, line.animal_group)
-            price = price_excl_vat(product, settings)
+            # What's agreed with the client (shared with the program's quote) wins.
+            price = line.unit_price if line.unit_price is not None else price_excl_vat(product, settings)
             costs = line_costs(product, line.dose, head, line.fixed_quantity, price)
+            if line.quantity_override is not None:
+                costs["buy"], costs["cost_buy"] = line.quantity_override, round(line.quantity_override * price, 2)
+            if line.discount_percent:
+                keep = 1 - line.discount_percent / 100
+                costs["cost_used"], costs["cost_buy"] = round(costs["cost_used"] * keep, 2), round(costs["cost_buy"] * keep, 2)
             lines.append({**line.model_dump(), "product_name": product.name, "unit": product.unit,
                           "pack_size": product.pack_size, "price": product.price, "price_excl_vat": price,
                           "head": head, **costs})

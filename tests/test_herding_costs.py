@@ -250,15 +250,13 @@ class ClientProgramTests(CostTestCase):
         self.assertNotIn(9, [l.dose for l in self.own_lines()])
 
     def test_quote_uses_whole_packs_and_the_medicine_box_quantity(self):
-        self.schedule()
+        out = programs.program_schedule(self.prog.id, session=self.s)
         lines = self.own_lines()
         box = next(l for l in lines if l.fixed_quantity)
         first_vaccine = next(l for l in lines if l.dose == 1.5)
-        result = programs.quote_from_program(self.prog.id, programs.ProgramQuoteRequest(line_ids=[box.id, first_vaccine.id]),
-                                             session=self.s, user=self.user)
-        items = self.s.exec(select(QuoteItem).where(QuoteItem.quote_id == result["quote"].id)).all()
-        self.assertEqual(sorted((i.product_id, i.quantity) for i in items),
-                         sorted([(self.mineral.id, 2), (self.vaccine.id, 8)]))
+        items = {i.program_line_id: i for i in self.s.exec(select(QuoteItem).where(QuoteItem.quote_id == out["quote"]["id"])).all()}
+        self.assertEqual((items[box.id].product_id, items[box.id].quantity), (self.mineral.id, 2))
+        self.assertEqual((items[first_vaccine.id].product_id, items[first_vaccine.id].quantity), (self.vaccine.id, 8))
 
     def test_cost_pdf(self):
         response = programs.program_cost_pdf(self.prog.id, session=self.s)

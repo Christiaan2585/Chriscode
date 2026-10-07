@@ -18,11 +18,11 @@ import {
   primary, programPayload, ruleLabel, secondary, useProducts, useSchedule,
 } from "../components/HerdingProgramPanel";
 import { saveBlob } from "../utils/documents";
-import { money, shortDate, statusStyle } from "../utils/format";
+import { money, statusStyle } from "../utils/format";
 import { GROUPS, SECTIONS, TEXT_COLUMNS, amount, dayLabel } from "../utils/herding";
 
 const COLUMNS = ["DATUM", "TYD", "PRODUK", "VERPAK", "PRYS EXCL VAT", "DOSERING ml / Dier", "PRODUK TOTAAL", "TOTAAL R"];
-const SPAN = COLUMNS.length + 2; // + the quote tick and the actions column
+const SPAN = COLUMNS.length + 1; // + the actions column
 const num = "whitespace-nowrap px-2 py-1.5 text-right tabular-nums";
 const CLIENT_ROWS = [["Business", "farm_name"], ["Name", "name"], ["Address", "address"], ["Email", "email"],
   ["Cell", "phone"], ["VAT no", "vat_number"]];
@@ -65,20 +65,22 @@ const ProgramSheet = () => {
     queryFn: () => clientService.getById(clientId),
     enabled: Boolean(clientId),
   });
-  const [selected, setSelected] = useState(() => new Set());
   const [editing, setEditing] = useState(false);
   const [counts, setCounts] = useState(null);
   const [lineForm, setLineForm] = useState(null); // {stepId} to add, {lineId} to change
   const [newStep, setNewStep] = useState(null);
-  const [result, setResult] = useState(null); // last quote / import result
+  const [result, setResult] = useState(null); // last import / invoice result
   const [preview, setPreview] = useState(null);
   const fileInput = useRef(null);
 
   const base = `/programs/${programId}`;
+  // The program and its quote are one thing: every change refreshes both.
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["program-schedule", programId] });
     queryClient.invalidateQueries({ queryKey: ["programs", "client", String(clientId)] });
     queryClient.invalidateQueries({ queryKey: ["program-calendar"] });
+    queryClient.invalidateQueries({ queryKey: ["quotes"] });
+    queryClient.invalidateQueries({ queryKey: ["document-pdf", "quote"] });
   };
   // Failures already show as a toast (api/client.js); true when it worked.
   const run = async (request) => {
@@ -118,21 +120,19 @@ const ProgramSheet = () => {
   });
   const reset = useMutation({
     mutationFn: () => apiClient.post(`${base}/reset`),
-    onSuccess: () => { setSelected(new Set()); refresh(); },
+    onSuccess: refresh,
   });
-  const quotesChanged = (r) => {
-    setResult(r);
-    refresh();
-    queryClient.invalidateQueries({ queryKey: ["quotes"] });
-    queryClient.invalidateQueries({ queryKey: ["document-pdf", "quote", r.quote.id] });
-  };
-  const makeQuote = useMutation({
-    mutationFn: async (lineIds) => (await apiClient.post(`${base}/quote`, { line_ids: lineIds })).data,
-    onSuccess: (r) => { setSelected(new Set()); quotesChanged({ ...r, kind: "made" }); },
+  const setStatus = useMutation({
+    mutationFn: (status) => apiClient.put(`${base}/quote/status`, { status }),
+    onSettled: refresh,
   });
-  const updateQuote = useMutation({
-    mutationFn: async (quoteId) => (await apiClient.post(`${base}/quotes/${quoteId}/refresh`)).data,
-    onSuccess: (r) => quotesChanged({ ...r, kind: "updated" }),
+  const makeInvoice = useMutation({
+    mutationFn: async (stepId) => (await apiClient.post(`${base}/steps/${stepId}/invoice`)).data,
+    onSuccess: (invoice) => {
+      setResult({ kind: "invoiced", invoice });
+      refresh();
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
   });
   const downloadSheet = useMutation({
     mutationFn: async () => (await apiClient.get(`${base}/sheet.xlsx`, { responseType: "blob" })).data,
@@ -144,14 +144,9 @@ const ProgramSheet = () => {
       form.append("file", file);
       return (await apiClient.post(`${base}/sheet`, form, { headers: { "Content-Type": "multipart/form-data" } })).data;
     },
-    onSuccess: (r) => { setSelected(new Set()); setResult({ ...r, kind: "imported" }); refresh(); },
+    onSuccess: (r) => { setResult({ ...r, kind: "imported" }); refresh(); },
   });
 
-  const toggle = (ids, on) => {
-    const next = new Set(selected);
-    ids.forEach((lineId) => (on ? next.add(lineId) : next.delete(lineId)));
-    setSelected(next);
-  };
   const saveLine = async (payload) => {
     const request = lineForm.lineId
       ? apiClient.patch(`${base}/lines/${lineForm.lineId}`, payload)
@@ -159,13 +154,11 @@ const ProgramSheet = () => {
     if (await run(request)) setLineForm(null);
   };
   const removeLine = (line) => {
-    if (!window.confirm(`Remove ${line.product_name} from this client's program?`)) return;
-    toggle([line.id], false);
+    if (!window.confirm(`Remove ${line.product_name} from this client's program and its quote?`)) return;
     run(apiClient.delete(`${base}/lines/${line.id}`));
   };
   const removeStep = (step) => {
-    if (!window.confirm(`Remove "${step.stage || ruleLabel(step)}" and its products from this client's program?`)) return;
-    toggle(step.products.map((l) => l.id), false);
+    if (!window.confirm(`Remove "${step.stage || ruleLabel(step)}" and its products from this client's program and its quote?`)) return;
     run(apiClient.delete(`${base}/steps/${step.id}`));
   };
   const addStep = async (e) => {
@@ -178,7 +171,8 @@ const ProgramSheet = () => {
   };
 
   if (isLoading || !data) return <div className="p-8 text-center">Loading the program…</div>;
-  const { program, groups, steps, sections, anchors, totals, progress } = data;
+  const { program, groups, steps, sections, anchors, totals, progress, quote } = data;
+  const locked = Boolean(quote?.locked); // accepted: the agreed products and amounts can't change
   const byId = Object.fromEntries(steps.map((s) => [s.id, s]));
   // Kudde program steps (no products, no section) show as notes under the
   // sheet's row on the same date; the rest are listed at the end.
@@ -186,24 +180,16 @@ const ProgramSheet = () => {
   const sheetDates = new Set(steps.filter((s) => s.section && s.date).map((s) => s.date));
   const notesFor = (step) => [step, ...(step.date ? noteSteps.filter((n) => n.date === step.date && n.id !== step.id) : [])];
   const otherDates = noteSteps.filter((n) => !n.date || !sheetDates.has(n.date));
-  const allLineIds = steps.flatMap((s) => s.products.filter((l) => l.buy > 0).map((l) => l.id));
   const count = (name) => groups.find((g) => g.animal_type.trim().toLowerCase() === name.toLowerCase())?.group_size ?? 0;
   const title = `${client?.name || ""} - ${program.name}`;
 
   const stepRows = (step) => {
     const notes = notesFor(step);
     const doneIds = notes.filter((n) => n.status !== "none").map((n) => n.id);
-    const lineIds = step.products.filter((l) => l.buy > 0).map((l) => l.id);
-    const allOn = lineIds.length > 0 && lineIds.every((id) => selected.has(id));
+    const agreed = step.products.some((l) => l.buy > 0);
     return (
       <Fragment key={step.id}>
         <tr className="border-t border-slate-200 bg-slate-50 align-top">
-          <td className="px-2 py-1.5">
-            {lineIds.length > 0 && (
-              <input type="checkbox" aria-label="Tick every product on this date" className="h-4 w-4 accent-emerald-600"
-                checked={allOn} onChange={() => toggle(lineIds, !allOn)} />
-            )}
-          </td>
           <td className="w-36 px-2 py-1.5">
             <StepDate key={`${step.date}`} step={step} onSave={(changes) => patchStep(step.id, changes)} />
           </td>
@@ -214,10 +200,17 @@ const ProgramSheet = () => {
                   onSave={(v) => patchStep(step.id, { stage: v })} />
               </span>
               {step.status !== "none" && <StatusChip status={step.status} />}
-              {step.quotes.map((q) => (
-                <span key={q.id} title={`On quote ${q.number} (${q.status})`}
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusStyle(q.status)}`}>{q.number} · {q.status}</span>
-              ))}
+              {step.invoice ? (
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusStyle(step.invoice.status)}`}>
+                  Invoice {step.invoice.number} · {step.invoice.status}
+                </span>
+              ) : locked && agreed && (
+                <button type="button" disabled={makeInvoice.isPending} onClick={() => {
+                  if (window.confirm(`Make the invoice for "${step.stage || ruleLabel(step)}" from the accepted quote?`)) makeInvoice.mutate(step.id);
+                }} className="flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-medium text-white hover:bg-emerald-700">
+                  <FileText size={12} /> Make invoice
+                </button>
+              )}
             </div>
             <Notes steps={notes} />
           </td>
@@ -232,8 +225,10 @@ const ProgramSheet = () => {
             )}
           </td>
           <td className="px-2 py-1.5 text-right">
-            <button type="button" onClick={() => removeStep(step)} aria-label="Remove this date" title="Remove this date"
-              className="p-1 text-slate-400 hover:text-red-600"><Trash2 size={14} /></button>
+            {!(locked && step.products.length) && (
+              <button type="button" onClick={() => removeStep(step)} aria-label="Remove this date" title="Remove this date"
+                className="p-1 text-slate-400 hover:text-red-600"><Trash2 size={14} /></button>
+            )}
           </td>
         </tr>
         {step.products.map((line) => (lineForm?.lineId === line.id ? (
@@ -242,10 +237,6 @@ const ProgramSheet = () => {
           </td></tr>
         ) : (
           <tr key={line.id} className="align-top">
-            <td className="px-2 py-1.5">
-              <input type="checkbox" aria-label={`Add ${line.product_name} to a quote`} className="h-4 w-4 accent-emerald-600"
-                disabled={!line.buy} checked={selected.has(line.id)} onChange={(e) => toggle([line.id], e.target.checked)} />
-            </td>
             <td />
             <td className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">{line.category}</td>
             <td className="px-2 py-1.5">
@@ -253,22 +244,32 @@ const ProgramSheet = () => {
               {line.note && <span className="block text-xs text-slate-500">{line.note}</span>}
             </td>
             <td className={num}>{line.pack_size ? `${amount(line.pack_size)} ${line.unit || ""}` : ""}</td>
-            <td className={num}>{money(line.price_excl_vat)}</td>
+            <td className={num} title={line.unit_price != null ? "Agreed price" : "The product's price"}>
+              {money(line.price_excl_vat)}{line.unit_price != null && <span className="block text-[11px] text-emerald-700">agreed</span>}
+            </td>
             <td className={num}>
               {line.fixed_quantity ? `x ${amount(line.fixed_quantity)}` : line.dose ? `${amount(line.dose)} ${line.unit || ""}` : "—"}
               {!line.fixed_quantity && (
                 <span className="block whitespace-normal text-[11px] text-slate-400">{line.animal_group || "All animals"} ({amount(line.head)})</span>
               )}
             </td>
-            <td className={num} title="Packs used (whole packs to buy)">
+            <td className={num} title="Packs used (whole packs on the quote)">
               {line.used.toFixed(2)}{line.buy !== line.used && <span className="text-slate-400"> ({amount(line.buy)})</span>}
+              {line.quantity_override != null && <span className="block text-[11px] text-emerald-700">agreed</span>}
             </td>
-            <td className={`${num} font-medium text-slate-800`}>{money(line.cost_used)}</td>
+            <td className={`${num} font-medium text-slate-800`}>
+              {money(line.cost_used)}
+              {line.discount_percent ? <span className="block text-[11px] font-normal text-emerald-700">less {amount(line.discount_percent)}%</span> : null}
+            </td>
             <td className="whitespace-nowrap px-2 py-1.5 text-right">
-              <button type="button" onClick={() => setLineForm({ lineId: line.id })} aria-label={`Change ${line.product_name}`}
-                title="Change" className="p-1 text-slate-400 hover:text-emerald-700"><Pencil size={14} /></button>
-              <button type="button" onClick={() => removeLine(line)} aria-label={`Remove ${line.product_name}`}
-                title="Remove" className="p-1 text-slate-400 hover:text-red-600"><X size={14} /></button>
+              {!locked && (
+                <>
+                  <button type="button" onClick={() => setLineForm({ lineId: line.id })} aria-label={`Change ${line.product_name}`}
+                    title="Change" className="p-1 text-slate-400 hover:text-emerald-700"><Pencil size={14} /></button>
+                  <button type="button" onClick={() => removeLine(line)} aria-label={`Remove ${line.product_name}`}
+                    title="Remove" className="p-1 text-slate-400 hover:text-red-600"><X size={14} /></button>
+                </>
+              )}
             </td>
           </tr>
         )))}
@@ -278,9 +279,11 @@ const ProgramSheet = () => {
               <ProgramLineForm products={products} submitLabel="Add" onSubmit={saveLine} onCancel={() => setLineForm(null)} />
             ) : (
               <div className="flex items-center justify-between">
-                <button type="button" onClick={() => setLineForm({ stepId: step.id })} className={`${linkButton} flex items-center gap-1`}>
-                  <Plus size={13} /> Add a product
-                </button>
+                {locked ? <span /> : (
+                  <button type="button" onClick={() => setLineForm({ stepId: step.id })} className={`${linkButton} flex items-center gap-1`}>
+                    <Plus size={13} /> Add a product
+                  </button>
+                )}
                 {step.products.length > 1 && (
                   <span className="text-sm text-slate-600">Subtotal <b className="tabular-nums text-slate-800">{money(step.subtotal)}</b></span>
                 )}
@@ -322,7 +325,8 @@ const ProgramSheet = () => {
               </button>
             </>
           )}
-          <button type="button" className={secondary} disabled={importSheet.isPending} onClick={() => fileInput.current?.click()}>
+          <button type="button" className={secondary} disabled={importSheet.isPending || locked} onClick={() => fileInput.current?.click()}
+            title={locked ? "The quote is accepted - set it back to Draft to import" : undefined}>
             <Upload size={16} /> {importSheet.isPending ? "Importing…" : "Import Excel"}
           </button>
           <input ref={fileInput} type="file" accept=".xlsx" className="sr-only" onChange={(e) => {
@@ -338,8 +342,8 @@ const ProgramSheet = () => {
           <p className="flex flex-wrap items-center gap-2">
             <CheckCircle2 size={16} aria-hidden="true" />
             {result.kind === "imported"
-              ? <>Cost sheet imported: {result.lines} product lines.</>
-              : <>Quote <b>{result.quote.number}</b> {result.kind === "made" ? "made" : "updated from the program"}. <Link to="/quotes" className="font-semibold underline">Open Quotes</Link></>}
+              ? <>Cost sheet imported: {result.lines} product lines - the quote follows.</>
+              : <>Invoice <b>{result.invoice.number}</b> made. <Link to="/invoices" className="font-semibold underline">Open Invoices</Link></>}
           </p>
           {(result.skipped || []).length > 0 && (
             <ul className="mt-1 list-disc pl-6 text-amber-700">{result.skipped.map((s) => <li key={s}>{s}</li>)}</ul>
@@ -350,12 +354,45 @@ const ProgramSheet = () => {
         </div>
       )}
 
+      {quote && (
+        <section className={`flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border p-4 shadow-sm ${locked ? "border-emerald-400 bg-emerald-50" : "border-slate-200 bg-white"}`}>
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">This program's quote</div>
+            <div className="text-lg font-bold text-slate-800">{quote.number || `#${quote.id}`}</div>
+          </div>
+          <label className="text-sm text-slate-600">
+            <span className="sr-only">Quote status</span>
+            <select value={quote.status} disabled={setStatus.isPending} onChange={(e) => {
+              const status = e.target.value;
+              if (status === "Accepted" && !window.confirm("Mark the quote accepted? The program's products and amounts are then locked, and each date can be invoiced.")) return;
+              setStatus.mutate(status);
+            }} className={`rounded-full px-3 py-1 text-sm font-medium ${statusStyle(quote.status)}`}>
+              {["Draft", "Sent", "Accepted"].map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+          <div className="text-sm text-slate-600">
+            <span className="text-lg font-bold tabular-nums text-slate-900">{money(quote.grand_total)}</span> incl VAT
+            <span className="ml-2 text-xs text-slate-500">({money(quote.total_exclusive)} excl)</span>
+          </div>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button type="button" className={secondary} onClick={() => setPreview({ kind: "quote", id: quote.id, title: quote.number })}>
+              <FileText size={16} /> Quote PDF
+            </button>
+          </div>
+          <p className="basis-full text-xs text-slate-500">
+            {locked
+              ? "Accepted - the agreed products and amounts are locked. Make each date's invoice from its row below. Set the quote back to Draft to change anything."
+              : "The quote is this program: change a dose, an animal number, a price or a product here or on the quote and both change together."}
+          </p>
+        </section>
+      )}
+
       {/* The sheet's head: animals, client, dates */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="font-semibold text-slate-800">Animals</h3>
-            {!counts && <button type="button" className={linkButton} onClick={() => setCounts(countsFrom(groups))}>Change numbers</button>}
+            {!counts && !locked && <button type="button" className={linkButton} onClick={() => setCounts(countsFrom(groups))}>Change numbers</button>}
           </div>
           {counts ? (
             <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); saveCounts.mutate(); }}>
@@ -404,42 +441,12 @@ const ProgramSheet = () => {
         </section>
       </div>
 
-      {anchors && (
-        <section className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="font-semibold text-slate-800">Quotes</h3>
-            <button type="button" className={linkButton} disabled={!allLineIds.length || makeQuote.isPending}
-              onClick={() => makeQuote.mutate(allLineIds)}>Quote the whole program</button>
-          </div>
-          {data.quotes.length === 0 ? (
-            <p className="text-sm text-slate-500">No quotes yet - quote the whole program, or tick products in the sheet.</p>
-          ) : (
-            <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
-              {data.quotes.map((q) => (
-                <li key={q.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
-                  <span className="font-semibold text-slate-800">{q.number || `#${q.id}`}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusStyle(q.status)}`}>{q.status}</span>
-                  <span className="text-slate-500">{shortDate(q.date)} · {q.step_ids.length} date{q.step_ids.length === 1 ? "" : "s"}</span>
-                  <span className="ml-auto font-medium tabular-nums text-slate-800">{money(q.total_amount)}</span>
-                  <button type="button" className={linkButton} onClick={() => setPreview({ kind: "quote", id: q.id, title: q.number })}>View</button>
-                  {["Draft", "Sent"].includes(q.status) && (
-                    <button type="button" className={linkButton} disabled={updateQuote.isPending} onClick={() => {
-                      if (window.confirm(`Update ${q.number} from the program? Its program lines are worked out again with the current doses, animals and prices (discounts on them are dropped); lines you added by hand stay.`)) updateQuote.mutate(q.id);
-                    }}>Update from program</button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
 
       {anchors && (
         <div className="relative overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">{/* relative: keeps sr-only labels inside the scroll box */}
           <table className="w-full min-w-[54rem] text-sm">
             <thead>
               <tr className="bg-emerald-600 text-left text-xs font-bold uppercase tracking-wide text-white">
-                <th className="w-8 px-2 py-2"><span className="sr-only">Quote</span></th>
                 {COLUMNS.map((c, i) => <th key={c} className={`px-2 py-2 ${i >= 4 ? "text-right" : ""}`}>{c}</th>)}
                 <th className="w-16 px-2 py-2"><span className="sr-only">Actions</span></th>
               </tr>
@@ -501,29 +508,15 @@ const ProgramSheet = () => {
           ) : (
             <button type="button" onClick={() => setNewStep({ date: "", stage: "", section: SECTIONS[0] })} className={secondary}><Plus size={16} /> Add a date</button>
           )}
-          <button type="button" disabled={reset.isPending} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-red-700"
+          {!locked && <button type="button" disabled={reset.isPending} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-red-700"
             onClick={() => {
               if (window.confirm("Start this client's program again from the master program? Changed products, doses and dates go back to the master's; dates already ticked off stay ticked.")) reset.mutate();
             }}>
             <RotateCcw size={14} /> Start again from the master program
-          </button>
+          </button>}
         </div>
       )}
 
-      {anchors && (
-        <div className="sticky bottom-0 z-30 flex flex-wrap items-center justify-end gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-lg">
-          {allLineIds.length > 0 && (
-            <button type="button" className={linkButton}
-              onClick={() => setSelected(selected.size === allLineIds.length ? new Set() : new Set(allLineIds))}>
-              {selected.size === allLineIds.length ? "Untick everything" : "Tick everything"}
-            </button>
-          )}
-          <span className="text-sm text-slate-600">{selected.size} product{selected.size === 1 ? "" : "s"} ticked</span>
-          <button type="button" disabled={!selected.size || makeQuote.isPending} onClick={() => makeQuote.mutate([...selected])} className={primary}>
-            <FileText size={16} /> {makeQuote.isPending ? "Making quote…" : "Make a quote"}
-          </button>
-        </div>
-      )}
 
       <Modal isOpen={editing} onClose={() => setEditing(false)} title="Program dates" size="lg">
         {editing && (

@@ -4,6 +4,7 @@ import {
   Sun, Moon, Cloud, CloudSun, CloudRain, CloudSnow, CloudLightning, CloudFog, CloudDrizzle,
   MapPin, Navigation, Droplets, Wind, Thermometer, Sunrise, Sunset, AlertTriangle, CheckCircle2, Search,
 } from "lucide-react";
+import { PREF_KEYS } from "../utils/preferences";
 
 // Location: the first visit asks for this computer's location once
 // (Electron shows a real "Allow location access?" prompt - see
@@ -11,8 +12,8 @@ import {
 // own location service answers, no API key needed). If that's declined
 // or unavailable, a town search (Open-Meteo geocoding) is the fallback.
 // The chosen location is remembered on this computer.
-const LOCATION_KEY = "sandveld_weather_location"; // {lat, lon, label, source}
-const ASKED_KEY = "sandveld_weather_permission_asked";
+const LOCATION_KEY = PREF_KEYS.weatherLocation; // {lat, lon, label, source}
+const ASKED_KEY = PREF_KEYS.weatherAsked;
 const REFRESH_MS = 30 * 60 * 1000;
 
 // Livestock alert thresholds for the 7-day outlook.

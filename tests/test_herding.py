@@ -166,22 +166,12 @@ class ScheduleAndQuoteTests(HerdingTestCase):
         programs.set_step_done(self.prog.id, self.before.id, programs.StepDone(done=False), session=self.s)
         self.assertEqual(herding.schedule(self.s, self.prog)["progress"]["done"], 0)
 
-    def test_quote_from_selected_lines_adds_up_per_product(self):
-        result = programs.quote_from_program(
-            self.prog.id, programs.ProgramQuoteRequest(line_ids=[self.line_ewes.id, self.line_rams.id, self.line_lambs.id]),
-            session=self.s, user=self.user)
-        items = self.s.exec(select(QuoteItem).where(QuoteItem.quote_id == result["quote"].id)).all()
-        # (100 + 4) x 3 ml = 312 ml of a 100 ml bottle -> 4 bottles; no lambs yet -> the drench is skipped
-        self.assertEqual([(i.product_id, i.quantity) for i in items], [(self.vaccine.id, 4)])
-        self.assertEqual(result["quote"].client_id, self.client.id)
-        self.assertEqual(len(result["skipped"]), 1)
-        self.assertIn("Drench", result["skipped"][0])
-
-    def test_quote_with_nothing_usable_is_refused(self):
-        with self.assertRaises(HTTPException) as ctx:
-            programs.quote_from_program(self.prog.id, programs.ProgramQuoteRequest(line_ids=[self.line_lambs.id]),
-                                        session=self.s, user=self.user)
-        self.assertEqual(ctx.exception.status_code, 422)
+    def test_the_programs_quote_has_whole_packs_per_line(self):
+        out = programs.program_schedule(self.prog.id, session=self.s)
+        items = self.s.exec(select(QuoteItem).where(QuoteItem.quote_id == out["quote"]["id"])).all()
+        # 100 ewes x 3 ml = 3 bottles, 4 rams x 3 ml = 1 bottle; no lambs counted -> no drench on the quote
+        self.assertEqual(sorted((i.product_id, i.quantity) for i in items), [(self.vaccine.id, 1), (self.vaccine.id, 3)])
+        self.assertEqual(out["quote"]["client_id"], self.client.id)
 
     def test_program_without_mating_date_has_no_schedule(self):
         legacy = HerdingProgram(name="Old", client_id=self.client.id)

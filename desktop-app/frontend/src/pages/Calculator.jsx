@@ -227,7 +227,7 @@ const Calculator = () => {
   };
 
   const handleCreateQuote = () => {
-    navigate("/quotes", {
+    navigate("/programs", {
       state: {
         presetItem: {
           product_id: selectedProduct.id,

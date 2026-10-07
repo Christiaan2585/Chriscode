@@ -481,7 +481,7 @@ const ClientDetail = () => {
                   ))}
               </div>
             )}
-            <Link to="/quotes" className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 mt-3 font-medium">
+            <Link to="/programs" className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 mt-3 font-medium">
               Full item detail & new quotes <ChevronRight size={14} />
             </Link>
           </div>

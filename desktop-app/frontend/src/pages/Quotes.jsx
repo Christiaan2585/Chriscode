@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Plus, Search, FileText, Trash2, Edit, Save, X, Download, Eye, FileInput, ClipboardList } from "lucide-react";
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
@@ -10,7 +10,7 @@ import Modal from "../components/Modal";
 import SearchableSelect from "../components/SearchableSelect";
 import DocumentPreview from "../components/DocumentPreview";
 import OrderFormImport from "../components/OrderFormImport";
-import ProgramQuoteDialog from "../components/ProgramQuoteDialog";
+import { NewProgramDialog } from "../components/HerdingProgramPanel";
 import { ClientHover, DocumentHover } from "../components/PreviewCards";
 import { downloadDocumentPdf, lineTotal } from "../utils/documents";
 import { newestFirst } from "../utils/format";
@@ -218,7 +218,8 @@ const Quotes = () => {
 
   const [preview, setPreview] = useState(null);
   const [importingOrder, setImportingOrder] = useState(false);
-  const [quotingProgram, setQuotingProgram] = useState(false);
+  const [newProgram, setNewProgram] = useState(false);
+  const navigate = useNavigate();
 
   if (isLoading) return <div className="p-8 text-center">Loading quotes...</div>;
 
@@ -226,8 +227,8 @@ const Quotes = () => {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-slate-800">Quotations</h2>
-          <p className="text-slate-500">Manage and create financial quotes for clients</p>
+          <h2 className="text-3xl font-bold text-slate-800">Programs &amp; Quotes</h2>
+          <p className="text-slate-500">Every client's herding program is also their quote - plus ordinary quotes.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -237,12 +238,18 @@ const Quotes = () => {
           >
             <FileInput size={20} /> Import order form
           </button>
-          <button
-            type="button"
-            onClick={() => setQuotingProgram(true)}
+          <Link
+            to="/programs/master"
             className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:border-emerald-300 hover:text-emerald-600 transition-colors shadow-sm"
           >
-            <ClipboardList size={20} /> From herding program
+            <ClipboardList size={20} /> Master program
+          </Link>
+          <button
+            type="button"
+            onClick={() => setNewProgram(true)}
+            className="flex items-center gap-2 bg-white border border-emerald-300 text-emerald-700 px-4 py-2 rounded-lg hover:bg-emerald-50 transition-colors shadow-sm"
+          >
+            <Plus size={20} /> New herding program
           </button>
           <button
             onClick={openAddModal}
@@ -283,6 +290,12 @@ const Quotes = () => {
               <tr key={q.id} className="hover:bg-slate-50 transition-colors">
                 <td className="px-6 py-4 text-slate-600">
                   <DocumentHover kind="quote" doc={q} clientName={clientName(q.client_id)}>{q.number || `#${q.id}`}</DocumentHover>
+                  {q.program_id && (
+                    <Link to={`/programs/${q.program_id}`} title="This quote is a herding program - open it"
+                      className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100">
+                      <ClipboardList size={12} /> Herding program
+                    </Link>
+                  )}
                 </td>
                 <td className="px-6 py-4 text-slate-600">{new Date(q.date).toLocaleDateString()}</td>
                 <td className="px-6 py-4 text-slate-600">
@@ -315,6 +328,11 @@ const Quotes = () => {
                   <button onClick={() => openEditModal(q)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors" title="Edit">
                     <Edit size={18} />
                   </button>
+                  {q.program_id ? (
+                    <button onClick={() => navigate(`/programs/${q.program_id}`)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors" title="Open the herding program">
+                      <ClipboardList size={18} />
+                    </button>
+                  ) : (
                   <button
                     onClick={() => {
                       if (window.confirm(`Delete quote #${q.id}? This can't be undone.`)) {
@@ -326,6 +344,7 @@ const Quotes = () => {
                   >
                     <Trash2 size={18} />
                   </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -500,8 +519,7 @@ const Quotes = () => {
       <DocumentPreview doc={preview} onClose={() => setPreview(null)} />
       <OrderFormImport isOpen={importingOrder} onClose={() => setImportingOrder(false)}
         clients={clients || []} onOpenQuote={openEditModal} />
-      <ProgramQuoteDialog isOpen={quotingProgram} onClose={() => setQuotingProgram(false)}
-        clients={clients || []} onOpenQuote={openEditModal} />
+      <NewProgramDialog isOpen={newProgram} onClose={() => setNewProgram(false)} clients={clients || []} />
     </div>
   );
 };

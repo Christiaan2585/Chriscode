@@ -29,11 +29,15 @@ const AREA_FIELDS = [
   ["postal_address", "Postal address"],
   ["physical_address", "Physical address"],
 ];
-const NUMBERING = [
-  ["invoice", "Invoice", "next_invoice_number"],
-  ["quote", "Quote", "next_quote_number"],
-  ["po", "PO", "next_po_number"],
-];
+const NUMBERING = {
+  invoice: ["Invoice", "next_invoice_number"],
+  quote: ["Quote", "next_quote_number"],
+  po: ["PO", "next_po_number"],
+};
+// Which part of the form each Settings department shows. The whole draft is
+// always saved together (PUT /business/ takes every field), a part only
+// decides what's on screen.
+export const ALL_PARTS = ["company", "invoices", "quotes", "purchase"];
 
 const inputClass =
   "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50 disabled:text-slate-500";
@@ -49,8 +53,30 @@ const Field = ({ label, children, hint, required = false }) => (
   </label>
 );
 
+const NumberRow = ({ kind, draft, saved, set }) => {
+  const [label, nextKey] = NUMBERING[kind];
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <Field label={`${label} prefix`}>
+        <input className={inputClass} value={draft[`${kind}_prefix`]} onChange={set(`${kind}_prefix`)} />
+      </Field>
+      <Field label="Start from" hint={`Next: ${saved[nextKey]}`}>
+        <input type="number" min="1" className={inputClass} value={draft[`${kind}_start_number`]} onChange={set(`${kind}_start_number`)} />
+      </Field>
+    </div>
+  );
+};
+
+const NUMBERING_HELP = (
+  <p className="mt-2 text-xs text-slate-500">
+    Numbers carry on after the highest one already used. To continue from Sage, set "Start from" to one more
+    than your last Sage number (e.g. 181 after INV0000180).
+  </p>
+);
+
 // Keyed on the saved data so the draft resets whenever a save comes back.
-const BusinessForm = ({ saved, canEdit, justSaved, onSaved }) => {
+const BusinessForm = ({ saved, canEdit, justSaved, onSaved, parts = ALL_PARTS }) => {
+  const show = (part) => parts.includes(part);
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(saved);
   const set = (key) => (e) =>
@@ -81,16 +107,18 @@ const BusinessForm = ({ saved, canEdit, justSaved, onSaved }) => {
         save.mutate();
       }}
     >
-      {saved.missing?.length > 0 && (
+      {show("company") && saved.missing?.length > 0 && (
         <p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
           Still needed on your invoices: {saved.missing.join(", ")}.
         </p>
       )}
-      <p className="text-xs text-slate-500">
-        <span className="text-red-600">*</span> Needed on your invoices. Everything else is optional.
-      </p>
+      {show("company") && (
+        <p className="text-xs text-slate-500">
+          <span className="text-red-600">*</span> Needed on your invoices. Everything else is optional.
+        </p>
+      )}
       <fieldset disabled={!canEdit} className="space-y-6">
-        {SECTIONS.map(([title, fields], i) => (
+        {show("company") && SECTIONS.map(([title, fields], i) => (
           <React.Fragment key={title}>
             <section className="space-y-3">
               <h4 className="text-sm font-semibold text-slate-800">{title}</h4>
@@ -117,41 +145,50 @@ const BusinessForm = ({ saved, canEdit, justSaved, onSaved }) => {
           </React.Fragment>
         ))}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700 sm:col-span-3">
-            <input type="checkbox" checked={draft.vat_registered} onChange={set("vat_registered")} className="h-4 w-4 accent-emerald-600" />
-            VAT registered (charge VAT and print "Tax Invoice")
-          </label>
-          <Field label="VAT rate %">
-            <input type="number" min="0" max="100" step="0.01" className={inputClass} value={draft.vat_rate} onChange={set("vat_rate")} />
-          </Field>
-          <Field label="Invoices due after (days)">
-            <input type="number" min="0" max="365" className={inputClass} value={draft.payment_terms_days} onChange={set("payment_terms_days")} />
-          </Field>
-          <Field label="Quotes valid for (days)">
-            <input type="number" min="0" max="365" className={inputClass} value={draft.quote_valid_days} onChange={set("quote_valid_days")} />
-          </Field>
-        </div>
+        {show("invoices") && (
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 sm:col-span-3">
+                <input type="checkbox" checked={draft.vat_registered} onChange={set("vat_registered")} className="h-4 w-4 accent-emerald-600" />
+                VAT registered (charge VAT and print "Tax Invoice")
+              </label>
+              <Field label="VAT rate %" hint="Also used on quotes and purchase orders.">
+                <input type="number" min="0" max="100" step="0.01" className={inputClass} value={draft.vat_rate} onChange={set("vat_rate")} />
+              </Field>
+              <Field label="Invoices due after (days)">
+                <input type="number" min="0" max="365" className={inputClass} value={draft.payment_terms_days} onChange={set("payment_terms_days")} />
+              </Field>
+            </div>
+            <div>
+              <h4 className="mb-2 text-sm font-semibold text-slate-800">Invoice numbers</h4>
+              <div className="max-w-sm"><NumberRow kind="invoice" draft={draft} saved={saved} set={set} /></div>
+              {NUMBERING_HELP}
+            </div>
+          </>
+        )}
 
-        <div>
-          <h4 className="mb-2 text-sm font-semibold text-slate-800">Document numbers</h4>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {NUMBERING.map(([kind, label, nextKey]) => (
-              <div key={kind} className="grid grid-cols-2 gap-2">
-                <Field label={`${label} prefix`}>
-                  <input className={inputClass} value={draft[`${kind}_prefix`]} onChange={set(`${kind}_prefix`)} />
-                </Field>
-                <Field label="Start from" hint={`Next: ${saved[nextKey]}`}>
-                  <input type="number" min="1" className={inputClass} value={draft[`${kind}_start_number`]} onChange={set(`${kind}_start_number`)} />
-                </Field>
-              </div>
-            ))}
+        {show("quotes") && (
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Field label="Quotes valid for (days)">
+                <input type="number" min="0" max="365" className={inputClass} value={draft.quote_valid_days} onChange={set("quote_valid_days")} />
+              </Field>
+            </div>
+            <div>
+              <h4 className="mb-2 text-sm font-semibold text-slate-800">Quote numbers</h4>
+              <div className="max-w-sm"><NumberRow kind="quote" draft={draft} saved={saved} set={set} /></div>
+              {NUMBERING_HELP}
+            </div>
+          </>
+        )}
+
+        {show("purchase") && (
+          <div>
+            <h4 className="mb-2 text-sm font-semibold text-slate-800">Purchase order numbers</h4>
+            <div className="max-w-sm"><NumberRow kind="po" draft={draft} saved={saved} set={set} /></div>
+            {NUMBERING_HELP}
           </div>
-          <p className="mt-2 text-xs text-slate-500">
-            Numbers carry on after the highest one already used. To continue from Sage, set "Start from" to one more
-            than your last Sage number (e.g. 181 after INV0000180).
-          </p>
-        </div>
+        )}
       </fieldset>
 
       {canEdit ? (
@@ -162,7 +199,7 @@ const BusinessForm = ({ saved, canEdit, justSaved, onSaved }) => {
             disabled={!dirty || save.isPending}
             className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
           >
-            <Save size={16} /> {save.isPending ? "Saving…" : "Save business details"}
+            <Save size={16} /> {save.isPending ? "Saving…" : "Save"}
           </button>
         </div>
       ) : (
@@ -172,7 +209,7 @@ const BusinessForm = ({ saved, canEdit, justSaved, onSaved }) => {
   );
 };
 
-const BusinessSettings = ({ canEdit, bare = false }) => {
+const BusinessSettings = ({ canEdit, bare = false, parts }) => {
   const [justSaved, setJustSaved] = useState(false);
   const { data, isLoading, isError } = useQuery({
     queryKey: ["business"],
@@ -190,6 +227,7 @@ const BusinessSettings = ({ canEdit, bare = false }) => {
       canEdit={Boolean(canEdit)}
       justSaved={justSaved}
       onSaved={() => setJustSaved(true)}
+      parts={parts}
     />
   );
   if (bare) return body;

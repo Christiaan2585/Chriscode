@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardList, FileSpreadsheet, Pencil, Plus, Receipt, Save, Trash2, X } from "lucide-react";
+import { ArrowLeft, ClipboardList, FileSpreadsheet, Pencil, Plus, Receipt, Save, Trash2, X } from "lucide-react";
+import { Link } from "react-router-dom";
 import apiClient from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import InlineEdit from "../components/InlineEdit";
@@ -225,8 +226,11 @@ const Programs = () => {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
+          <Link to="/programs" className="mb-1 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-emerald-700">
+            <ArrowLeft size={14} /> Programs &amp; Quotes
+          </Link>
           <h2 className="flex items-center gap-2 text-3xl font-bold text-slate-800">
-            <ClipboardList size={28} className="text-emerald-600" /> Herding Program
+            <ClipboardList size={28} className="text-emerald-600" /> Master herding program
           </h2>
           <p className="text-slate-500">
             The master program every new client program is copied from. Dates are worked out from each client's first mating day;

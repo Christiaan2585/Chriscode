@@ -12,5 +12,6 @@ class QuoteItem(SQLModel, table=True):
     discount_percent: Optional[float] = None
     vat_percent: Optional[float] = None
     program_step_id: Optional[int] = None  # the herding program step this line is for (a program quote)
+    program_line_id: Optional[int] = None  # the program's product line this IS (kept in step both ways)
 
     quote: Optional["Quote"] = Relationship(back_populates="items")

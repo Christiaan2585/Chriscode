@@ -70,7 +70,7 @@ const SetupReminder = ({ user }) => {
           <span>
             Invoices are missing: {missing.join(", ")}.{" "}
             {user?.is_admin ? (
-              <Link to="/settings" className="font-semibold underline">Fill in business details</Link>
+              <Link to="/settings/company" className="font-semibold underline">Fill in business details</Link>
             ) : (
               "Ask an admin to fill them in under Settings."
             )}
@@ -79,7 +79,7 @@ const SetupReminder = ({ user }) => {
         {own.length > 0 && (
           <span>
             Add {own.join(" and ")}{!user.phone ? " (your number is printed as the sales rep on your invoices)" : ""}.{" "}
-            <Link to="/settings" className="font-semibold underline">My details</Link>
+            <Link to="/settings/my-details" className="font-semibold underline">My details</Link>
           </span>
         )}
         <button type="button" onClick={hideBar} title="Hide this warning" aria-label="Hide this warning"
@@ -96,7 +96,7 @@ const SetupReminder = ({ user }) => {
             These are printed on every invoice, quote and purchase order, including where your clients should pay.
             You can change them any time under Settings.
           </p>
-          <BusinessSettings canEdit bare />
+          <BusinessSettings canEdit bare parts={["company"]} />
           <div className="flex justify-start">
             <button type="button" onClick={later} className="text-sm font-medium text-slate-500 hover:text-slate-700">
               I'll do this later

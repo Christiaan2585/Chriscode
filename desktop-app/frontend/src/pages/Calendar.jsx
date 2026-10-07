@@ -7,6 +7,7 @@ import { STEP_STATUS, TEXT_COLUMNS, ruleText } from "../utils/herding";
 import { clientService, animalService } from "../api/services";
 import Modal from "../components/Modal";
 import SearchableSelect from "../components/SearchableSelect";
+import { PREF_KEYS } from "../utils/preferences";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MAX_CHIPS = 2;
@@ -37,7 +38,7 @@ const CHIP = {
   completed: "bg-blue-100 text-blue-700",
 };
 
-const PLAN_KEY = "sandveld_calendar_plan_mating_date";
+const PLAN_KEY = PREF_KEYS.calendarPlanDate;
 const readPlanDate = () => {
   try {
     return localStorage.getItem(PLAN_KEY) || "";

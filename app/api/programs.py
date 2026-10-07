@@ -7,9 +7,9 @@ from typing import List, Literal, Optional
 import io
 import re
 import pandas as pd
-from app.api.business import get_business, price_line
-from app.api.quotes import _recalculate_total, create_quote
-from app.core import herding
+from app.api.business import get_business, totals_for
+from app.api.invoices import create_invoice
+from app.core import herding, program_quote
 from app.core.db import get_session
 from app.core.dates import coerce_datetime
 from app.core.pdf import generate_program_cost_pdf, generate_program_pdf
@@ -18,6 +18,7 @@ from app.models.client import Client
 from app.models.product import Product
 from app.models.program import (AnimalGroup, HerdingProgram, ProgramAssignment, ProgramStep, ProgramStepProduct,
                                 ProgramStepProgress)
+from app.models.invoice import Invoice, InvoiceItem
 from app.models.quote import Quote
 from app.models.quote_item import QuoteItem
 from app.models.user import User
@@ -110,12 +111,22 @@ def delete_program(program_id: int, session: Session = Depends(get_session)):
             session.delete(row)
     for step in herding.ordered_steps(session, program_id):
         herding.delete_step(session, step)
+    # The program's own quote goes with it while it's a Draft nobody has seen;
+    # a Sent or Accepted quote is a record and stays, just unlinked.
+    own = program_quote.program_quote(session, program)
+    program.quote_id = None
     for item in _quote_items(session, program_id):
-        item.program_step_id = None
-        session.add(item)
+        if own is not None and own.status == "Draft" and item.quote_id == own.id:
+            session.delete(item)
+        else:
+            item.program_step_id = item.program_line_id = None
+            session.add(item)
     for quote in session.exec(select(Quote).where(Quote.program_id == program_id)).all():
-        quote.program_id = None
-        session.add(quote)
+        if own is not None and own.status == "Draft" and quote.id == own.id:
+            session.delete(quote)
+        else:
+            quote.program_id = None
+            session.add(quote)
     session.delete(program)
     session.commit()
     return {"ok": True}
@@ -145,7 +156,8 @@ class HeadCounts(BaseModel):
 def set_head_counts(program_id: int, data: HeadCounts, session: Session = Depends(get_session)):
     """Sets the program's headcounts by group name ("Ooie": 1200, ...): a
     group it already has gets the new count, 0 removes the group."""
-    _program_or_404(session, program_id)
+    program = _program_or_404(session, program_id)
+    program_quote.check_unlocked(session, program)
     existing = {g.animal_type.strip().lower(): g for g in
                 session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program_id)).all()}
     for name, count in data.counts.items():
@@ -161,6 +173,7 @@ def set_head_counts(program_id: int, data: HeadCounts, session: Session = Depend
         group.group_size = count
         session.add(group)
     session.commit()
+    program_quote.sync(session, program)
     return session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program_id)).all()
 
 
@@ -410,14 +423,17 @@ class StepProductFields(BaseModel):
     note: Optional[str] = Field(default=None, max_length=200)
     category: Optional[str] = Field(default=None, max_length=80)
     fixed_quantity: Optional[float] = Field(default=None, ge=0, le=100_000)
+    quantity_override: Optional[float] = Field(default=None, ge=0, le=100_000)  # packs agreed, blank = worked out
+    unit_price: Optional[float] = Field(default=None, ge=0, le=10_000_000)  # per pack excl VAT, blank = product price
+    discount_percent: Optional[float] = Field(default=None, ge=0, le=100)
 
 
 class StepDone(BaseModel):
     done: bool
 
 
-class ProgramQuoteRequest(BaseModel):
-    line_ids: List[int] = Field(min_length=1, max_length=500)
+class QuoteStatus(BaseModel):
+    status: Literal["Draft", "Sent", "Accepted"]
 
 
 MAX_TEMPLATE_UPLOAD_BYTES = 5 * 1024 * 1024
@@ -620,27 +636,68 @@ def program_calendar(start: date, end: date, session: Session = Depends(get_sess
 
 
 @router.get("/{program_id}/schedule")
-def program_schedule(program_id: int, session: Session = Depends(get_session)):
+def program_schedule(program_id: int, session: Session = Depends(get_session),
+                     user: Optional[User] = Depends(get_current_user)):
+    """The program with its quote - one thing, so the quote is brought in
+    step here too (the first look also makes it)."""
     program = _program_or_404(session, program_id)
+    quote = program_quote.sync(session, program, user.id if isinstance(user, User) else None)
     groups = session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program_id)).all()
     out = {"program": program, "groups": groups, "template": herding.get_template(session),
            "group_names": list(herding.GROUPS), **herding.schedule(session, program)}
-    out["quotes"] = _program_quotes(session, program_id)
+    out["quote"] = quote and {**quote.model_dump(), "locked": quote.status == program_quote.LOCKED,
+                              **totals_for(session.exec(select(QuoteItem).where(QuoteItem.quote_id == quote.id)).all())}
+    invoices = {i.id: i for i in session.exec(select(Invoice).where(
+        Invoice.id.in_([s["invoice_id"] for s in out["steps"] if s["invoice_id"]]))).all()}
     for step in out["steps"]:
-        step["quotes"] = [{k: q[k] for k in ("id", "number", "status")} for q in out["quotes"] if step["id"] in q["step_ids"]]
+        invoice = invoices.get(step["invoice_id"])
+        step["invoice"] = invoice and {"id": invoice.id, "number": invoice.number, "status": invoice.status}
     return out
 
 
-def _program_quotes(session: Session, program_id: int) -> list:
-    """The quotes made from this program, with the steps each one covers."""
-    linked = session.exec(select(Quote).where(Quote.program_id == program_id).order_by(Quote.id)).all()
-    steps = {}
-    for quote_id, step_id in session.exec(select(QuoteItem.quote_id, QuoteItem.program_step_id)
-                                          .where(QuoteItem.quote_id.in_([q.id for q in linked]))).all() if linked else []:
-        if step_id:
-            steps.setdefault(quote_id, set()).add(step_id)
-    return [{"id": q.id, "number": q.number, "status": q.status, "total_amount": q.total_amount, "date": q.date,
-             "step_ids": sorted(steps.get(q.id, ()))} for q in linked]
+@router.put("/{program_id}/quote/status")
+def set_quote_status(program_id: int, data: QuoteStatus, session: Session = Depends(get_session)):
+    """Accepted locks the program's products and amounts; back to Draft or
+    Sent unlocks them."""
+    program = _dated_program(session, program_id)
+    quote = program_quote.sync(session, program)
+    if quote is None:
+        raise HTTPException(status_code=422, detail="This program isn't linked to a client")
+    quote.status = data.status
+    session.add(quote)
+    session.commit()
+    return program_quote.sync(session, program)
+
+
+@router.post("/{program_id}/steps/{step_id}/invoice")
+def invoice_program_step(program_id: int, step_id: int, session: Session = Depends(get_session),
+                         user: User = Depends(get_current_user)):
+    """The invoice for one date of an accepted program: exactly the agreed
+    lines (packs, price, discount, VAT) for that date. Once per date."""
+    program = _dated_program(session, program_id)
+    step = _own_step_or_404(session, program, step_id)
+    quote = program_quote.program_quote(session, program)
+    if quote is None or quote.status != program_quote.LOCKED:
+        raise HTTPException(status_code=409, detail="Accept the program's quote first - invoices follow what was agreed")
+    if step.invoice_id and session.get(Invoice, step.invoice_id):
+        raise HTTPException(status_code=409, detail="This date has already been invoiced")
+    agreed = session.exec(select(QuoteItem).where(QuoteItem.quote_id == quote.id,
+                                                  QuoteItem.program_step_id == step.id)).all()
+    if not agreed:
+        raise HTTPException(status_code=422, detail="Nothing was agreed for this date")
+    invoice = create_invoice(Invoice(client_id=program.client_id, reference=f"{quote.number} - {step.stage or ''}".strip(" -")[:200],
+                                     notes=f"Herding program: {program.name}"[:1000]), session, user)
+    for item in agreed:
+        session.add(InvoiceItem(invoice_id=invoice.id, product_id=item.product_id, quantity=item.quantity,
+                                unit_price=item.unit_price, discount_percent=item.discount_percent,
+                                vat_percent=item.vat_percent, subtotal=item.subtotal))
+    session.flush()
+    invoice.total_amount = totals_for(session.exec(select(InvoiceItem).where(InvoiceItem.invoice_id == invoice.id)).all())["grand_total"]
+    step.invoice_id = invoice.id
+    session.add_all([invoice, step])
+    session.commit()
+    session.refresh(invoice)
+    return invoice
 
 
 # The client's own copy: anyone signed in can change it (it's that client's
@@ -668,6 +725,12 @@ def _own_line_or_404(session: Session, program: HerdingProgram, line_id: int) ->
     return line
 
 
+def _unlocked_program(session: Session, program_id: int) -> HerdingProgram:
+    program = _dated_program(session, program_id)
+    program_quote.check_unlocked(session, program)
+    return program
+
+
 @router.post("/{program_id}/steps")
 def add_program_step(program_id: int, data: StepFields, session: Session = Depends(get_session)):
     program = _dated_program(session, program_id)
@@ -692,19 +755,25 @@ def update_program_step(program_id: int, step_id: int, data: StepFields, session
 
 @router.delete("/{program_id}/steps/{step_id}")
 def delete_program_step(program_id: int, step_id: int, session: Session = Depends(get_session)):
-    step = _own_step_or_404(session, _dated_program(session, program_id), step_id)
+    program = _dated_program(session, program_id)
+    step = _own_step_or_404(session, program, step_id)
+    if session.exec(select(ProgramStepProduct).where(ProgramStepProduct.step_id == step.id)).first():
+        program_quote.check_unlocked(session, program)  # a date with products is part of what was agreed
     herding.delete_step(session, step)
     session.commit()
+    program_quote.sync(session, program)
     return {"ok": True}
 
 
 @router.post("/{program_id}/steps/{step_id}/products")
 def add_program_line(program_id: int, step_id: int, data: StepProductFields, session: Session = Depends(get_session)):
-    step = _own_step_or_404(session, _dated_program(session, program_id), step_id)
+    program = _unlocked_program(session, program_id)
+    step = _own_step_or_404(session, program, step_id)
     _checked_product(session, data.product_id)
     line = ProgramStepProduct(step_id=step.id, **_blank_to_none(data.model_dump(exclude_unset=True)))
     session.add(line)
     session.commit()
+    program_quote.sync(session, program)
     session.refresh(line)
     return line
 
@@ -712,18 +781,22 @@ def add_program_line(program_id: int, step_id: int, data: StepProductFields, ses
 @router.patch("/{program_id}/lines/{line_id}")
 def update_program_line(program_id: int, line_id: int, data: StepProductFields,
                         session: Session = Depends(get_session)):
-    line = _own_line_or_404(session, _dated_program(session, program_id), line_id)
+    program = _unlocked_program(session, program_id)
+    line = _own_line_or_404(session, program, line_id)
     _apply_line_changes(session, line, data)
     session.commit()
+    program_quote.sync(session, program)
     session.refresh(line)
     return line
 
 
 @router.delete("/{program_id}/lines/{line_id}")
 def delete_program_line(program_id: int, line_id: int, session: Session = Depends(get_session)):
-    line = _own_line_or_404(session, _dated_program(session, program_id), line_id)
+    program = _unlocked_program(session, program_id)
+    line = _own_line_or_404(session, program, line_id)
     session.delete(line)
     session.commit()
+    program_quote.sync(session, program)
     return {"ok": True}
 
 
@@ -731,24 +804,16 @@ def delete_program_line(program_id: int, line_id: int, session: Session = Depend
 def reset_from_master(program_id: int, session: Session = Depends(get_session)):
     """Throws away this client's changes and copies the master program
     again. Steps already ticked off stay ticked."""
-    program = _dated_program(session, program_id)
-    done, source_of = {}, {}
+    program = _unlocked_program(session, program_id)
+    done = {}
     for step in herding.ordered_steps(session, program.id):
         if step.done_at and step.source_step_id:
             done[step.source_step_id] = step.done_at
-        source_of[step.id] = step.source_step_id
         herding.delete_step(session, step)
     session.flush()
     herding.copy_master_into(session, program, done)
-    session.flush()
-    # The program's quotes point at the new copy of the same master step; a
-    # step the client added themselves has no copy, so its lines become "Other items".
-    copy_of = {s.source_step_id: s.id for s in herding.ordered_steps(session, program.id)}
-    for item in _quote_items(session, program.id):
-        if item.program_step_id in source_of:
-            item.program_step_id = copy_of.get(source_of[item.program_step_id])
-            session.add(item)
     session.commit()
+    program_quote.sync(session, program)  # the quote follows the fresh copy
     return {"ok": True}
 
 
@@ -767,90 +832,6 @@ def set_step_done(program_id: int, step_id: int, data: StepDone, session: Sessio
     session.add(step)
     session.commit()
     return {"ok": True}
-
-
-def _program_quote_items(session: Session, program: HerdingProgram, lines) -> tuple:
-    """({(step id, product id): (product, whole packs)}, skipped): each line's
-    whole packs for the program's headcounts (or the medicine box's fixed
-    number), added up per product within each step."""
-    groups = session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program.id)).all()
-    built, skipped = {}, []
-    for line in lines:
-        product = session.get(Product, line.product_id) if line else None
-        if product is None:
-            skipped.append("A product line that has since been removed from the program")
-            continue
-        head = herding.headcount(groups, line.animal_group)
-        units = herding.line_costs(product, line.dose, head, line.fixed_quantity, 0)["buy"]
-        if not units:
-            skipped.append(f"{product.name} for {line.animal_group or 'all animals'}: "
-                           + ("no dose set" if not line.dose else "no animals in that group"))
-            continue
-        key = (line.step_id, product.id)
-        built[key] = (product, built.get(key, (product, 0))[1] + units)
-    return built, skipped
-
-
-def _add_quote_items(session: Session, quote: Quote, built: dict) -> None:
-    for (step_id, _), (product, units) in built.items():
-        item = QuoteItem(quote_id=quote.id, product_id=product.id, quantity=units, unit_price=0.0,
-                         program_step_id=step_id)
-        price_line(session, item)
-        session.add(item)
-    session.flush()
-    _recalculate_total(session, quote)
-
-
-@router.post("/{program_id}/quote")
-def quote_from_program(program_id: int, data: ProgramQuoteRequest, session: Session = Depends(get_session),
-                       user: User = Depends(get_current_user)):
-    """A draft quote for the ticked product lines, linked to the program:
-    one line per step and product, printed under each step."""
-    program = _dated_program(session, program_id)
-    if not program.client_id or not session.get(Client, program.client_id):
-        raise HTTPException(status_code=422, detail="This program isn't linked to a client")
-    lines = [herding.own_line(session, program, line_id) for line_id in dict.fromkeys(data.line_ids)]
-    built, skipped = _program_quote_items(session, program, lines)
-    if not built:
-        raise HTTPException(status_code=422, detail="Nothing to quote: " + "; ".join(skipped))
-    quote = create_quote(Quote(client_id=program.client_id, reference="Herding program",
-                               notes=f"Herding program: {program.name}"[:1000]), session, user)
-    quote.program_id = program.id
-    _add_quote_items(session, quote, built)
-    session.commit()
-    session.refresh(quote)
-    return {"quote": quote, "skipped": skipped}
-
-
-@router.post("/{program_id}/quotes/{quote_id}/refresh")
-def refresh_program_quote(program_id: int, quote_id: int, session: Session = Depends(get_session)):
-    """Works the quote out again from the program as it is now (doses,
-    headcounts, prices) for the same steps. Lines added to the quote by hand
-    stay. Only while it's a Draft or Sent - an accepted quote is what the
-    farmer agreed to."""
-    program = _dated_program(session, program_id)
-    quote = session.get(Quote, quote_id)
-    if quote is None or quote.program_id != program.id:
-        raise HTTPException(status_code=404, detail="Quote not found")
-    if quote.status not in ("Draft", "Sent"):
-        raise HTTPException(status_code=409, detail="This quote has been accepted - make a new quote instead")
-    items = session.exec(select(QuoteItem).where(QuoteItem.quote_id == quote.id)).all()
-    step_ids = {i.program_step_id for i in items if i.program_step_id}
-    lines = session.exec(select(ProgramStepProduct).join(ProgramStep, ProgramStep.id == ProgramStepProduct.step_id)
-                         .where(ProgramStep.program_id == program.id, ProgramStep.id.in_(step_ids))
-                         .order_by(ProgramStepProduct.id)).all() if step_ids else []
-    built, skipped = _program_quote_items(session, program, lines)
-    if not built:
-        raise HTTPException(status_code=422, detail="The steps on this quote are no longer in the program, "
-                                                    "or have nothing to quote")
-    for item in items:
-        if item.program_step_id:
-            session.delete(item)
-    session.flush()
-    _add_quote_items(session, quote, built)
-    session.commit()
-    session.refresh(quote)
-    return {"quote": quote, "skipped": skipped}
 
 
 def _pdf_parts(session: Session, program_id: int):
@@ -904,8 +885,11 @@ def program_sheet(program_id: int, session: Session = Depends(get_session),
 
 def import_program_sheet_bytes(program_id: int, data: bytes, session: Session) -> dict:
     program = _program_or_404(session, program_id)
+    program_quote.check_unlocked(session, program)
     try:
-        return herding.import_client_sheet(session, program, data)
+        result = herding.import_client_sheet(session, program, data)
+        program_quote.sync(session, program)
+        return result
     except herding.TemplateImportError as exc:
         session.rollback()
         raise HTTPException(status_code=422, detail=str(exc))
