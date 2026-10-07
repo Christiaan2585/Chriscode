@@ -6,6 +6,7 @@ import { clientService } from "../api/services";
 import { toTelLink, toWhatsAppLink } from "../utils/contact";
 import Modal from "../components/Modal";
 import { ClientHover } from "../components/PreviewCards";
+import { farmLabel } from "../utils/format";
 
 const emptyClient = { name: "", email: "", phone: "", address: "", postal_address: "", vat_number: "", farm_name: "" };
 
@@ -134,7 +135,6 @@ const Clients = () => {
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
             <tr>
-              <th className="px-6 py-3 font-medium">Name</th>
               <th className="px-6 py-3 font-medium">Farm</th>
               <th className="px-6 py-3 font-medium">Contact</th>
               <th className="px-6 py-3 font-medium">Location</th>
@@ -155,9 +155,11 @@ const Clients = () => {
                     <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 shrink-0">
                       <User size={16} />
                     </div>
-                    <ClientHover client={client} className="font-medium text-slate-700">{client.name}</ClientHover>
+                    <div>
+                      <ClientHover client={client} className="font-medium text-slate-700">{farmLabel(client)}</ClientHover>
+                      {client.farm_name && <div className="text-xs text-slate-400">{client.name}</div>}
+                    </div>
                   </td>
-                  <td className="px-6 py-4 text-slate-600">{client.farm_name || "—"}</td>
                   <td className="px-6 py-4 text-slate-600">
                     <div>{client.email || "—"}</div>
                     <div className="text-xs text-slate-400">{client.phone || ""}</div>

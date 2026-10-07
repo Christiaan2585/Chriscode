@@ -4,6 +4,9 @@ export const money = (n) =>
 // Newest first, as Sage lists documents.
 export const newestFirst = (a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id;
 
+// A client is a farm: show the farm's name, and the contact's own name when there is no farm name.
+export const farmLabel = (client) => client?.farm_name || client?.name || "";
+
 export const shortDate = (d) => (d ? new Date(d).toLocaleDateString() : "—");
 
 // Invoice statuses are lowercase, quote/order statuses capitalised.

@@ -8,6 +8,7 @@ import { clientService, animalService } from "../api/services";
 import Modal from "../components/Modal";
 import SearchableSelect from "../components/SearchableSelect";
 import { PREF_KEYS } from "../utils/preferences";
+import { farmLabel } from "../utils/format";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MAX_CHIPS = 2;
@@ -67,7 +68,7 @@ const Calendar = () => {
   const { data: clients } = useQuery({ queryKey: ["clients"], queryFn: clientService.getAll });
   const { data: animals } = useQuery({ queryKey: ["animals"], queryFn: animalService.getAll });
 
-  const clientName = (id) => clients?.find((c) => c.id === Number(id))?.name || `Client #${id}`;
+  const clientName = (id) => farmLabel(clients?.find((c) => c.id === Number(id))) || `Client #${id}`;
   const animalName = (id) => animals?.find((a) => a.id === Number(id))?.name || `Animal #${id}`;
   const animalsForClient = (clientId) => (animals || []).filter((a) => String(a.client_id) === String(clientId));
 
@@ -380,7 +381,7 @@ const Calendar = () => {
               <SearchableSelect
                 value={newApp.client_id}
                 onChange={(v) => setNewApp({ ...newApp, client_id: v, animal_id: "" })}
-                options={(clients || []).map((c) => ({ value: c.id, label: c.name, sublabel: c.farm_name }))}
+                options={(clients || []).map((c) => ({ value: c.id, label: farmLabel(c), sublabel: c.farm_name ? c.name : "" }))}
                 placeholder="Select a client…"
                 searchPlaceholder="Search clients…"
               />

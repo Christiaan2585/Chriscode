@@ -14,6 +14,7 @@ from app.core import cascade
 from app.models.animal import Animal
 from app.models.client import Client
 from app.models.invoice import Invoice
+from app.models.program import AnimalGroup, HerdingProgram
 from app.models.quote import Quote
 
 router = APIRouter(prefix="/clients", tags=["Clients"])
@@ -65,8 +66,19 @@ def read_client_summary(client_id: int, session: Session = Depends(get_session))
         select(func.count()).select_from(Quote)
         .where(Quote.client_id == client_id, Quote.status.in_(["Draft", "Sent"]))
     ).one()
+    # The animals on the farm: the headcounts of the newest program that has
+    # any (a farm has one flock, whichever program it was last counted in).
+    groups = session.exec(
+        select(AnimalGroup).join(HerdingProgram, AnimalGroup.program_id == HerdingProgram.id)
+        .where(HerdingProgram.client_id == client_id)
+        .order_by(HerdingProgram.created_at.desc(), HerdingProgram.id.desc(), AnimalGroup.id)
+    ).all()
+    newest = groups[0].program_id if groups else None
+    farm_animals = [{"animal_type": g.animal_type, "group_size": g.group_size} for g in groups if g.program_id == newest]
     return {
         "animal_count": animal_count,
+        "farm_animals": farm_animals,
+        "farm_animal_total": sum(g["group_size"] for g in farm_animals),
         "unpaid_invoice_count": len(unpaid),
         "outstanding": round(sum(i.total_amount for i in unpaid), 2),
         "last_invoice_date": max((i.date for i in invoices), default=None),

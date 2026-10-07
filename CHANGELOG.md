@@ -21,6 +21,9 @@ All notable changes to Sandveld Vee Dienste. Newest first.
 - **Excel per client**: download a client's program as an Excel sheet in the same layout (it still calculates in Excel), and import a filled-in sheet back into that client's program.
 - The Costs PDF is grouped in the same sections.
 - **Auto-lock**: the app locks itself (PIN to carry on) after 2, 3, 5, 10, 15, 20, 25 or 30 minutes of nobody using it, or Off. Set under Settings -> Security & Auto-Lock; kept per computer/phone, on at 10 minutes to begin with.
+- **Every client is a farm**: the farm's name is the heading everywhere (Clients list, client page, calendar, hover card), with the contact person under it. The client page has a "The farm" card: how many animals are on the farm (and the split by type, from the herding program's animal numbers), phone, email, farm and postal address.
+- **Herding program invoices from the client page**: each program card shows how many dates are invoiced and a one-click button for the next date's invoice once the quote is accepted.
+- **Visits can be changed**: the pencil on a client's appointment changes its date, time or reason, and every change shows on the System Calendar straight away.
 - **Settings looks like the iPhone's Settings app**: a list (with search and your profile on top) and the page beside it - on a phone, the list first and a "Settings" back button. General, Security & Auto-Lock and Company details, then one entry per department (Clients, Programs & Quotes, Products, Orders, Invoices, Purchase Orders, Calendar, Weather, Product Calc), then Phones, Data & Backups and Legal.
 
 ### Changed

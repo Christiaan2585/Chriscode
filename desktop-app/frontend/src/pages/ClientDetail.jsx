@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Calendar, Plus, Trash2, Check, StickyNote,
   Phone, MessageCircle, Edit, Briefcase, Mail, MapPin,
-  FileText, ShoppingCart, Download, Eye, BookOpen, ChevronRight, Clock, CheckCircle, Ban,
+  FileText, ShoppingCart, Download, Eye, BookOpen, ChevronRight, Clock, CheckCircle, Ban, PawPrint, Pencil, Home,
 } from "lucide-react";
 import { clientService } from "../api/services";
 import apiClient from "../api/client";
@@ -15,7 +15,7 @@ import HerdingProgramPanel from "../components/HerdingProgramPanel";
 import { loadedLanguages, useSupplierBook } from "../components/SupplierCatalogue";
 import { DocumentHover } from "../components/PreviewCards";
 import { downloadDocumentPdf, orderFormFor } from "../utils/documents";
-import { money, statusStyle } from "../utils/format";
+import { farmLabel, money, statusStyle } from "../utils/format";
 
 
 const ClientDetail = () => {
@@ -32,6 +32,7 @@ const ClientDetail = () => {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const emptyAppointment = { animal_id: "", date: new Date().toISOString().split("T")[0], time: "09:00", reason: "", status: "scheduled" };
   const [newAppointment, setNewAppointment] = useState(emptyAppointment);
+  const [editingAppointmentId, setEditingAppointmentId] = useState(null);
 
   const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: ["client", id],
@@ -56,6 +57,10 @@ const ClientDetail = () => {
   const { data: invoices } = useQuery({
     queryKey: ["invoices", "client", id],
     queryFn: async () => (await apiClient.get(`/invoices/client/${id}`)).data,
+  });
+  const { data: summary } = useQuery({
+    queryKey: ["clients", id, "summary"],
+    queryFn: async () => (await apiClient.get(`/clients/${id}/summary`)).data,
   });
   const { data: appointments } = useQuery({
     queryKey: ["appointments", "client", id],
@@ -99,7 +104,12 @@ const ClientDetail = () => {
 
   const updateQuoteMutation = useMutation({
     mutationFn: async ({ quoteId, data }) => (await apiClient.put(`/quotes/${quoteId}`, data)).data,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["quotes", "client", id] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["quotes", "client", id] });
+      // A herding program's quote is the program: its card must follow.
+      queryClient.invalidateQueries({ queryKey: ["program-schedule"] });
+      queryClient.invalidateQueries({ queryKey: ["programs"] });
+    },
   });
   const deleteQuoteMutation = useMutation({
     mutationFn: async (quoteId) => (await apiClient.delete(`/quotes/${quoteId}`)).data,
@@ -124,33 +134,37 @@ const ClientDetail = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["invoices", "client", id] }),
   });
 
-  const addAppointmentMutation = useMutation({
-    mutationFn: async (data) =>
-      (
-        await apiClient.post("/appointments/", {
-          client_id: Number(id),
-          animal_id: data.animal_id === "" ? null : Number(data.animal_id),
-          date: data.date,
-          time: data.time,
-          reason: data.reason,
-          status: "scheduled",
-        })
-      ).data,
+  // Every appointment change refreshes the calendar as well as this page.
+  const refreshAppointments = () => queryClient.invalidateQueries({ queryKey: ["appointments"] });
+
+  const saveAppointmentMutation = useMutation({
+    mutationFn: async (data) => {
+      const body = {
+        client_id: Number(id),
+        animal_id: data.animal_id === "" || data.animal_id == null ? null : Number(data.animal_id),
+        date: data.date,
+        time: data.time,
+        reason: data.reason,
+        status: data.status || "scheduled",
+      };
+      return editingAppointmentId
+        ? (await apiClient.put(`/appointments/${editingAppointmentId}`, body)).data
+        : (await apiClient.post("/appointments/", body)).data;
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["appointments", "client", id] });
-      setIsScheduleModalOpen(false);
-      setNewAppointment(emptyAppointment);
+      refreshAppointments();
+      closeScheduleModal();
     },
   });
 
   const updateAppointmentMutation = useMutation({
     mutationFn: async ({ appointmentId, data }) => (await apiClient.put(`/appointments/${appointmentId}`, data)).data,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments", "client", id] }),
+    onSuccess: refreshAppointments,
   });
 
   const deleteAppointmentMutation = useMutation({
     mutationFn: async (appointmentId) => (await apiClient.delete(`/appointments/${appointmentId}`)).data,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments", "client", id] }),
+    onSuccess: refreshAppointments,
   });
 
   if (clientLoading) return <div className="p-8 text-center">Loading client details...</div>;
@@ -165,6 +179,26 @@ const ClientDetail = () => {
   const upcomingAppointments = (appointments || [])
     .slice()
     .sort((a, b) => new Date(`${a.date}T${a.time || "00:00"}`) - new Date(`${b.date}T${b.time || "00:00"}`));
+
+  function closeScheduleModal() {
+    setIsScheduleModalOpen(false);
+    setEditingAppointmentId(null);
+    setNewAppointment(emptyAppointment);
+  }
+  const openEditAppointment = (app) => {
+    setEditingAppointmentId(app.id);
+    setNewAppointment({
+      animal_id: app.animal_id ?? "",
+      date: String(app.date).slice(0, 10),
+      time: app.time || "09:00",
+      reason: app.reason || "",
+      status: app.status,
+    });
+    setIsScheduleModalOpen(true);
+  };
+
+  const farmAnimals = summary?.farm_animals || [];
+  const farmAnimalTotal = summary?.farm_animal_total || 0;
 
   const openEditClient = () => {
     setClientForm({
@@ -187,8 +221,11 @@ const ClientDetail = () => {
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h2 className="text-3xl font-bold text-slate-800">{client.name}</h2>
-            <p className="text-slate-500">{client.farm_name || "Client Profile & History"}</p>
+            <h2 className="text-3xl font-bold text-slate-800">{farmLabel(client)}</h2>
+            <p className="text-slate-500">
+              {client.farm_name ? `Contact: ${client.name}` : "Farm profile & history"}
+              {farmAnimalTotal > 0 && <> · {farmAnimalTotal.toLocaleString()} animals</>}
+            </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -225,20 +262,35 @@ const ClientDetail = () => {
         {/* Left column: contact info + notes */}
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-            <h3 className="text-lg font-semibold mb-4 border-b pb-2">Contact Information</h3>
+            <h3 className="text-lg font-semibold mb-4 border-b pb-2 flex items-center gap-2">
+              <Home size={18} className="text-emerald-600" /> The farm
+            </h3>
             <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <Briefcase size={16} className="text-slate-400 mt-0.5" />
+                <PawPrint size={16} className="text-slate-400 mt-0.5" />
                 <div className="flex flex-col">
-                  <span className="text-xs text-slate-400 uppercase font-bold">Farm / Business</span>
-                  <span className="text-slate-700">{client.farm_name || "—"}</span>
+                  <span className="text-xs text-slate-400 uppercase font-bold">Animals on the farm</span>
+                  {farmAnimalTotal > 0 ? (
+                    <>
+                      <span className="text-2xl font-bold text-slate-800 leading-tight">{farmAnimalTotal.toLocaleString()}</span>
+                      <span className="mt-1 flex flex-wrap gap-1">
+                        {farmAnimals.map((g) => (
+                          <span key={g.animal_type} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                            {g.animal_type} × {g.group_size}
+                          </span>
+                        ))}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-sm text-slate-500">Not counted yet - fill in the animal numbers on a herding program below.</span>
+                  )}
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <Mail size={16} className="text-slate-400 mt-0.5" />
+                <Briefcase size={16} className="text-slate-400 mt-0.5" />
                 <div className="flex flex-col">
-                  <span className="text-xs text-slate-400 uppercase font-bold">Email</span>
-                  <span className="text-slate-700">{client.email || "—"}</span>
+                  <span className="text-xs text-slate-400 uppercase font-bold">Contact person</span>
+                  <span className="text-slate-700">{client.name}</span>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -249,12 +301,28 @@ const ClientDetail = () => {
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <MapPin size={16} className="text-slate-400 mt-0.5" />
+                <Mail size={16} className="text-slate-400 mt-0.5" />
                 <div className="flex flex-col">
-                  <span className="text-xs text-slate-400 uppercase font-bold">Address</span>
-                  <span className="text-slate-700">{client.address || "—"}</span>
+                  <span className="text-xs text-slate-400 uppercase font-bold">Email</span>
+                  <span className="text-slate-700 break-all">{client.email || "—"}</span>
                 </div>
               </div>
+              <div className="flex items-start gap-3">
+                <MapPin size={16} className="text-slate-400 mt-0.5" />
+                <div className="flex flex-col">
+                  <span className="text-xs text-slate-400 uppercase font-bold">Farm address</span>
+                  <span className="whitespace-pre-line text-slate-700">{client.address || "—"}</span>
+                </div>
+              </div>
+              {client.postal_address && (
+                <div className="flex items-start gap-3">
+                  <Mail size={16} className="text-slate-400 mt-0.5" />
+                  <div className="flex flex-col">
+                    <span className="text-xs text-slate-400 uppercase font-bold">Postal address</span>
+                    <span className="whitespace-pre-line text-slate-700">{client.postal_address}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -386,6 +454,13 @@ const ClientDetail = () => {
                       }`}>
                         {app.status}
                       </span>
+                      <button
+                        onClick={() => openEditAppointment(app)}
+                        className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                        title="Change date, time or reason"
+                      >
+                        <Pencil size={16} />
+                      </button>
                       <button
                         onClick={() => updateAppointmentMutation.mutate({ appointmentId: app.id, data: { ...app, status: "completed" } })}
                         disabled={app.status === "completed"}
@@ -683,7 +758,7 @@ const ClientDetail = () => {
         )}
       </Modal>
 
-      <Modal isOpen={isScheduleModalOpen} onClose={() => setIsScheduleModalOpen(false)} title={`Schedule Visit for ${client.name}`}>
+      <Modal isOpen={isScheduleModalOpen} onClose={closeScheduleModal} title={`${editingAppointmentId ? "Change visit" : "Schedule visit"} - ${farmLabel(client)}`}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -729,11 +804,11 @@ const ClientDetail = () => {
             />
           </div>
           <button
-            disabled={!newAppointment.reason || addAppointmentMutation.isPending}
-            onClick={() => addAppointmentMutation.mutate(newAppointment)}
+            disabled={!newAppointment.reason || !newAppointment.date || saveAppointmentMutation.isPending}
+            onClick={() => saveAppointmentMutation.mutate(newAppointment)}
             className="w-full bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50"
           >
-            {addAppointmentMutation.isPending ? "Saving..." : "Schedule Visit"}
+            {saveAppointmentMutation.isPending ? "Saving..." : editingAppointmentId ? "Save changes" : "Schedule Visit"}
           </button>
         </div>
       </Modal>

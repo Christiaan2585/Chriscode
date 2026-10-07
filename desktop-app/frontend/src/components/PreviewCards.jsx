@@ -4,7 +4,7 @@ import { Mail, MapPin, Phone } from "lucide-react";
 import apiClient from "../api/client";
 import HoverCard from "./HoverCard";
 import { fetchDocumentItems } from "../utils/documents";
-import { money, shortDate, statusStyle } from "../utils/format";
+import { farmLabel, money, shortDate, statusStyle } from "../utils/format";
 
 const MAX_LINES = 6;
 
@@ -31,8 +31,8 @@ const ClientCardContent = ({ client }) => {
   return (
     <div className="space-y-3">
       <div>
-        <div className="font-semibold text-slate-800">{client.name}</div>
-        {client.farm_name && <div className="text-xs text-slate-500">{client.farm_name}</div>}
+        <div className="font-semibold text-slate-800">{farmLabel(client)}</div>
+        {client.farm_name && <div className="text-xs text-slate-500">{client.name}</div>}
       </div>
       {contact.length > 0 && (
         <ul className="space-y-1 text-slate-600">
@@ -50,7 +50,7 @@ const ClientCardContent = ({ client }) => {
         <p className="text-xs text-slate-400">Loading summary…</p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
-          <Stat label="Animals" value={summary.animal_count} />
+          <Stat label="Animals on the farm" value={summary.farm_animal_total || summary.animal_count} />
           <Stat
             label="Owed"
             value={money(summary.outstanding)}

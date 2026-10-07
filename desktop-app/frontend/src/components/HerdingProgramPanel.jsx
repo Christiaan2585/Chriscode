@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardList, Trash2 } from "lucide-react";
+import { ClipboardList, FileText, Trash2 } from "lucide-react";
 import apiClient from "../api/client";
 import Modal from "./Modal";
 import SearchableSelect from "./SearchableSelect";
@@ -192,6 +192,40 @@ export const StepDate = ({ step, onSave }) => {
   );
 };
 
+// The program's invoices: once the quote is accepted, each treatment date is
+// invoiced from the agreed lines - this is the shortcut for the next one.
+const ProgramInvoicing = ({ program, data }) => {
+  const queryClient = useQueryClient();
+  const invoiceable = (data.steps || []).filter((s) => s.products?.length);
+  const next = invoiceable.find((s) => !s.invoice);
+  const make = useMutation({
+    mutationFn: async (stepId) => (await apiClient.post(`/programs/${program.id}/steps/${stepId}/invoice`)).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["program-schedule", program.id] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
+  if (!invoiceable.length) return null;
+  const invoiced = invoiceable.filter((s) => s.invoice).length;
+  const accepted = data.quote?.status === "Accepted";
+  const label = next && (next.stage || ruleLabel(next));
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-emerald-100 pt-2 text-xs text-slate-600">
+      <span>{invoiced} of {invoiceable.length} dates invoiced</span>
+      {next && accepted && (
+        <button type="button" disabled={make.isPending}
+          onClick={() => {
+            if (window.confirm(`Make the invoice for "${label}" (${dayLabel(next.date)}) from the accepted quote?`)) make.mutate(next.id);
+          }}
+          className="flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-0.5 font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+          <FileText size={12} /> Invoice {label}
+        </button>
+      )}
+      {next && !accepted && <span className="text-amber-700">Accept the quote to start invoicing</span>}
+    </div>
+  );
+};
+
 const ProgramCard = ({ program, onOpen, onDelete }) => {
   const { data } = useSchedule(program.id);
   const next = nextStep(data?.steps);
@@ -231,6 +265,7 @@ const ProgramCard = ({ program, onOpen, onDelete }) => {
           <Trash2 size={16} />
         </button>
       </div>
+      {data && <ProgramInvoicing program={program} data={data} />}
       {(program.groups || []).length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {program.groups.map((g) => (
