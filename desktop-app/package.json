@@ -53,6 +53,12 @@
       "**/*",
       "!frontend/node_modules",
       "!frontend/src",
+      "!frontend/android",
+      "!dist-android",
+      "!frontend/capacitor.config.json",
+      "!**/keystore.properties",
+      "!**/local.properties",
+      "!**/*.jks",
       "!scripts"
     ],
     "extraResources": [
