@@ -17,8 +17,22 @@ const deviceName = () => {
 // VPN such as Tailscale's 100.64.0.0/10) - never an internet address. A
 // pairing link pointing anywhere else is someone trying to get this phone's
 // staff to type their password into their server.
-const PRIVATE_HOST = /^(10\.\d+|192\.168|172\.(1[6-9]|2\d|3[01])|169\.254|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7]))\.\d+\.\d+$|\.local$/i;
-export const isOfficeAddress = (host) => PRIVATE_HOST.test(String(host || "").trim());
+// Whole-string matches only ("evil.com/x.local" must not pass), and the
+// address is re-read by the URL parser so nothing in it (an "@", a port
+// like "1@evil.com") can point the request anywhere else.
+const PRIVATE_IP = /^(10\.\d{1,3}|192\.168|172\.(1[6-9]|2\d|3[01])|169\.254|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7]))\.\d{1,3}\.\d{1,3}$/;
+const LOCAL_NAME = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.local$/i;
+export const isOfficeAddress = (host, port = 8443) => {
+  const h = String(host || "").trim();
+  if (!PRIVATE_IP.test(h) && !LOCAL_NAME.test(h)) return false;
+  if (!Number.isInteger(Number(port)) || Number(port) < 1 || Number(port) > 65535) return false;
+  try {
+    const url = new URL(`https://${h}:${Number(port)}/`);
+    return url.hostname === h.toLowerCase() && url.port === String(Number(port)) && !url.username;
+  } catch {
+    return false;
+  }
+};
 
 // Tries each address the PC offered (it may have more than one network
 // interface) until one actually answers.
@@ -54,7 +68,8 @@ const PairingScreen = ({ onPaired }) => {
 
   const pair = async ({ hosts, port, fp, code }) => {
     setOffer(null);
-    const office = (hosts || []).filter(isOfficeAddress);
+    port = Number(port);
+    const office = (hosts || []).map((h) => String(h).trim()).filter((h) => isOfficeAddress(h, port));
     if (!office.length) {
       setStatus("error");
       setError("That isn't an office network address, so this app won't pair with it. Only scan the QR code shown on the office PC.");
