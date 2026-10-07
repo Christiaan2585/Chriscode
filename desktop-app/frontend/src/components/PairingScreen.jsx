@@ -13,6 +13,13 @@ const deviceName = () => {
   }
 };
 
+// The office PC is only ever on the office network (or, later, a private
+// VPN such as Tailscale's 100.64.0.0/10) - never an internet address. A
+// pairing link pointing anywhere else is someone trying to get this phone's
+// staff to type their password into their server.
+const PRIVATE_HOST = /^(10\.\d+|192\.168|172\.(1[6-9]|2\d|3[01])|169\.254|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7]))\.\d+\.\d+$|\.local$/i;
+export const isOfficeAddress = (host) => PRIVATE_HOST.test(String(host || "").trim());
+
 // Tries each address the PC offered (it may have more than one network
 // interface) until one actually answers.
 async function pairAgainst(hosts, port, fingerprint, code) {
@@ -43,7 +50,17 @@ const PairingScreen = ({ onPaired }) => {
   const [error, setError] = useState(null);
   const [manual, setManual] = useState({ host: "", port: "8443", fingerprint: "", code: "" });
 
+  const [offer, setOffer] = useState(null); // pairing details from a link, waiting for the user's OK
+
   const pair = async ({ hosts, port, fp, code }) => {
+    setOffer(null);
+    const office = (hosts || []).filter(isOfficeAddress);
+    if (!office.length) {
+      setStatus("error");
+      setError("That isn't an office network address, so this app won't pair with it. Only scan the QR code shown on the office PC.");
+      return;
+    }
+    hosts = office;
     setStatus("pairing");
     setError(null);
     try {
@@ -60,7 +77,9 @@ const PairingScreen = ({ onPaired }) => {
   useEffect(() => {
     const subscription = App.addListener("appUrlOpen", ({ url }) => {
       const data = decodePairingLink(url);
-      if (data) pair({ hosts: data.hosts, port: data.port, fp: data.fp, code: data.code });
+      // Never pair straight from a link - anyone can send one. Show where it
+      // points and let the user say yes.
+      if (data) setOffer({ hosts: data.hosts, port: data.port, fp: data.fp, code: data.code });
     });
     return () => {
       subscription.then((handle) => handle.remove());
@@ -85,6 +104,19 @@ const PairingScreen = ({ onPaired }) => {
           </p>
         </div>
 
+        {offer && (
+          <div role="alertdialog" aria-label="Confirm pairing" className="space-y-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <p>
+              Pair with the office PC at <b>{(offer.hosts || []).join(" / ")}</b>? Only say yes if you just scanned the QR code
+              on the office PC yourself.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setOffer(null)} className="px-3 py-1.5 font-medium text-slate-600">Cancel</button>
+              <button type="button" onClick={() => pair(offer)}
+                className="rounded-lg bg-emerald-600 px-3 py-1.5 font-medium text-white hover:bg-emerald-700">Pair</button>
+            </div>
+          </div>
+        )}
         {status === "pairing" && <p className="text-center text-sm text-emerald-700">Pairing...</p>}
         {status === "error" && <p role="alert" className="text-center text-sm text-red-600">{error}</p>}
 

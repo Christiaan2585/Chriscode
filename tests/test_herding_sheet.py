@@ -62,6 +62,30 @@ class ExcelOutTests(SheetTestCase):
         self.assertTrue(any("TOTALE KOSTE" in t for t in texts))
 
 
+class ExcelInjectionTests(SheetTestCase):
+    def test_typed_in_text_is_never_a_formula(self):
+        self.client.name = '=HYPERLINK("http://example.com","x")'
+        self.s.add(self.client)
+        step = next(s for s in herding.ordered_steps(self.s) if s.section == LAM)
+        step.stage = "=1+1"
+        self.s.add(step)
+        self.s.commit()
+        ws = load_workbook(io.BytesIO(self.export(self.program()))).worksheets[0]
+        cells = {c.value: c.data_type for row in ws.iter_rows() for c in row if isinstance(c.value, str)}
+        self.assertEqual(cells[self.client.name], "s")
+        self.assertEqual(cells["=1+1"], "s")
+        self.assertEqual(cells["=A12+147"], "f")  # the sheet's own formulas still work
+
+    def test_such_text_reads_back_as_text(self):
+        step = next(s for s in herding.ordered_steps(self.s) if s.section == LAM)
+        step.stage = "=1+1"
+        self.s.add(step)
+        self.s.commit()
+        fresh = self.program()
+        data = self.export(fresh)
+        programs.import_program_sheet_bytes(fresh.id, data, session=self.s)  # no "couldn't work out the date"
+
+
 class ExcelInTests(SheetTestCase):
     def other_program(self):
         other = HerdingProgram(name="Nuut", client_id=self.client.id, mating_date=datetime(2026, 1, 5))

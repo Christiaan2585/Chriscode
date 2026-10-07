@@ -603,7 +603,7 @@ def parse_cost_sheet(data: bytes, products) -> dict:
                                   "PRODUK / DOSERING header and DEKTYD with the first mating date)")
 
     formulas = {r: cell("A", r) for r in range(1, ws.max_row + 1)
-                if isinstance(cell("A", r), str) and cell("A", r).startswith("=")}
+                if ws[f"A{r}"].data_type == "f"}
     lambing_row = next((r for r, f in formulas.items() if re.fullmatch(rf"=\+?\$?A\$?{mating_row}\+(\d+)", f.replace(" ", ""))
                         and "lam" in str(cell("B", r) or "").lower()), None)
     gestation = int(re.search(r"\+(\d+)$", formulas[lambing_row].replace(" ", "")).group(1)) if lambing_row else 147
@@ -828,8 +828,15 @@ def export_client_sheet(session: Session, program: HerdingProgram, client, rep=(
     ws.title = "ENT EN DOSEER KOSTE"
     for col, width in zip("ABCDEFGH", (23.6, 52.5, 44.6, 9.5, 14.5, 12.8, 12.8, 26)):
         ws.column_dimensions[col].width = width
+    def text(ref, value):
+        """Text someone typed into the app (names, notes, products): always a
+        plain string cell - openpyxl would store "=..." as a live formula."""
+        ws[ref] = value
+        if isinstance(value, str):
+            ws[ref].data_type = "s"
+
     for row, value in enumerate(rep, start=1):
-        ws[f"A{row}"] = value
+        text(f"A{row}", value)
     ws["B1"] = f"VEEARTSENYPROGRAM KOSTE BEREKENING {sched['anchors']['lambing_start'].year}"
     ws["B1"].font = bold
     ws["A4"], ws["B4"] = "=SUM(A5:A9)", "TOTALE DIERE"
@@ -838,7 +845,8 @@ def export_client_sheet(session: Session, program: HerdingProgram, client, rep=(
         ws[f"A{row}"], ws[f"B{row}"] = groups.get(name, 0), f"TOTAAL {label.upper()}"
         ws[f"A{row}"].font = bold
     for row, (label, field) in enumerate(_CLIENT_FIELDS, start=2):
-        ws[f"C{row}"], ws[f"D{row}"] = label, getattr(client, field, None) if client else None
+        ws[f"C{row}"] = label
+        text(f"D{row}", getattr(client, field, None) if client else None)
     for col, head in zip("ABCDEFGH", ("DATUM", "TYD", "PRODUK", "VERPAK", "PRYS EXCL VAT", "DOSERING ml / Dier",
                                       "PRODUK TOTAAL", "TOTAAL R EXCL VAT")):
         ws[f"{col}10"] = head
@@ -866,14 +874,16 @@ def export_client_sheet(session: Session, program: HerdingProgram, client, rep=(
         for step in (steps[i] for i in section["step_ids"]):
             if not box:
                 row += 1
-                ws[f"A{row}"], ws[f"B{row}"] = date_formula(step), step["stage"]
+                ws[f"A{row}"] = date_formula(step)
+                text(f"B{row}", step["stage"])
                 ws[f"A{row}"].number_format, ws[f"A{row}"].font, ws[f"B{row}"].font = day_fmt, bold, bold
             notes = [n for n in (step["management"] or "").split("\n") if n.strip()] if step["origin"] == "cost" else []
             for i, line in enumerate(step["products"]):
                 row += 1
                 if i < len(notes):
-                    ws[f"A{row}"] = notes[i]
-                ws[f"B{row}"], ws[f"C{row}"] = line["category"], line["product_name"]
+                    text(f"A{row}", notes[i])
+                text(f"B{row}", line["category"])
+                text(f"C{row}", line["product_name"])
                 ws[f"D{row}"], ws[f"E{row}"] = line["pack_size"], line["price_excl_vat"]
                 if line["fixed_quantity"]:
                     ws[f"F{row}"], ws[f"G{row}"] = line["fixed_quantity"], f'=IFERROR(F{row},"")'
