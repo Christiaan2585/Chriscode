@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { checkPin, makeVerifier } from "./pinVerifier.js";
-import { MAX_OFFLINE_FAILURES, saveOfflineLogin, tryOfflineUnlock, offlineLoginExists, touchOfflineLogin } from "./offlineLogin.js";
+import { MAX_OFFLINE_FAILURES, saveOfflineLogin, tryOfflineUnlock, offlineLoginExists, touchOfflineLogin, updateOfflineUser } from "./offlineLogin.js";
 
 // A secure store that keeps text in a map, like the phone's Keystore-sealed one.
 const memoryStore = () => {
@@ -96,4 +96,31 @@ test("a check-in with the office PC renews the time", async () => {
   await saveOfflineLogin(store, "24680", USER, { ...FAST, now: () => start });
   await touchOfflineLogin(store, { now: () => start + 6 * day });
   assert.equal((await tryOfflineUnlock(store, "24680", { now: () => start + 12 * day })).ok, true);
+});
+
+test("moving the phone's clock back does not buy more time", async () => {
+  const store = memoryStore();
+  const day = 24 * 60 * 60 * 1000;
+  const start = 1_700_000_000_000;
+  await saveOfflineLogin(store, "24680", USER, { ...FAST, now: () => start });
+  assert.equal((await tryOfflineUnlock(store, "24680", { now: () => start + 6 * day })).ok, true);
+  const rolledBack = await tryOfflineUnlock(store, "24680", { now: () => start + 3 * day }); // earlier than the last time it was used
+  assert.deepEqual([rolledBack.ok, rolledBack.expired], [false, true]);
+  assert.equal(await offlineLoginExists(store), false);
+});
+
+test("a small clock correction is not mistaken for tampering", async () => {
+  const store = memoryStore();
+  const start = 1_700_000_000_000;
+  await saveOfflineLogin(store, "24680", USER, { ...FAST, now: () => start });
+  assert.equal((await tryOfflineUnlock(store, "24680", { now: () => start + 60_000 })).ok, true);
+  assert.equal((await tryOfflineUnlock(store, "24680", { now: () => start + 30_000 })).ok, true); // 30 s back
+});
+
+test("a check-in or profile update that lands during a lock-out cannot bring the record back", async () => {
+  const store = memoryStore();
+  await saveOfflineLogin(store, "24680", USER, FAST);
+  const wrong = [..."12345"].map((d) => tryOfflineUnlock(store, `0000${d}`));
+  await Promise.all([...wrong, touchOfflineLogin(store), updateOfflineUser(store, { ...USER, name: "Late" })]);
+  assert.equal(await offlineLoginExists(store), false);
 });
