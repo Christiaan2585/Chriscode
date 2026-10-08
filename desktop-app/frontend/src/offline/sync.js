@@ -5,7 +5,8 @@ import { useSyncExternalStore } from "react";
 import apiClient, { isHoldingUnauthorized } from "../api/client";
 import { flushOutbox } from "../utils/outbox";
 import { onBackOnline, isReachable } from "./connectivity";
-import { meta, savedCopy } from "./store";
+import { touchOfflineLogin } from "./offlineLogin";
+import { meta, savedCopy, secure } from "./store";
 import { downloadEverything } from "./syncPlan";
 
 const state = { running: false, done: 0, total: 0, lastSyncedAt: null, lastFullAt: null, saved: 0, deep: false };
@@ -69,6 +70,8 @@ export async function syncNow({ deep = false, queryClient } = {}) {
       } catch {
         // see loadMeta
       }
+      // Talking to the PC with a valid sign-in renews how long the PIN may open the app without it.
+      if (!isHoldingUnauthorized()) touchOfflineLogin(secure).catch(() => {});
       queryClient?.invalidateQueries(); // the screens now showing refresh from what was just fetched
     }
   } finally {

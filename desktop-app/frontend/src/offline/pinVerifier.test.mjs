@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { checkPin, makeVerifier } from "./pinVerifier.js";
-import { MAX_OFFLINE_FAILURES, saveOfflineLogin, tryOfflineUnlock, offlineLoginExists } from "./offlineLogin.js";
+import { MAX_OFFLINE_FAILURES, saveOfflineLogin, tryOfflineUnlock, offlineLoginExists, touchOfflineLogin } from "./offlineLogin.js";
 
 // A secure store that keeps text in a map, like the phone's Keystore-sealed one.
 const memoryStore = () => {
@@ -67,4 +67,33 @@ test("saving again after an online sign-in resets the count", async () => {
   await tryOfflineUnlock(store, "11111");
   await saveOfflineLogin(store, "24680", USER, FAST);
   assert.match(store.map.get("offlineLogin"), /"failures":0/);
+});
+
+test("guesses made at the same moment cannot get round the five-try limit", async () => {
+  const store = memoryStore();
+  await saveOfflineLogin(store, "24680", USER, FAST);
+  // nine wrong guesses and then the right PIN, all fired at once
+  const results = await Promise.all([..."111111111"].map((_, i) => tryOfflineUnlock(store, `0000${i}`)).concat(tryOfflineUnlock(store, "24680")));
+  assert.equal(results.some((r) => r.ok), false); // the right PIN came after the fifth miss, so it is refused
+  assert.equal(await offlineLoginExists(store), false);
+});
+
+test("offline unlock expires: the phone must have checked in with the office PC recently", async () => {
+  const store = memoryStore();
+  const day = 24 * 60 * 60 * 1000;
+  const start = 1_700_000_000_000;
+  await saveOfflineLogin(store, "24680", USER, { ...FAST, now: () => start });
+  assert.equal((await tryOfflineUnlock(store, "24680", { now: () => start + 6 * day })).ok, true);
+  const late = await tryOfflineUnlock(store, "24680", { now: () => start + 8 * day });
+  assert.deepEqual([late.ok, late.expired], [false, true]);
+  assert.equal(await offlineLoginExists(store), false); // gone until the next online PIN entry
+});
+
+test("a check-in with the office PC renews the time", async () => {
+  const store = memoryStore();
+  const day = 24 * 60 * 60 * 1000;
+  const start = 1_700_000_000_000;
+  await saveOfflineLogin(store, "24680", USER, { ...FAST, now: () => start });
+  await touchOfflineLogin(store, { now: () => start + 6 * day });
+  assert.equal((await tryOfflineUnlock(store, "24680", { now: () => start + 12 * day })).ok, true);
 });

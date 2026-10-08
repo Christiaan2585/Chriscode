@@ -149,7 +149,15 @@ export function AuthProvider({ children }) {
         persistSession({ ...result, fromPin: true }, { pin });
         notifySessionResumed();
       } catch (err) {
-        if (err.response && !cancelled) goToSignedOut(); // the PC refused (account changed, device forgotten): lock, ask again
+        if (err.response && !cancelled) {
+          // The PC refused the PIN the phone had accepted on its own (account removed or changed, phone signed out
+          // there): nothing saved on this phone may keep opening - forget the offline check and the saved copy.
+          if (err.response.status === 401 || err.response.status === 403) {
+            clearOfflineLogin(secure).catch(() => {});
+            wipeSavedCopy().catch(() => {});
+          }
+          goToSignedOut();
+        }
       } finally {
         busy = false;
       }
@@ -236,7 +244,9 @@ export function AuthProvider({ children }) {
       setScreen('app');
       return;
     }
-    setError(outcome.disabled
+    setError(outcome.expired
+      ? "It has been too long since this phone checked in with the office PC. Connect to the office Wi-Fi and enter your PIN."
+      : outcome.disabled
       ? "Can't reach the office PC, and unlocking without it isn't available. Connect to the office Wi-Fi and enter your PIN."
       : `Incorrect PIN - ${outcome.left} ${outcome.left === 1 ? 'try' : 'tries'} left`);
     throw new Error('offline unlock refused');
@@ -257,6 +267,11 @@ export function AuthProvider({ children }) {
     } catch (err) {
       if (isNative() && !err.response) return unlockOffline(pin);
       const detail = err.response?.data?.detail;
+      if (isNative() && detail === 'Please sign in again') {
+        // This phone's sign-in was ended on the PC: the offline PIN check and the saved copy go with it.
+        clearOfflineLogin(secure).catch(() => {});
+        wipeSavedCopy().catch(() => {});
+      }
       setError((typeof detail === 'string' ? detail : detail?.message) || 'Something went wrong. Please try again.');
       throw err;
     }
