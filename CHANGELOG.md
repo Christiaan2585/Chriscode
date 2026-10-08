@@ -5,6 +5,8 @@ All notable changes to Sandveld Vee Dienste. Newest first.
 ## 1.0.10 - 2026-10-08
 
 ### New
+- **Ram ID tags**: each client's page has a Rams card - type an ear-tag number and press Add, then use the pencil for the ram's name, breed, birth date and notes. A tag can only be used once on a farm. The top search finds a ram by its tag and opens its farm, and the phone keeps the rams in its offline copy.
+- **New header animation**: the sheep, cow, collie and bakkie now run in that order, with a more realistic red-and-white collie (like the photo you sent) and the bakkie drawn as a 2006 Land Cruiser 79 with a bullbar, snorkel, cattle rails, a farmer at the wheel and a collie riding on the back.
 - **The phone keeps a copy of the office data and syncs it** (Android): right after pairing and signing in, the app downloads the clients (with their pages), products and pictures, invoices, quotes, orders, purchase orders, programs, calendar, visits and the dashboard. Out of the office Wi-Fi, an "Offline" badge shows and everything still opens from that copy; your PIN opens the app without the office PC (5 wrong tries switch that off until you sign in online again). New quotes and ticked program dates are kept and sent when the PC is back, then the phone signs in again by itself and refreshes. Unlocking without the PC stops working a week after the phone last checked in with it (or at once if the PC refuses the phone), and guessing PINs in parallel cannot get round the five-try limit. Settings -> Phones shows when it last refreshed and has Download everything again / Remove saved data. A half-sent quote no longer risks being made twice.
 
 ## 1.0.9 - 2026-10-07

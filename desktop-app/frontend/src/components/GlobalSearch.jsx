@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Search, Users, Package } from "lucide-react";
+import { Search, Users, Package, Tag } from "lucide-react";
 import apiClient from "../api/client";
 import { useMediaQuery } from "../utils/useMediaQuery";
 
@@ -13,7 +13,7 @@ const listQuery = (key, path, enabled) => ({
   enabled,
 });
 
-// Header search across clients and products. Reuses the same
+// Header search across clients, rams (by ear-tag number) and products. Reuses the same
 // query keys as the list pages, so it shares their cache instead of
 // refetching; nothing loads until the box is first focused.
 const GlobalSearch = () => {
@@ -27,6 +27,7 @@ const GlobalSearch = () => {
 
   const { data: clients = [] } = useQuery(listQuery("clients", "/clients/", loaded));
   const { data: products = [] } = useQuery(listQuery("products", "/products/", loaded));
+  const { data: rams = [] } = useQuery(listQuery("rams", "/rams/", loaded));
 
   useEffect(() => {
     const onKey = (e) => {
@@ -45,11 +46,17 @@ const GlobalSearch = () => {
     return [
       ...clients.filter((c) => matches(q, c.name, c.farm_name, c.email, c.phone)).slice(0, PER_GROUP)
         .map((c) => ({ key: `c${c.id}`, group: "Clients", Icon: Users, title: c.name, sub: c.farm_name || c.phone, to: `/clients/${c.id}` })),
+      // A ram's ear-tag number finds the farm it is on.
+      ...rams.filter((r) => matches(q, r.tag_id, r.name)).slice(0, PER_GROUP)
+        .map((r) => {
+          const farm = clients.find((c) => c.id === r.client_id);
+          return { key: `r${r.id}`, group: "Rams", Icon: Tag, title: `Ram ${r.tag_id}`, sub: [r.name !== `Ram ${r.tag_id}` ? r.name : null, farm?.farm_name || farm?.name].filter(Boolean).join(" · "), to: `/clients/${r.client_id}` };
+        }),
       ...products.filter((p) => matches(q, p.name, p.code)).slice(0, PER_GROUP)
         .map((p) => ({ key: `p${p.id}`, group: "Products", Icon: Package, title: p.name,
           sub: `R ${Number(p.price || 0).toFixed(2)}${p.code ? ` · ${p.code}` : ""}`, to: "/products" })),
     ];
-  }, [query, clients, products]);
+  }, [query, clients, products, rams]);
 
   const go = (result) => {
     navigate(result.to);

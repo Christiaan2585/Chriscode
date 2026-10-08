@@ -24,7 +24,7 @@ test("everything the phone shows is downloaded, including each client's own page
   const result = await downloadEverything({ get });
   for (const url of BASE_ENDPOINTS) assert.ok(asked.some((a) => a.startsWith(url)), url);
   for (const url of ["/clients/1", "/clients/1/summary", "/animals/client/1", "/notes/client/1", "/quotes/client/1", "/orders/client/1",
-    "/invoices/client/1", "/appointments/client/1", "/programs/client/1", "/clients/2/summary", "/programs/7/schedule",
+    "/invoices/client/1", "/appointments/client/1", "/rams/client/1", "/programs/client/1", "/clients/2/summary", "/programs/7/schedule",
     "/invoices/10/items", "/quotes/20/items", "/quotes/21/items"]) {
     assert.ok(asked.includes(url), url);
   }

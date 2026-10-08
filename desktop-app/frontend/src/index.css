@@ -150,7 +150,7 @@ html.theme-dark {
    'unsafe-inline', which silently blocks inline <style> elements (that is how
    an earlier version of this animation shipped frozen and unstyled).
    Deliberately calm: slow, smooth, no sway and nothing that flickers. */
-.chase-thigh, .chase-shin, .chase-bob, .chase-tail, .chase-lunge, .chase-wheel, .chase-truck-body, .chase-rider {
+.chase-thigh, .chase-shin, .chase-bob, .chase-tail, .chase-lunge, .chase-wheel, .chase-truck-body, .chase-rider, .chase-ear {
   transform-box: view-box;
   transform-origin: 0 0; /* the pivot is the group's own local origin: hip, knee, rump, axle... */
 }
@@ -193,9 +193,12 @@ html.theme-dark {
 
 /* The bakkie rides the paddock: a gentle bounce, the collie in the back nodding with it, wheels turning. */
 .chase-truck-body { animation: chase-truck 1.9s ease-in-out infinite; }
+.chase-rider { animation: chase-rider 1.9s ease-in-out infinite; animation-delay: -0.3s; }
+@keyframes chase-rider { 0%, 100% { transform: rotate(0deg); } 40% { transform: rotate(-1.4deg); } 70% { transform: rotate(1deg); } }
+.chase-ear { animation: chase-ear 0.55s ease-in-out infinite alternate; }
+@keyframes chase-ear { from { transform: rotate(-6deg); } to { transform: rotate(14deg); } }
+.chase-tail-wind { animation-duration: 0.8s; }
 @keyframes chase-truck { 0%, 100% { transform: translateY(0) rotate(0deg); } 40% { transform: translateY(-1.3px) rotate(-0.25deg); } 70% { transform: translateY(0.4px) rotate(0.2deg); } }
-.chase-rider { transform-origin: -40px -62px; animation: chase-rider 1.9s ease-in-out infinite; animation-delay: -0.3s; }
-@keyframes chase-rider { 0%, 100% { transform: rotate(0deg); } 40% { transform: rotate(-3deg); } 70% { transform: rotate(2deg); } }
 .chase-wheel { animation: chase-spin 1.05s linear infinite; }
 @keyframes chase-spin { to { transform: rotate(360deg); } }
 .chase-headlamp { animation: chase-lamp 6s ease-in-out infinite; }

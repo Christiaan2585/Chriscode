@@ -20,7 +20,7 @@ MAX_ROWS = 100_000
 _ENTITIES = {
     "clients": "client", "products": "product", "invoices": "invoice", "quotes": "quote", "orders": "order",
     "purchase-orders": "purchase order", "programs": "herding program", "appointments": "appointment",
-    "notes": "note", "animals": "animal", "herds": "herd", "schedules": "schedule", "medical": "medical record",
+    "notes": "note", "animals": "animal", "rams": "ram", "herds": "herd", "schedules": "schedule", "medical": "medical record",
     "weights": "weight record", "dosing": "dosing rule", "business": "company details", "catalogue": "catalogue",
     "devices": "phone", "backups": "backup", "exports": "export", "auth": "user",
 }

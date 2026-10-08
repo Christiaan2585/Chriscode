@@ -11,7 +11,7 @@ from app.core.db import create_db_and_tables, database_file_path, engine
 from app.core.backup import backup_on_version_change, start_scheduler
 from app.core.local_secret import LocalSecretGuard, configured_secret
 from app.core.security import get_current_user
-from app.api import audit as audit_api, auth, clients, animals, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups, exports, business, purchase_orders, devices, catalogue
+from app.api import audit as audit_api, auth, clients, animals, rams, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups, exports, business, purchase_orders, devices, catalogue
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -84,6 +84,7 @@ app.include_router(devices.router)
 _protected = [Depends(get_current_user)]
 app.include_router(clients.router, dependencies=_protected)
 app.include_router(animals.router, dependencies=_protected)
+app.include_router(rams.router, dependencies=_protected)
 app.include_router(medical.router, dependencies=_protected)
 app.include_router(programs.router, dependencies=_protected)
 app.include_router(products.router, dependencies=_protected)

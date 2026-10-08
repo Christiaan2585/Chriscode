@@ -13,6 +13,7 @@ import Modal from "../components/Modal";
 import DocumentPreview from "../components/DocumentPreview";
 import HerdingProgramPanel from "../components/HerdingProgramPanel";
 import TaxCertificate from "../components/TaxCertificate";
+import RamsPanel from "../components/RamsPanel";
 import ClientPrivacy from "../components/ClientPrivacy";
 import { loadedLanguages, useSupplierBook } from "../components/SupplierCatalogue";
 import { DocumentHover } from "../components/PreviewCards";
@@ -328,6 +329,7 @@ const ClientDetail = () => {
             </div>
           </div>
 
+          <RamsPanel clientId={id} />
           <TaxCertificate clientId={id} clientName={farmLabel(client)} />
           <ClientPrivacy client={client} />
 

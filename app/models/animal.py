@@ -13,4 +13,5 @@ class Animal(SQLModel, table=True):
     birth_date: Optional[datetime] = None
     gender: Optional[str] = None
     tag_id: Optional[str] = Field(default=None, index=True)
+    notes: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)

@@ -6,13 +6,13 @@ import { monthRange } from "../utils/calendarRange.js";
 // Lists every screen starts from.
 export const BASE_ENDPOINTS = [
   "/clients/", "/products/", "/products/thumbnails", "/invoices/", "/quotes/", "/orders/", "/purchase-orders/", "/suppliers/",
-  "/programs/", "/programs/template", "/appointments/", "/animals/", "/herds/", "/business/", "/dosing/",
+  "/programs/", "/programs/template", "/appointments/", "/animals/", "/rams/", "/herds/", "/business/", "/dosing/",
   "/analytics/dashboard", "/analytics/revenue", "/analytics/revenue-by-month",
 ];
 
 const CLIENT_PAGES = (id) => [
   `/clients/${id}`, `/clients/${id}/summary`, `/animals/client/${id}`, `/notes/client/${id}`, `/quotes/client/${id}`,
-  `/orders/client/${id}`, `/invoices/client/${id}`, `/appointments/client/${id}`,
+  `/orders/client/${id}`, `/invoices/client/${id}`, `/appointments/client/${id}`, `/rams/client/${id}`,
 ];
 
 const extraParams = { "/analytics/revenue-by-month": { months: 12 } };
