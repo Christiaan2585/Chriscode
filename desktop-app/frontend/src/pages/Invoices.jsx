@@ -435,33 +435,35 @@ const Invoices = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_6rem_4.5rem_2.75rem] gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <SearchableSelect
+            <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_4.5rem_2.75rem]">
+              <div className="col-span-3 sm:col-span-1">
+<SearchableSelect
                 value={newItem.product_id}
                 onChange={(v) => setNewItem({ ...newItem, product_id: v })}
                 options={pickerProducts(products, newItem.product_id).map((p) => ({ value: p.id, label: p.name }))}
                 placeholder="Select product…"
                 searchPlaceholder="Search products…"
               />
-              <input
+              </div>
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Qty</span><input
                 type="number"
                 placeholder="Qty"
                 value={newItem.quantity}
                 onChange={(e) => setNewItem({ ...newItem, quantity: Number(e.target.value) })}
-                className="p-2 border border-slate-200 rounded-lg text-sm"
+                className="w-full p-2 border border-slate-200 rounded-lg text-sm"
                 aria-label="Quantity"
-              />
-              <input
+              /></div>
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Price</span><input
                 type="number"
                 min="0"
                 step="0.01"
                 placeholder="Price"
                 value={newItem.unit_price}
                 onChange={(e) => setNewItem({ ...newItem, unit_price: e.target.value })}
-                className="p-2 border border-slate-200 rounded-lg text-sm"
+                className="w-full p-2 border border-slate-200 rounded-lg text-sm"
                 aria-label="Unit price (blank for list price)"
-              />
-              <input
+              /></div>
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Discount %</span><input
                 type="number"
                 min="0"
                 max="100"
@@ -469,14 +471,14 @@ const Invoices = () => {
                 placeholder="Disc %"
                 value={newItem.discount_percent}
                 onChange={(e) => setNewItem({ ...newItem, discount_percent: e.target.value })}
-                className="p-2 border border-slate-200 rounded-lg text-sm"
+                className="w-full p-2 border border-slate-200 rounded-lg text-sm"
                 aria-label="Discount percent"
-              />
+              /></div>
               <button
                 onClick={addItem}
                 aria-label="Add line"
                 title="Add line"
-                className="bg-emerald-600 text-white rounded-lg p-2 hover:bg-emerald-700 transition-colors"
+                className="col-span-3 min-h-11 bg-emerald-600 text-white rounded-lg p-2 hover:bg-emerald-700 transition-colors sm:col-span-1 sm:min-h-0"
               >
                 <Plus size={18} className="mx-auto" />
               </button>

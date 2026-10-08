@@ -118,6 +118,7 @@ const AppLayout = () => {
             <GrazingHeaderStrip />
           </div>
           <div className="flex-1 lg:hidden" />
+          <OutboxBadge compact />
           <ThemeToggle />
         </header>
         <SetupReminder user={user} />

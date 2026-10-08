@@ -421,8 +421,9 @@ const Quotes = () => {
             <h4 className="font-semibold text-slate-800 flex items-center gap-2">
               <FileText size={18} /> Quote Items
             </h4>
-            <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_6rem_4.5rem_2.75rem] gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <SearchableSelect
+            <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_4.5rem_2.75rem]">
+              <div className="col-span-3 sm:col-span-1">
+<SearchableSelect
                 value={newItem.product_id}
                 onChange={(v) => {
                   const product = products?.find(p => p.id === Number(v));
@@ -436,22 +437,23 @@ const Quotes = () => {
                 placeholder="Select product…"
                 searchPlaceholder="Search products…"
               />
-              <input
+              </div>
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Qty</span><input
                 type="number"
                 placeholder="Qty"
                 value={newItem.quantity}
                 onChange={e => setNewItem({...newItem, quantity: Number(e.target.value)})}
-                className="p-2 border border-slate-200 rounded-lg text-sm"
-              />
-              <input
+                className="w-full p-2 border border-slate-200 rounded-lg text-sm"
+              /></div>
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Price</span><input
                 type="number"
                 placeholder="Price"
                 value={newItem.unit_price}
                 onChange={e => setNewItem({...newItem, unit_price: Number(e.target.value)})}
-                className="p-2 border border-slate-200 rounded-lg text-sm"
+                className="w-full p-2 border border-slate-200 rounded-lg text-sm"
                 aria-label="Unit price"
-              />
-              <input
+              /></div>
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Discount %</span><input
                 type="number"
                 min="0"
                 max="100"
@@ -459,14 +461,14 @@ const Quotes = () => {
                 placeholder="Disc %"
                 value={newItem.discount_percent}
                 onChange={e => setNewItem({...newItem, discount_percent: e.target.value})}
-                className="p-2 border border-slate-200 rounded-lg text-sm"
+                className="w-full p-2 border border-slate-200 rounded-lg text-sm"
                 aria-label="Discount percent"
-              />
+              /></div>
               <button
                 onClick={addItem}
                 aria-label="Add line"
                 title="Add line"
-                className="bg-emerald-600 text-white rounded-lg p-2 hover:bg-emerald-700 transition-colors"
+                className="col-span-3 min-h-11 bg-emerald-600 text-white rounded-lg p-2 hover:bg-emerald-700 transition-colors sm:col-span-1 sm:min-h-0"
               >
                 <Plus size={18} className="mx-auto" />
               </button>

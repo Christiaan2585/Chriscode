@@ -285,19 +285,21 @@ const PurchaseOrders = () => {
           <div className="space-y-3">
             <h4 className="flex items-center gap-2 font-semibold text-slate-800"><Truck size={18} /> Order lines</h4>
             <p className="text-xs text-slate-500">Pick a product (priced at its cost price unless you type one), or type a description for anything else.</p>
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4rem_5.5rem_4.5rem_2.75rem] gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <SearchableSelect value={line.product_id} onChange={(v) => setLine({ ...line, product_id: v })}
-                options={pickerProducts(products, line.product_id).map((p) => ({ value: p.id, label: p.code ? `${p.code} - ${p.name}` : p.name }))}
-                placeholder="Product…" searchPlaceholder="Search products…" />
-              <input className="rounded-lg border border-slate-200 p-2 text-sm" placeholder={line.product_id ? "Description (optional)" : "Description"}
+            <div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4rem_5.5rem_4.5rem_2.75rem]">
+              <div className="col-span-3 sm:col-span-1">
+                <SearchableSelect value={line.product_id} onChange={(v) => setLine({ ...line, product_id: v })}
+                  options={pickerProducts(products, line.product_id).map((p) => ({ value: p.id, label: p.code ? `${p.code} - ${p.name}` : p.name }))}
+                  placeholder="Product…" searchPlaceholder="Search products…" />
+              </div>
+              <input className="col-span-3 rounded-lg border border-slate-200 p-2 text-sm sm:col-span-1" placeholder={line.product_id ? "Description (optional)" : "Description"}
                 value={line.description} onChange={(e) => setLine({ ...line, description: e.target.value })} aria-label="Description" />
-              <input type="number" min="0" className="rounded-lg border border-slate-200 p-2 text-sm" value={line.quantity}
-                onChange={(e) => setLine({ ...line, quantity: e.target.value })} aria-label="Quantity" />
-              <input type="number" min="0" step="0.01" className="rounded-lg border border-slate-200 p-2 text-sm" placeholder="Price"
-                value={line.unit_price} onChange={(e) => setLine({ ...line, unit_price: e.target.value })} aria-label="Unit price (blank for cost price)" />
-              <input type="number" min="0" max="100" step="0.01" className="rounded-lg border border-slate-200 p-2 text-sm" placeholder="Disc %"
-                value={line.discount_percent} onChange={(e) => setLine({ ...line, discount_percent: e.target.value })} aria-label="Discount percent" />
-              <button type="button" onClick={addLine} title="Add line" className="rounded-lg bg-emerald-600 p-2 text-white hover:bg-emerald-700">
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Qty</span><input type="number" min="0" className="w-full rounded-lg border border-slate-200 p-2 text-sm" value={line.quantity}
+                onChange={(e) => setLine({ ...line, quantity: e.target.value })} aria-label="Quantity" /></div>
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Price</span><input type="number" min="0" step="0.01" className="w-full rounded-lg border border-slate-200 p-2 text-sm" placeholder="Price"
+                value={line.unit_price} onChange={(e) => setLine({ ...line, unit_price: e.target.value })} aria-label="Unit price (blank for cost price)" /></div>
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Discount %</span><input type="number" min="0" max="100" step="0.01" className="w-full rounded-lg border border-slate-200 p-2 text-sm" placeholder="Disc %"
+                value={line.discount_percent} onChange={(e) => setLine({ ...line, discount_percent: e.target.value })} aria-label="Discount percent" /></div>
+              <button type="button" onClick={addLine} title="Add line" className="col-span-3 min-h-11 rounded-lg bg-emerald-600 p-2 text-white hover:bg-emerald-700 sm:col-span-1 sm:min-h-0">
                 <Plus size={18} className="mx-auto" />
               </button>
             </div>

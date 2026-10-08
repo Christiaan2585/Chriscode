@@ -203,12 +203,16 @@ function PinDots({ length, filled }) {
 
 // Shared numeric keypad + hidden input used by both the "set your PIN" and
 // "enter your PIN" screens, so digits can be typed on a real keyboard too.
+// On a touchscreen the on-screen keypad IS the input: focusing the hidden field would pop the phone's own
+// keyboard up over the keypad.
+const touchOnly = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+
 function usePinInput(length, onComplete) {
   const [pin, setPin] = useState('');
   const inputRef = useRef(null);
 
   useEffect(() => {
-    inputRef.current?.focus();
+    if (!touchOnly()) inputRef.current?.focus();
   }, []);
 
   useEffect(() => {
@@ -224,13 +228,13 @@ function usePinInput(length, onComplete) {
     <input
       ref={inputRef}
       className="opacity-0 absolute w-0 h-0"
-      inputMode="numeric"
+      inputMode={touchOnly() ? 'none' : 'numeric'}
       value={pin}
       onChange={(e) => {
         const digits = e.target.value.replace(/\D/g, '').slice(0, length);
         setPin(digits);
       }}
-      autoFocus
+      autoFocus={!touchOnly()}
     />
   );
 
