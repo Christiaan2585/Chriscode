@@ -3,12 +3,12 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
-import { applyTheme, getTheme } from './utils/theme'
+import { applyAppearance } from './utils/theme'
 import { getPairing } from './utils/pairing'
 import { setDeviceConnection } from './api/client'
 
 // Before the first render, so screens never flash the wrong theme.
-applyTheme(getTheme())
+applyAppearance()
 
 // Error boundaries only catch errors thrown while React is rendering.
 // Errors thrown inside event handlers, timers, or unhandled promise

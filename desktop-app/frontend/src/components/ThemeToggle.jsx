@@ -1,16 +1,13 @@
-import React, { useState } from "react";
+import React from "react";
 import { Moon, Sun } from "lucide-react";
-import { applyTheme, getTheme } from "../utils/theme";
+import { setTheme } from "../utils/theme";
+import { useAppearance } from "../utils/useAppearance";
 
 const ThemeToggle = () => {
-  const [theme, setTheme] = useState(getTheme);
-  const isDark = theme === "dark";
+  const { mode } = useAppearance(); // stays in step with the Appearance settings
+  const isDark = mode === "dark";
 
-  const toggle = () => {
-    const next = isDark ? "light" : "dark";
-    applyTheme(next);
-    setTheme(next);
-  };
+  const toggle = () => setTheme(isDark ? "light" : "dark");
 
   return (
     <button

@@ -11,8 +11,8 @@ import MyDetails from "../MyDetails";
 import BusinessSettings from "../BusinessSettings";
 import PhoneSettings from "../PhoneSettings";
 import PhonePairingSettings from "../PhonePairingSettings";
-import ThemeToggle from "../ThemeToggle";
 import ActivityLog from "./ActivityLog";
+import AppearanceSettings from "./AppearanceSettings";
 import AutoLockSetting from "./AutoLockSetting";
 import BackupSettings from "./BackupSettings";
 import {
@@ -45,12 +45,7 @@ const GeneralPanel = () => {
         )}
       </SettingsCard>
       <SoftwareUpdateSettings currentVersion={version?.version} />
-      <SettingsCard title="Appearance">
-        <div className="flex items-center justify-between gap-4">
-          <p className="text-sm text-slate-600">Dark or light look. Kept on this computer.</p>
-          <ThemeToggle />
-        </div>
-      </SettingsCard>
+      <AppearanceSettings />
     </>
   );
 };

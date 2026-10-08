@@ -94,8 +94,8 @@ const Dashboard = () => {
             <ComposedChart data={salesChartQuery.data} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
               <defs>
                 <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                  <stop offset="0%" stopColor="var(--color-emerald-500)" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="var(--color-emerald-500)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -103,7 +103,7 @@ const Dashboard = () => {
               <YAxis tick={{ fontSize: 12, fill: "#64748b" }} tickFormatter={(v) => `R${v >= 1000 ? `${Math.round(v / 1000)}k` : v}`} width={56} />
               <Tooltip formatter={(v, name) => [money(v), name]} />
               <Legend verticalAlign="top" height={28} />
-              <Area type="monotone" dataKey="revenue" name="This year" stroke="#10b981" strokeWidth={2} fill="url(#salesFill)" dot={false} activeDot={{ r: 5 }} />
+              <Area type="monotone" dataKey="revenue" name="This year" stroke="var(--color-emerald-500)" strokeWidth={2} fill="url(#salesFill)" dot={false} activeDot={{ r: 5 }} />
               <Line type="monotone" dataKey="previous_year" name="Same month last year" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 4" dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
