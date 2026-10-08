@@ -53,9 +53,9 @@ const AppLayout = () => {
       )}
       {/* Sidebar */}
       <aside className={`app-sidebar fixed inset-y-0 left-0 z-40 w-64 bg-emerald-900 text-white flex flex-col transition-transform md:static md:translate-x-0 ${navOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="p-6 text-2xl font-bold tracking-tight flex items-center gap-3">
-          <img src={logo} alt="" className="w-10 h-10 rounded-full shrink-0" />
-          Sandveld Vee Dienste
+        <div className="px-5 py-6 text-xl leading-tight font-bold tracking-tight flex items-center gap-3">
+          <img src={logo} alt="" className="w-11 h-11 rounded-full shrink-0" />
+          <span className="min-w-0">Sandveld<br />Vee Dienste</span>
           <button type="button" aria-label="Close the menu" onClick={() => setNavOpen(false)}
             className="ml-auto rounded-lg p-1 text-emerald-200 hover:bg-emerald-800 md:hidden"><X size={20} /></button>
         </div>
