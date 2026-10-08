@@ -6,6 +6,7 @@ import QrScanner from "./QrScanner";
 import { decodePairingLink, savePairing, trustHost } from "../utils/pairing";
 import { setDeviceConnection } from "../api/client";
 import { nativeAdapter } from "../api/nativeHttp";
+import { wipeOfflineData } from "../offline/store";
 
 // A readable name for Settings -> Phones' paired-phone list on the PC.
 const deviceName = () => {
@@ -84,6 +85,7 @@ const PairingScreen = ({ onPaired }) => {
     setError(null);
     try {
       const { host, token } = await pairAgainst(hosts, port, fp, code);
+      await wipeOfflineData(); // a copy of some other office's data must never mix with this one
       await savePairing(host, port, fp, token, deviceName());
       setDeviceConnection({ host, port, token });
       onPaired();

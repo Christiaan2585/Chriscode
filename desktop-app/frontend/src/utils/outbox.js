@@ -66,11 +66,23 @@ const isRetryable = (error) => isOffline(error) || error.response?.status === 40
 // every 30 seconds - see api/client.js.
 const QUEUEABLE = { queueable: true };
 
+// Remembers how far a job got, so a retry after a dropped connection carries on instead of starting over.
+const saveProgress = (job, progress) => {
+  Object.assign(job, progress);
+  const queue = readQueue();
+  const at = queue.findIndex((j) => j.id === job.id);
+  if (at >= 0) {
+    queue[at] = { ...queue[at], ...progress };
+    writeQueue(queue);
+  }
+};
+
 const runJob = async (job) => {
   if (job.kind === "quote-create") {
-    const savedQuote = (await apiClient.post("/quotes/", job.quote, QUEUEABLE)).data;
-    for (const item of job.items) {
-      await apiClient.post(`/quotes/${savedQuote.id}/items`, item, QUEUEABLE);
+    if (!job.quoteId) saveProgress(job, { quoteId: (await apiClient.post("/quotes/", job.quote, QUEUEABLE)).data.id, itemsSent: 0 });
+    for (let i = job.itemsSent || 0; i < job.items.length; i += 1) {
+      await apiClient.post(`/quotes/${job.quoteId}/items`, job.items[i], QUEUEABLE);
+      saveProgress(job, { itemsSent: i + 1 });
     }
     return;
   }
@@ -91,7 +103,8 @@ export async function flushOutbox() {
         // A real rejection (expired session, a product since deleted, ...) -
         // drop it rather than retry forever on something that will never work.
       }
-      writeQueue(queue.slice(1));
+      const doneId = queue[0].id;
+      writeQueue(readQueue().filter((j) => j.id !== doneId)); // a job queued while this one was sending must not be lost
     }
   } finally {
     flushing = false;

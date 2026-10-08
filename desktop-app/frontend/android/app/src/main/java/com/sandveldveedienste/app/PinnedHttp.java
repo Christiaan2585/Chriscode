@@ -75,13 +75,14 @@ final class PinnedHttp {
     /** Opens the connection, trying again if the PC cannot be reached yet: an office PC on Wi-Fi often goes
      * quiet when idle and only answers a moment after the first attempt. Only the connecting is repeated
      * (nothing has been sent), so a retry can never do something twice. */
-    private static HttpsURLConnection connect(URL url, String fingerprint, int timeoutMs, String method, JSONObject headers, int bodyLength) throws Exception {
+    private static HttpsURLConnection connect(URL url, String fingerprint, int timeoutMs, String method, JSONObject headers, int bodyLength, boolean fast) throws Exception {
         IOException last = null;
-        for (int attempt = 0; attempt < 3; attempt++) {
+        int attempts = fast ? 1 : 3;
+        for (int attempt = 0; attempt < attempts; attempt++) {
             HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
             conn.setSSLSocketFactory(pinnedContext(fingerprint).getSocketFactory());
             conn.setHostnameVerifier((hostname, session) -> true); // the pinned certificate IS the identity check
-            conn.setConnectTimeout(Math.min(timeoutMs, 6000));
+            conn.setConnectTimeout(Math.min(timeoutMs, fast ? 3500 : 6000));
             conn.setReadTimeout(timeoutMs);
             conn.setInstanceFollowRedirects(false);
             conn.setRequestMethod(method);
@@ -107,7 +108,7 @@ final class PinnedHttp {
         throw last;
     }
 
-    static Reply execute(Context ctx, String address, String method, JSONObject headers, byte[] body, int timeoutMs) throws Exception {
+    static Reply execute(Context ctx, String address, String method, JSONObject headers, byte[] body, int timeoutMs, boolean fast) throws Exception {
         String host = PairingStore.getHost(ctx);
         int port = PairingStore.getPort(ctx);
         String fingerprint = PairingStore.getFingerprint(ctx);
@@ -118,7 +119,7 @@ final class PinnedHttp {
             throw new IOException("This phone only talks to the office PC it is paired with");
         }
 
-        HttpsURLConnection conn = connect(url, fingerprint, timeoutMs, method, headers, body == null ? 0 : body.length);
+        HttpsURLConnection conn = connect(url, fingerprint, timeoutMs, method, headers, body == null ? 0 : body.length, fast);
         if (body != null && body.length > 0) {
             try (OutputStream out = conn.getOutputStream()) {
                 out.write(body);

@@ -1,6 +1,11 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { authService } from '../api/authService';
-import { setAccessToken, setUnauthorizedHandler, unreachableMessage } from '../api/client';
+import { setAccessToken, setHoldUnauthorized, setUnauthorizedHandler, unreachableMessage } from '../api/client';
+import { isNative } from '../utils/pairing';
+import { isReachable, notifySessionResumed, subscribeReachable } from '../offline/connectivity';
+import { clearOfflineLogin, offlineLoginExists, saveOfflineLogin, tryOfflineUnlock, updateOfflineUser } from '../offline/offlineLogin';
+import { meta, secure, wipeOfflineData, wipeSavedCopy } from '../offline/store';
+import { forgetSyncState } from '../offline/sync';
 import { signInWithGoogle, isElectron } from '../utils/googleLogin';
 
 const REMEMBER_TOKEN_KEY = 'sandveld_remember_token';
@@ -31,6 +36,11 @@ export function AuthProvider({ children }) {
   const [googleEnabled, setGoogleEnabled] = useState(false);
   const [error, setError] = useState(null);
   const [twoStepRequired, setTwoStepRequired] = useState(false); // the password was right; the app's 6-digit code is next
+  // Phone only: unlocked with the PIN while the office PC could not be reached - it works from the saved copy
+  // until the PC answers, then signs in again quietly with the PIN held (in memory only) here.
+  const [offlineSession, setOfflineSession] = useState(false);
+  const [offlineNote, setOfflineNote] = useState(false);
+  const pinRef = useRef(null);
 
   const rememberedToken = () => localStorage.getItem(REMEMBER_TOKEN_KEY);
 
@@ -45,16 +55,41 @@ export function AuthProvider({ children }) {
     setRememberedUser(remembered);
   }, []);
 
-  const persistSession = useCallback((result) => {
+  // Phone only: the saved copy belongs to one person; someone else signing in starts it afresh.
+  const checkOwner = useCallback(async (u) => {
+    try {
+      if ((await meta.get('owner')) !== u.id) {
+        await wipeSavedCopy();
+        await meta.set('owner', u.id);
+      }
+    } catch {
+      // storage unavailable - nothing to protect
+    }
+  }, []);
+
+  // `pin` is given when this sign-in came from typing the PIN: that is the moment the phone can learn to
+  // check the PIN itself. A full password / Google sign-in forgets it, so the PIN is asked for once afterwards.
+  const persistSession = useCallback((result, { pin } = {}) => {
     setAccessToken(result.access_token);
     localStorage.setItem(REMEMBER_TOKEN_KEY, result.remember_token);
     rememberUser(result.user);
     setUser(result.user);
+    setOfflineNote(false);
+    const phone = isNative();
+    if (phone) checkOwner(result.user);
+    if (phone && result.user.has_pin && pin) saveOfflineLogin(secure, pin, result.user).catch(() => {});
+    if (phone && !pin && !result.fromPin) clearOfflineLogin(secure).catch(() => {});
     // An admin-set temporary password has to be replaced before anything else.
-    setScreen(result.user.must_change_password ? 'change-password' : result.user.has_pin ? 'app' : 'pin-setup');
+    if (result.user.must_change_password) setScreen('change-password');
+    else if (!result.user.has_pin) setScreen('pin-setup');
+    else if (phone && !pin && !result.fromPin) setScreen('unlock'); // type the PIN once so offline unlock can be set up
+    else setScreen('app');
   }, []);
 
   const goToSignedOut = useCallback(() => {
+    pinRef.current = null;
+    setOfflineSession(false);
+    setHoldUnauthorized(false);
     setAccessToken(null);
     setUser(null);
     setScreen(rememberedToken() ? 'unlock' : 'login');
@@ -78,11 +113,54 @@ export function AuthProvider({ children }) {
           setScreen('login');
         }
       } catch {
-        setError(unreachableMessage());
-        setScreen('login');
+        // Phone, signed in before, PIN check saved: let the PIN unlock the saved copy instead of a dead end.
+        let usable = false;
+        try {
+          usable = isNative() && Boolean(rememberedToken()) && (await offlineLoginExists(secure));
+        } catch {
+          usable = false;
+        }
+        if (usable) {
+          setOfflineNote(true);
+          setScreen('unlock');
+        } else {
+          setError(unreachableMessage());
+          setScreen('login');
+        }
       }
     })();
   }, []);
+
+  // Back online after an offline unlock: sign in again quietly with the PIN, so queued changes can go and the data can refresh.
+  useEffect(() => {
+    if (!offlineSession) return undefined;
+    let cancelled = false;
+    let busy = false;
+    const resume = async () => {
+      if (cancelled || busy || !isReachable() || !pinRef.current) return;
+      busy = true;
+      try {
+        const pin = pinRef.current;
+        const result = await authService.verifyPin(rememberedToken(), pin);
+        if (cancelled) return;
+        pinRef.current = null;
+        setHoldUnauthorized(false);
+        setOfflineSession(false);
+        persistSession({ ...result, fromPin: true }, { pin });
+        notifySessionResumed();
+      } catch (err) {
+        if (err.response && !cancelled) goToSignedOut(); // the PC refused (account changed, device forgotten): lock, ask again
+      } finally {
+        busy = false;
+      }
+    };
+    const unsubscribe = subscribeReachable(resume);
+    resume();
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [offlineSession]);
 
   const withErrorHandling = (fn) => async (...args) => {
     setError(null);
@@ -139,19 +217,50 @@ export function AuthProvider({ children }) {
 
   const setupPin = withErrorHandling(async (pin) => {
     await authService.setupPin(pin);
-    setUser((u) => (u ? { ...u, has_pin: true } : u));
+    const updated = user ? { ...user, has_pin: true } : user;
+    setUser(updated);
+    if (isNative() && updated) saveOfflineLogin(secure, pin, updated).catch(() => {});
     setScreen('app');
   });
 
-  const verifyPin = withErrorHandling(async (pin) => {
+  // The office PC is not answering: the PIN can still be checked here, against what this phone saved.
+  const unlockOffline = async (pin) => {
+    const outcome = await tryOfflineUnlock(secure, pin).catch(() => ({ ok: false, disabled: true }));
+    if (outcome.ok) {
+      pinRef.current = pin;
+      setHoldUnauthorized(true);
+      setAccessToken(null);
+      setUser(outcome.user);
+      setOfflineNote(false);
+      setOfflineSession(true);
+      setScreen('app');
+      return;
+    }
+    setError(outcome.disabled
+      ? "Can't reach the office PC, and unlocking without it isn't available. Connect to the office Wi-Fi and enter your PIN."
+      : `Incorrect PIN - ${outcome.left} ${outcome.left === 1 ? 'try' : 'tries'} left`);
+    throw new Error('offline unlock refused');
+  };
+
+  const verifyPin = async (pin) => {
+    setError(null);
     const token = rememberedToken();
     if (!token) {
       setScreen('login');
       throw new Error('Please sign in again.');
     }
-    const result = await authService.verifyPin(token, pin);
-    persistSession(result);
-  });
+    // Already known to be out of reach: do not wait for the connection attempts to give up first.
+    if (isNative() && !isReachable()) return unlockOffline(pin);
+    try {
+      const result = await authService.verifyPin(token, pin);
+      persistSession({ ...result, fromPin: true }, { pin });
+    } catch (err) {
+      if (isNative() && !err.response) return unlockOffline(pin);
+      const detail = err.response?.data?.detail;
+      setError((typeof detail === 'string' ? detail : detail?.message) || 'Something went wrong. Please try again.');
+      throw err;
+    }
+  };
 
   // "Lock" the app for the current session without forgetting the device -
   // next launch (or clicking Unlock again) only needs the PIN, same as now.
@@ -172,6 +281,14 @@ export function AuthProvider({ children }) {
     }
     localStorage.removeItem(REMEMBER_TOKEN_KEY);
     localStorage.removeItem(REMEMBERED_USER_KEY);
+    if (isNative()) {
+      // Nothing of the office data stays on a phone that has signed out completely.
+      forgetSyncState();
+      wipeOfflineData().catch(() => {});
+    }
+    pinRef.current = null;
+    setOfflineSession(false);
+    setHoldUnauthorized(false);
     setRememberedUser(null);
     setAccessToken(null);
     setUser(null);
@@ -182,6 +299,7 @@ export function AuthProvider({ children }) {
     const me = await authService.me();
     setUser(me);
     if (rememberedToken()) rememberUser(me); // a new name or photo shows on the lock screen too
+    if (isNative()) updateOfflineUser(secure, me).catch(() => {});
     return me;
   }, [rememberUser]);
 
@@ -193,6 +311,8 @@ export function AuthProvider({ children }) {
       googleEnabled,
       isElectron: isElectron(),
       error,
+      offlineSession,
+      offlineNote,
       twoStepRequired,
       cancelTwoStep: () => { setTwoStepRequired(false); setError(null); },
       clearError: () => setError(null),
@@ -207,7 +327,7 @@ export function AuthProvider({ children }) {
       forgetDevice,
       refreshMe,
     }),
-    [screen, user, rememberedUser, googleEnabled, error, twoStepRequired]
+    [screen, user, rememberedUser, googleEnabled, error, twoStepRequired, offlineSession, offlineNote]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

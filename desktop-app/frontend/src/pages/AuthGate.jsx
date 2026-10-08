@@ -335,7 +335,7 @@ function SetupPinScreen() {
 }
 
 function UnlockScreen() {
-  const { verifyPin, rememberedUser, forgetDevice, error, clearError } = useAuth();
+  const { verifyPin, rememberedUser, forgetDevice, error, clearError, offlineNote } = useAuth();
   const [busy, setBusy] = useState(false);
   const [lockMsg, setLockMsg] = useState(null);
   const { pin, reset, inputEl, inputRef, append, backspace } = usePinInput(5, async (value) => {
@@ -365,6 +365,11 @@ function UnlockScreen() {
           </div>
           <p className="text-xs text-slate-400 mt-1">Enter your 5-digit PIN to continue</p>
         </div>
+        {offlineNote && (
+          <p className="mb-3 rounded-lg bg-[#fef3c7] px-3 py-2 text-center text-xs font-medium text-[#78350f]">
+            The office PC can't be reached. Your PIN opens the saved copy of the office data.
+          </p>
+        )}
         <ErrorBanner error={lockMsg || error} />
         <PinDots length={5} filled={pin.length} />
         {inputEl}

@@ -6,7 +6,7 @@
 // is just the JS-side way to read and write that same store.
 import { Capacitor, registerPlugin } from "@capacitor/core";
 
-const PairingStorePlugin = registerPlugin("PairingStore");
+export const PairingStorePlugin = registerPlugin("PairingStore");
 
 export const isNative = () => {
   try {

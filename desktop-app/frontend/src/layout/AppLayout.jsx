@@ -10,6 +10,8 @@ import ThemeToggle from "../components/ThemeToggle";
 import PoweredBy from "../components/PoweredBy";
 import Avatar from "../components/Avatar";
 import OutboxBadge from "../components/OutboxBadge";
+import OfflineSupport from "../components/OfflineSupport";
+import SyncStatus from "../components/SyncStatus";
 import AutoLock from "../components/AutoLock";
 
 const NAV = [
@@ -44,6 +46,7 @@ const AppLayout = () => {
   return (
     <div className="app-bg flex h-screen bg-slate-50 text-slate-900 font-sans">
       <AutoLock />
+      <OfflineSupport />
       {navOpen && (
         <button type="button" aria-label="Close the menu" onClick={() => setNavOpen(false)}
           className="fixed inset-0 z-30 bg-slate-900/50 md:hidden" />
@@ -118,6 +121,7 @@ const AppLayout = () => {
             <GrazingHeaderStrip />
           </div>
           <div className="flex-1 lg:hidden" />
+          <SyncStatus />
           <OutboxBadge compact />
           <ThemeToggle />
         </header>

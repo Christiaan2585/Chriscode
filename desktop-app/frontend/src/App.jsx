@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { HashRouter as BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import apiClient from "./api/client";
 import { startOutboxAutoFlush } from "./utils/outbox";
 import { isNative } from "./utils/pairing";
+import { startReachabilityWatch } from "./offline/connectivity";
 import PairingScreen from "./components/PairingScreen";
 import { AuthProvider } from "./context/AuthContext";
 import { ToastProvider, ToastErrorBridge } from "./context/ToastContext";
@@ -25,11 +27,20 @@ import Weather from "./pages/Weather";
 import PurchaseOrders from "./pages/PurchaseOrders";
 import ProgramSheet from "./pages/ProgramSheet";
 
-const queryClient = new QueryClient();
+// On a phone a read that finds the office PC out of reach is answered from the saved copy, so there is no point
+// asking again and again; the PC coming back refreshes everything (offline/sync.js).
+const queryClient = new QueryClient(isNative() ? { defaultOptions: { queries: { retry: false, networkMode: "always", staleTime: 15000 } } } : undefined);
 
 const App = ({ initiallyPaired = false }) => {
   const [paired, setPaired] = useState(initiallyPaired);
   useEffect(() => startOutboxAutoFlush(), []);
+  // Phone only: keep asking whether the office PC is answering, so "Offline" and catching up are timely.
+  useEffect(
+    () => (isNative() && paired
+      ? startReachabilityWatch(() => apiClient.get("/version", { silent: true, queueable: true, timeout: 6000, fast: true }))
+      : undefined),
+    [paired],
+  );
 
   if (isNative() && !paired) {
     return <PairingScreen onPaired={() => setPaired(true)} />;

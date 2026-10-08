@@ -51,7 +51,7 @@ export function createAdapter(call) {
 
     let reply;
     try {
-      reply = await call({ url, method, headers, body: body ? bytesToBase64(body) : null, timeout: config.timeout || 120000 });
+      reply = await call({ url, method, headers, body: body ? bytesToBase64(body) : null, timeout: config.timeout || 120000, fast: Boolean(config.fast) });
     } catch (error) {
       const timedOut = error?.code === "TIMEOUT";
       throw new AxiosError(timedOut ? `timeout of ${config.timeout || 120000}ms exceeded` : "Network Error",

@@ -36,7 +36,9 @@ You may not, and may not allow anyone else to:
 
 4.4 Your Data may include documents you add (such as a client's tax certificate) and an activity log of who changed what and when (without passwords or amounts, kept for a year). Backups can be locked with a passphrase; if you lock them and lose the passphrase, we cannot recover them. A client's data can be exported or erased from their page.
 
-4.5 Where Your Data includes personal information about other people (for example your clients' names and contact details), you are the responsible party for that information under the Protection of Personal Information Act 4 of 2013 (POPIA). You must have a lawful reason to process it, keep it secure, and deal with requests from the people it concerns. Authorised users must keep client information confidential.
+4.5 On the Android phone app, a copy of Your Data (such as client details, products, invoices and quotes) is kept in the app's private storage on the phone so it can be used when the office computer cannot be reached. The PIN check used for that is stored encrypted by Android. The copy is removed when you sign out completely, forget the office computer or choose Remove saved data in Settings; keep the phone locked and protected.
+
+4.6 Where Your Data includes personal information about other people (for example your clients' names and contact details), you are the responsible party for that information under the Protection of Personal Information Act 4 of 2013 (POPIA). You must have a lawful reason to process it, keep it secure, and deal with requests from the people it concerns. Authorised users must keep client information confidential.
 
 5. PRIVACY - WHAT THE SOFTWARE SENDS OVER THE INTERNET
 

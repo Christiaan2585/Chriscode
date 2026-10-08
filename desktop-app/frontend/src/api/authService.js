@@ -1,7 +1,7 @@
 import apiClient from './client';
 
 export const authService = {
-  status: async () => (await apiClient.get('/auth/status')).data,
+  status: async () => (await apiClient.get('/auth/status', { fast: true })).data,
   setupFirstAccount: async (data) => (await apiClient.post('/auth/setup', data)).data,
   login: async (email, password, code) =>
     (await apiClient.post('/auth/login', { email, password, code: code || null }, { silent: true })).data,

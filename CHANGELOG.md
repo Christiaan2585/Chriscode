@@ -2,6 +2,11 @@
 
 All notable changes to Sandveld Vee Dienste. Newest first.
 
+## 1.0.10 - 2026-10-08
+
+### New
+- **The phone keeps a copy of the office data and syncs it** (Android): right after pairing and signing in, the app downloads the clients (with their pages), products and pictures, invoices, quotes, orders, purchase orders, programs, calendar, visits and the dashboard. Out of the office Wi-Fi, an "Offline" badge shows and everything still opens from that copy; your PIN opens the app without the office PC (5 wrong tries switch that off until you sign in online again). New quotes and ticked program dates are kept and sent when the PC is back, then the phone signs in again by itself and refreshes. Settings -> Phones shows when it last refreshed and has Download everything again / Remove saved data. A half-sent quote no longer risks being made twice.
+
 ## 1.0.9 - 2026-10-07
 
 ### Security

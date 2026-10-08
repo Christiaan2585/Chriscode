@@ -1,5 +1,12 @@
 import axios from 'axios';
 import { nativeAdapter } from './nativeHttp';
+import { withOfflineCache } from '../offline/cachingAdapter';
+import { savedCopy } from '../offline/store';
+import { isReachable, setReachable } from '../offline/connectivity';
+
+// What the phone uses for the office PC: the pinned native connection, with a saved copy of every
+// answer so the screens still have something to show when the PC cannot be reached.
+const phoneAdapter = withOfflineCache(nativeAdapter, { store: savedCopy, onReachable: setReachable, preferSaved: () => !isReachable() });
 
 // VITE_API_URL: dev only, e.g. a test backend on another port while the installed app holds 8000.
 const LOCAL_BACKEND = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -33,7 +40,7 @@ export function setDeviceConnection(pairing) {
   if (pairing?.host) {
     apiClient.defaults.baseURL = `https://${pairing.host}:${pairing.port}`;
     apiClient.defaults.headers.common['X-Device-Token'] = pairing.token;
-    apiClient.defaults.adapter = nativeAdapter; // the WebView would refuse the PC's self-signed certificate
+    apiClient.defaults.adapter = phoneAdapter; // the WebView would refuse the PC's self-signed certificate
   } else {
     apiClient.defaults.adapter = axios.defaults.adapter;
     apiClient.defaults.baseURL = LOCAL_BACKEND;
@@ -43,7 +50,7 @@ export function setDeviceConnection(pairing) {
 
 // What to say when nothing answers: a phone talks to the office PC, the desktop app to its own backend.
 export function unreachableMessage() {
-  return apiClient.defaults.adapter === nativeAdapter
+  return apiClient.defaults.adapter === phoneAdapter
     ? "Could not reach the office PC. Is the Sandveld app open on it, and is this phone on the office Wi-Fi?"
     : "Could not reach the backend. Is it running?";
 }
@@ -51,6 +58,15 @@ export function unreachableMessage() {
 export function setUnauthorizedHandler(handler) {
   onUnauthorized = handler;
 }
+
+// While the phone is unlocked without the office PC (offline PIN check) it holds no access token
+// yet; a request that happens to reach the PC in the moment before it signs in again must not
+// throw the person back to the lock screen.
+let holdUnauthorized = false;
+export function setHoldUnauthorized(value) {
+  holdUnauthorized = value;
+}
+export const isHoldingUnauthorized = () => holdUnauthorized;
 
 // Called once from a bridge component inside <ToastProvider> (see
 // ToastContext.jsx) so every API call gets automatic, visible error
@@ -80,6 +96,9 @@ apiClient.interceptors.response.use(
     if (quietly) return Promise.reject(error);
     // Calls marked `silent` (bulk deletes) report a refusal themselves, next to the record it was about.
     if (error.config?.silent && error.response && error.response.status !== 401) return Promise.reject(error);
+    // A read that found the office PC out of reach is not worth a pop-up: the top bar already says "Offline".
+    if (!error.response && String(error.config?.method || 'get').toLowerCase() === 'get' && !isReachable()) return Promise.reject(error);
+    if (error.response?.status === 401 && holdUnauthorized) return Promise.reject(error);
     if (error.response?.status === 401 && onUnauthorized) {
       onUnauthorized();
     } else if (notifyError) {

@@ -12,6 +12,43 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 public class PairingStorePlugin extends Plugin {
     private final java.util.concurrent.ExecutorService network = java.util.concurrent.Executors.newCachedThreadPool();
 
+    /** Small secrets the app needs while the office PC is out of reach (the offline PIN check):
+     * kept sealed with the Keystore key, so a copy of the app data cannot read them. */
+    @PluginMethod
+    public void secureSet(PluginCall call) {
+        String key = call.getString("key");
+        String value = call.getString("value");
+        if (key == null || value == null) {
+            call.reject("key and value are required");
+            return;
+        }
+        try {
+            SecureValues.set(getContext(), key, value);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Could not store that securely");
+        }
+    }
+
+    @PluginMethod
+    public void secureGet(PluginCall call) {
+        String key = call.getString("key");
+        if (key == null) {
+            call.reject("key is required");
+            return;
+        }
+        JSObject ret = new JSObject();
+        ret.put("value", SecureValues.get(getContext(), key)); // null when missing or unreadable
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void secureRemove(PluginCall call) {
+        String key = call.getString("key");
+        if (key != null) SecureValues.remove(getContext(), key);
+        call.resolve();
+    }
+
     /** One HTTPS call to the paired office PC with its certificate pinned (see PinnedHttp).
      * The body goes in and comes back as base64, so uploads and PDFs survive the trip. */
     @PluginMethod
@@ -22,6 +59,7 @@ public class PairingStorePlugin extends Plugin {
         final String body = call.getString("body");
         final Integer timeoutValue = call.getInt("timeout", 60000);
         final int timeout = timeoutValue == null ? 60000 : timeoutValue;
+        final boolean fast = Boolean.TRUE.equals(call.getBoolean("fast", false)); // one quick try: used to ask "is the PC there?"
         if (url == null) {
             call.reject("url is required");
             return;
@@ -29,7 +67,7 @@ public class PairingStorePlugin extends Plugin {
         network.execute(() -> {
             try {
                 byte[] payload = body == null || body.isEmpty() ? null : android.util.Base64.decode(body, android.util.Base64.DEFAULT);
-                PinnedHttp.Reply reply = PinnedHttp.execute(getContext(), url, method, headers, payload, timeout);
+                PinnedHttp.Reply reply = PinnedHttp.execute(getContext(), url, method, headers, payload, timeout, fast);
                 JSObject ret = new JSObject();
                 ret.put("status", reply.status);
                 ret.put("headers", reply.headers);
@@ -89,6 +127,7 @@ public class PairingStorePlugin extends Plugin {
     @PluginMethod
     public void clear(PluginCall call) {
         PairingStore.clear(getContext());
+        SecureValues.clear(getContext());
         call.resolve();
     }
 }
