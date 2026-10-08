@@ -1,5 +1,6 @@
 import { saveBlob } from "./documents";
 import { toWhatsAppLink } from "./contact";
+import { isNativeApp, shareBlob } from "./nativeFiles";
 
 const EMAIL = /^[^\s@?&#]+@[^\s@?&#]+\.[^\s@?&#]+$/;
 
@@ -17,6 +18,10 @@ export const sendLink = (via, { phone, email, subject, message }) => {
 export async function sendDocument(blob, filename, via, send) {
   const url = sendLink(via, send);
   if (!url) throw new Error(via === "whatsapp" ? "This client has no phone number" : "This client has no email address");
+  if (isNativeApp()) { // the share sheet offers WhatsApp and email with the file attached
+    await shareBlob(blob, filename, { title: filename, text: send.message });
+    return null;
+  }
   const api = window.electronAPI;
   let savedTo = null;
   if (api?.saveForSending) {

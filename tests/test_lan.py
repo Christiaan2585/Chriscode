@@ -66,8 +66,8 @@ class PairingCodeTests(unittest.TestCase):
 
 
 class Response:
-    def __init__(self, status_code, body):
-        self.status_code, self.body = status_code, body
+    def __init__(self, status_code, body, headers=None):
+        self.status_code, self.body, self.headers = status_code, body, headers or {}
 
     def json(self):
         return json.loads(self.body)
@@ -89,7 +89,7 @@ class Client:
                  "scheme": "https", "path": path, "raw_path": path.encode(), "query_string": b"",
                  "root_path": "", "headers": raw_headers, "client": ("192.168.1.50", 50000),
                  "server": ("192.168.1.10", 8443), "state": {}}
-        sent, out = [False], {"status": None, "body": b""}
+        sent, out = [False], {"status": None, "body": b"", "headers": {}}
 
         async def receive():
             if sent[0]:
@@ -100,11 +100,12 @@ class Client:
         async def send(message):
             if message["type"] == "http.response.start":
                 out["status"] = message["status"]
+                out["headers"] = {k.decode().lower(): v.decode() for k, v in message.get("headers", [])}
             elif message["type"] == "http.response.body":
                 out["body"] += message.get("body", b"")
 
         asyncio.run(self.app(scope, receive, send))
-        return Response(out["status"], out["body"])
+        return Response(out["status"], out["body"], out["headers"])
 
     def get(self, path, headers=None):
         return self.request("GET", path, headers)
@@ -189,6 +190,38 @@ class DeviceGuardTests(unittest.TestCase):
 
     def test_the_pc_itself_needs_no_device_token(self):
         self.assertEqual(self.local.get("/version").status_code, 200)
+
+
+class PhoneAppOriginTests(DeviceGuardTests):
+    """The Android app's page lives at https://localhost, so every call it makes to the PC is cross-origin:
+    without CORS answers on the phone listener the app could not even pair."""
+    APP = {"Origin": "https://localhost"}
+
+    def test_the_preflight_is_answered_without_a_token(self):
+        r = self.phone.request("OPTIONS", "/devices/pair", {**self.APP, "Access-Control-Request-Method": "POST",
+                                                           "Access-Control-Request-Headers": "content-type,x-device-token,authorization"})
+        self.assertEqual(r.status_code, 204)
+        self.assertEqual(r.headers["access-control-allow-origin"], "https://localhost")
+        for header in ("x-device-token", "authorization", "content-type"):
+            self.assertIn(header, r.headers["access-control-allow-headers"].lower())
+        self.assertIn("DELETE", r.headers["access-control-allow-methods"])
+
+    def test_answers_carry_the_origin_even_when_refused(self):
+        self.assertEqual(self.phone.get("/version", headers=self.APP).status_code, 401)
+        self.assertEqual(self.phone.get("/version", headers=self.APP).headers["access-control-allow-origin"], "https://localhost")
+        token = self.pair().json()["device_token"]
+        ok = self.phone.get("/version", headers={**self.APP, "X-Device-Token": token})
+        self.assertEqual((ok.status_code, ok.headers["access-control-allow-origin"]), (200, "https://localhost"))
+        self.assertIn("content-disposition", ok.headers["access-control-expose-headers"].lower())
+
+    def test_other_websites_get_nothing(self):
+        r = self.phone.request("OPTIONS", "/devices/pair", {"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"})
+        self.assertNotIn("access-control-allow-origin", r.headers)
+        self.assertEqual(r.status_code, 401)
+        self.assertNotIn("access-control-allow-origin", self.phone.get("/version", headers={"Origin": "https://evil.example"}).headers)
+
+    def test_the_pc_listener_does_not_trust_the_phone_origin(self):
+        self.assertNotIn("access-control-allow-origin", self.local.get("/version", headers=self.APP).headers)
 
 
 class LoginLimitTests(unittest.TestCase):

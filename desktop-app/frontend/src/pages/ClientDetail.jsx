@@ -703,7 +703,7 @@ const ClientDetail = () => {
                 className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
                 <input
@@ -723,7 +723,7 @@ const ClientDetail = () => {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Physical Address</label>
                 <textarea
@@ -765,7 +765,7 @@ const ClientDetail = () => {
 
       <Modal isOpen={isScheduleModalOpen} onClose={closeScheduleModal} title={`${editingAppointmentId ? "Change visit" : "Schedule visit"} - ${farmLabel(client)}`}>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
               <input

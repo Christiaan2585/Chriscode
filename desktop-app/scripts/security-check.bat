@@ -6,7 +6,7 @@ cd /d "%~dp0\.."
 set FAILED=0
 
 REM pip-audit is a developer tool, not part of the app: fetched on first use.
-"..env\Scripts\python.exe" -m pip show pip-audit >nul 2>&1 || "..env\Scripts\python.exe" -m pip install pip-audit
+"..\venv\Scripts\python.exe" -m pip show pip-audit >nul 2>&1 || "..\venv\Scripts\python.exe" -m pip install pip-audit
 
 echo ============================================
 echo   Security check: Python libraries

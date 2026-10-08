@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Search, Users, Package } from "lucide-react";
 import apiClient from "../api/client";
+import { useMediaQuery } from "../utils/useMediaQuery";
 
 const PER_GROUP = 5;
 const matches = (q, ...fields) => fields.some((f) => f && String(f).toLowerCase().includes(q));
@@ -16,6 +17,7 @@ const listQuery = (key, path, enabled) => ({
 // query keys as the list pages, so it shares their cache instead of
 // refetching; nothing loads until the box is first focused.
 const GlobalSearch = () => {
+  const keyboard = useMediaQuery("(min-width: 640px)"); // the Ctrl+K hint is for a PC; a phone has no room for it
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -70,7 +72,7 @@ const GlobalSearch = () => {
         ref={inputRef}
         type="text"
         value={query}
-        placeholder="Search... (Ctrl+K)"
+        placeholder={keyboard ? "Search... (Ctrl+K)" : "Search"}
         onFocus={() => { setOpen(true); setLoaded(true); }}
         onBlur={() => setOpen(false)}
         onChange={(e) => { setQuery(e.target.value); setActive(0); setOpen(true); }}

@@ -2,7 +2,7 @@
 
 All notable changes to Sandveld Vee Dienste. Newest first.
 
-## Unreleased (planned 1.0.9)
+## 1.0.9 - 2026-10-07
 
 ### Security
 - **Five wrong tries, then locked**: a password (or PIN, or two-step code) tried wrongly 5 times locks that account for 15 minutes; each further lock is longer (1 hour, 4 hours, 24 hours). The sign-in screen counts down the tries left. Admins can unlock a person under Settings -> Security.
@@ -11,6 +11,8 @@ All notable changes to Sandveld Vee Dienste. Newest first.
 - **Activity log** (Settings -> Activity log, admins): who signed in, failed tries, and every change - what, who, when, PC or phone. No passwords or amounts. Kept a year.
 - **Lock backups with a passphrase** (AES-256): locked backups are unreadable without it. This PC remembers the passphrase (Windows DPAPI) for the daily backups. Backups made before locking stay as they were.
 - **Only the Sandveld app can use its own backend**: the desktop app and its backend share a secret made on each launch, so other programs on the PC can no longer talk to it; only one copy of the app can run.
+- **Easier to see and use on a phone (and a narrow window)**: lists - clients, products, invoices, quotes, orders, purchase orders - show as one card per item instead of a table that scrolls sideways: the main detail as a heading, each other detail labelled, and big buttons (view, download, edit, call, WhatsApp, delete). Products have picture cards with larger names and prices, category buttons you can swipe through, and bigger buttons; forms stack in one column; the search box fits.
+- **Fixes found while checking the Android app**: the phone now talks to the office PC through its own secure connection (the phone's web view refused the PC's certificate, so the app could not have connected); PDFs open in the phone's PDF app or the share sheet (WhatsApp, email, print) instead of a blank frame. Google sign-in no longer skips two-step sign-in or the account lock, and an admin cannot reset their own password or two-step without proof (current password / code).
 - **Android**: the phone's access key is kept in the Android Keystore, the app is excluded from Android backups, and screenshots/recent-apps previews are blocked.
 - **Client privacy tools** (admins, on the client's page): export everything kept about a client, or erase their personal details (invoices, quotes and orders are kept as accounting records).
 - **Security check on every build** (`security-check.bat`: pip-audit and npm audit); updated react-router to fix reported vulnerabilities.

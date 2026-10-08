@@ -49,7 +49,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left">
+      <table className="card-table w-full text-left">
         <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
           <tr>
             <SelectAllTh selection={selection} />
@@ -62,7 +62,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
           {products.map((p) => (
             <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${isActive(p) ? "" : "opacity-60"}`}>
               <SelectTd selection={selection} id={p.id} label={`Select ${p.name}`} />
-              <td className={cell}>
+              <td data-primary className={cell}>
                 <div className="flex items-center gap-3">
                   <ProductThumb product={p} src={thumbnails[p.id]} onOpen={onOpenPicture} />
                   <div className="min-w-0">
@@ -74,14 +74,14 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
                   </div>
                 </div>
               </td>
-              <td className={`${cell} text-slate-500`}><InlineEdit value={p.code} onSave={save(p.id, "code")} label="Code" placeholder="—" /></td>
-              <td className={`${cell} text-slate-500`}><InlineEdit value={p.category} onSave={save(p.id, "category")} label="Category" placeholder="—" listId="product-categories" /></td>
-              <td className={`${cell} text-slate-500`}><InlineEdit value={p.pack_size} onSave={save(p.id, "pack_size")} label="Pack size" type="number" placeholder="—" /></td>
-              <td className={`${cell} text-slate-500`}><InlineEdit value={p.packaging} onSave={save(p.id, "packaging")} label="Packaging" placeholder="—" /></td>
-              <td className={`${cell} text-right text-slate-600`}><InlineEdit value={p.cost} onSave={saveCost(p.id)} label="Cost" type="number" format={money} placeholder="—" /></td>
-              <td className={`${cell} text-right text-slate-600`}><InlineEdit value={p.price_excl_vat} onSave={save(p.id, "price_excl_vat")} label="Selling price excl VAT" type="number" format={money} placeholder="—" /></td>
-              <td className={`${cell} text-right font-semibold text-slate-800`}><InlineEdit value={p.price} onSave={save(p.id, "price")} label="Selling price incl VAT" type="number" required format={money} /></td>
-              <td className={`${cell} text-right`}>
+              <td data-label="Code" className={`${cell} text-slate-500`}><InlineEdit value={p.code} onSave={save(p.id, "code")} label="Code" placeholder="—" /></td>
+              <td data-label="Category" className={`${cell} text-slate-500`}><InlineEdit value={p.category} onSave={save(p.id, "category")} label="Category" placeholder="—" listId="product-categories" /></td>
+              <td data-label="Pack size" className={`${cell} text-slate-500`}><InlineEdit value={p.pack_size} onSave={save(p.id, "pack_size")} label="Pack size" type="number" placeholder="—" /></td>
+              <td data-label="Packaging" className={`${cell} text-slate-500`}><InlineEdit value={p.packaging} onSave={save(p.id, "packaging")} label="Packaging" placeholder="—" /></td>
+              <td data-label="Cost" className={`${cell} text-right text-slate-600`}><InlineEdit value={p.cost} onSave={saveCost(p.id)} label="Cost" type="number" format={money} placeholder="—" /></td>
+              <td data-label="Price excl VAT" className={`${cell} text-right text-slate-600`}><InlineEdit value={p.price_excl_vat} onSave={save(p.id, "price_excl_vat")} label="Selling price excl VAT" type="number" format={money} placeholder="—" /></td>
+              <td data-label="Price incl VAT" data-key className={`${cell} text-right font-semibold text-slate-800`}><InlineEdit value={p.price} onSave={save(p.id, "price")} label="Selling price incl VAT" type="number" required format={money} /></td>
+              <td data-actions className={`${cell} text-right`}>
                 <div className="flex justify-end gap-1">
                   <button onClick={() => onEdit(p)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors" title="All details" aria-label={`Edit all details of ${p.name}`}>
                     <Edit size={18} />
@@ -253,7 +253,7 @@ const Products = () => {
         <div>
           <h2 className="text-3xl font-bold text-slate-800">Products</h2>
           <p className="text-slate-500">
-            {products?.length || 0} products{hiddenCount ? `, ${hiddenCount} hidden` : ""} - click any detail to change it
+            {products?.length || 0} products{hiddenCount ? `, ${hiddenCount} hidden` : ""} - tap any detail to change it
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -284,10 +284,18 @@ const Products = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, code or description..." aria-label="Search products"
-              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              className="w-full pl-10 pr-4 py-3 md:py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div className="-mx-1 flex w-full gap-2 overflow-x-auto px-1 pb-1 md:hidden" role="group" aria-label="Category">
+            {categoryFilter.map((c) => (
+              <button key={c} type="button" onClick={() => setCategory(c)} aria-pressed={category === c}
+                className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium ${category === c ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-200 bg-white text-slate-600"}`}>
+                {c}
+              </button>
+            ))}
           </div>
           <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category"
-            className="p-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            className="hidden p-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 md:block">
             {categoryFilter.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
           <label className="flex items-center gap-2 text-sm text-slate-600">
@@ -338,7 +346,7 @@ const Products = () => {
             <label className="block text-sm font-medium text-slate-700 mb-1">Product Name</label>
             <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Code</label>
               <input type="text" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className={inputClass} />
@@ -354,7 +362,7 @@ const Products = () => {
             <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder="What it's for, dosage notes, withdrawal period..." className={inputClass} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Pack Size (ml/gr)</label>
               <input type="number" value={form.pack_size} onChange={(e) => setForm({ ...form, pack_size: e.target.value })} className={inputClass} />
@@ -365,7 +373,7 @@ const Products = () => {
                 placeholder="e.g. 6 x 500 ml" className={inputClass} />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Cost (excl VAT)</label>
               <input type="number" value={form.cost} onChange={(e) => handleCostChange(e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-sm" />

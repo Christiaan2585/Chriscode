@@ -224,7 +224,7 @@ const Animals = () => {
 
       <Modal isOpen={isModalOpen} onClose={closeModal} title={editingId ? "Edit Animal" : "Register New Animal"}>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Animal Name</label>
               <input
@@ -245,7 +245,7 @@ const Animals = () => {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Age Group</label>
               <select
@@ -266,7 +266,7 @@ const Animals = () => {
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Tag / Ear Tag ID</label>
               <input

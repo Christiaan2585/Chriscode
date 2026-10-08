@@ -5,6 +5,7 @@ import { ScanLine } from "lucide-react";
 import QrScanner from "./QrScanner";
 import { decodePairingLink, savePairing, trustHost } from "../utils/pairing";
 import { setDeviceConnection } from "../api/client";
+import { nativeAdapter } from "../api/nativeHttp";
 
 // A readable name for Settings -> Phones' paired-phone list on the PC.
 const deviceName = () => {
@@ -46,7 +47,7 @@ async function pairAgainst(hosts, port, fingerprint, code) {
       const response = await axios.post(
         `https://${host}:${port}/devices/pair`,
         { code, name: deviceName() },
-        { timeout: 8000 }
+        { timeout: 8000, adapter: nativeAdapter }
       );
       return { host, token: response.data.device_token };
     } catch (error) {

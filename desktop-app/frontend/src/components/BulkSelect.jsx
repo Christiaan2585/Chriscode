@@ -15,7 +15,7 @@ export const SelectAllTh = ({ selection, label = "Select all" }) => (
 
 // The tick box at the start of a row.
 export const SelectTd = ({ selection, id, label }) => (
-  <td className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
+  <td data-select className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
     <input type="checkbox" className={box} aria-label={label} checked={selection.has(id)} onChange={() => selection.toggle(id)} />
   </td>
 );

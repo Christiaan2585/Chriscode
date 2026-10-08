@@ -338,6 +338,14 @@ def google_callback(payload: GoogleCallbackRequest, session: Session = Depends(g
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account has been deactivated")
 
+    # Google must not be a way round the app's own protections.
+    if user.totp_enabled:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="This account uses two-step sign-in. Sign in with your password and code instead.")
+    if user.login_locked_until and user.login_locked_until > _utcnow():
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail="This account is locked after too many wrong tries. Try again later, or ask an admin to unlock it.")
+
     user.google_sub = profile["sub"]
     user.avatar_url = profile.get("picture")
     session.add(user)
@@ -501,7 +509,7 @@ def deactivate_user(user_id: int, admin: User = Depends(require_admin), session:
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     user.is_active = False
-    session.add(user)
+    _forget_all_sessions(user, session)
     session.commit()
     return {"ok": True}
 
@@ -564,6 +572,8 @@ def _user_or_404(session: Session, user_id: int) -> User:
 def admin_reset_password(user_id: int, payload: AdminPasswordReset, admin: User = Depends(require_admin),
                          session: Session = Depends(get_session)):
     """Gives a user a new (temporary) password; they must change it at their next sign-in."""
+    if user_id == admin.id:  # your own password needs your current one: use change-password
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Change your own password under Your password, which asks for the current one.")
     user = _user_or_404(session, user_id)
     password_policy.require(payload.new_password, user.email, user.name)
     user.password_hash = hash_secret(payload.new_password)
@@ -650,6 +660,8 @@ def _drop_two_step(user: User, session: Session) -> None:
 @router.post("/users/{user_id}/two-step/reset")
 def admin_reset_two_step(user_id: int, admin: User = Depends(require_admin), session: Session = Depends(get_session)):
     """For someone who lost their phone and their recovery codes."""
+    if user_id == admin.id:  # turning off your own two-step needs your password and a code: use two-step disable
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Turn off your own two-step sign-in with your password and a code.")
     _drop_two_step(_user_or_404(session, user_id), session)
     session.commit()
     return {"ok": True}

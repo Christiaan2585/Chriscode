@@ -4,6 +4,7 @@ import { Download, Mail, MessageCircle, Printer } from "lucide-react";
 import Modal from "./Modal";
 import { fetchDocumentPdf, pdfFilename, saveBlob } from "../utils/documents";
 import { sendDocument, sendLink } from "../utils/sending";
+import { isNativeApp } from "../utils/nativeFiles";
 
 const sendButton =
   "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-emerald-400 disabled:opacity-50";
@@ -64,6 +65,7 @@ const DocumentPreview = ({ doc, onClose }) => {
     gcTime: 0, // always re-render from current data - an edit changes the PDF
   });
 
+  const phone = isNativeApp(); // Android's web view cannot show a PDF in a frame
   const [url, setUrl] = useState(null);
   const frame = useRef(null);
   const [printProblem, setPrintProblem] = useState(null);
@@ -105,7 +107,7 @@ const DocumentPreview = ({ doc, onClose }) => {
         <div className="flex flex-wrap items-center justify-end gap-3">
           {doc?.hint && <p className="mr-auto text-sm text-slate-600">{doc.hint}</p>}
           {doc?.send && <SendButtons key={doc.url} blob={blob} filename={filename} send={doc.send} />}
-          {!doc?.noPrint && (
+          {!doc?.noPrint && !phone && (
             <button type="button" disabled={!blob} onClick={printIt} className={sendButton}>
               <Printer size={16} /> Print
             </button>
@@ -116,7 +118,7 @@ const DocumentPreview = ({ doc, onClose }) => {
             onClick={() => saveBlob(blob, filename)}
             className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:opacity-50"
           >
-            <Download size={16} /> Download
+            <Download size={16} /> {phone ? "Open or share" : "Download"}
           </button>
         </div>
         {printProblem && <p role="alert" className="text-sm text-red-600">{printProblem}</p>}
@@ -125,6 +127,12 @@ const DocumentPreview = ({ doc, onClose }) => {
             <p className="p-8 text-center text-sm text-red-600">Couldn't load the PDF for {title}.</p>
           ) : isLoading || !url ? (
             <p className="p-8 text-center text-sm text-slate-500">Loading {title}…</p>
+          ) : phone ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-sm text-slate-600">
+              <p>{title} is ready. On a phone it opens in your PDF app, or you can send it by WhatsApp or email.</p>
+              <button type="button" onClick={() => saveBlob(blob, filename)}
+                className="rounded-lg bg-emerald-600 px-5 py-3 font-medium text-white shadow-sm hover:bg-emerald-700">Open or share</button>
+            </div>
           ) : (
             <iframe ref={frame} src={url} title={`${title} PDF`} className="h-full w-full border-0" />
           )}

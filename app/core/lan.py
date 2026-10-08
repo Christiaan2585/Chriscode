@@ -22,13 +22,20 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from starlette.concurrency import run_in_threadpool
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 logger = logging.getLogger("uvicorn.error")
 
 DEFAULT_PORT = 8443
 DEVICE_HEADER = "x-device-token"
 OPEN_PATHS = {("POST", "/devices/pair")}
+# The Android app's page is served from this origin (Capacitor's default), so everything it asks the PC is
+# cross-origin. Only the phone listener answers it, and only for this exact origin; every call still needs the
+# paired phone's token (the preflight, which a browser sends without one, is the one exception).
+APP_ORIGIN = b"https://localhost"
+CORS_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+CORS_HEADERS = "authorization, content-type, x-device-token"
+CORS_EXPOSE = "content-disposition, content-type"
 PAIRING_CODE_LIFETIME = timedelta(minutes=10)
 MAX_PAIRING_ATTEMPTS = 5
 LAST_SEEN_EVERY = timedelta(minutes=1)
@@ -184,10 +191,28 @@ class DeviceGuard:
                 session.commit()
             return True
 
+    @staticmethod
+    def _with_origin(send):
+        async def wrapped(message):
+            if message["type"] == "http.response.start":
+                headers = [(k, v) for k, v in message.get("headers", []) if k.lower() != b"access-control-allow-origin"]
+                headers += [(b"access-control-allow-origin", APP_ORIGIN), (b"access-control-expose-headers", CORS_EXPOSE.encode()),
+                            (b"vary", b"Origin")]
+                message = {**message, "headers": headers}
+            await send(message)
+        return wrapped
+
     async def __call__(self, scope, receive, send):
         if scope["type"] not in ("http", "websocket"):
             return await self.app(scope, receive, send)
         scope.setdefault("state", {})["via_lan"] = True
+        if scope["type"] == "http" and dict(scope.get("headers") or []).get(b"origin") == APP_ORIGIN:
+            if scope.get("method") == "OPTIONS":
+                preflight = Response(status_code=204, headers={
+                    "access-control-allow-origin": APP_ORIGIN.decode(), "access-control-allow-methods": CORS_METHODS,
+                    "access-control-allow-headers": CORS_HEADERS, "access-control-max-age": "600", "vary": "Origin"})
+                return await preflight(scope, receive, send)
+            send = self._with_origin(send)
         if (scope.get("method"), scope.get("path")) not in OPEN_PATHS:
             token = dict(scope.get("headers") or []).get(DEVICE_HEADER.encode(), b"").decode("latin-1")
             if not token or not await run_in_threadpool(self._check, token):

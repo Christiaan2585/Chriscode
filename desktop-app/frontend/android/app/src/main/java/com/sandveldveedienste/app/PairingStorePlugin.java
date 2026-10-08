@@ -10,6 +10,38 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  * save, read and clear the office-PC pairing. */
 @CapacitorPlugin(name = "PairingStore")
 public class PairingStorePlugin extends Plugin {
+    private final java.util.concurrent.ExecutorService network = java.util.concurrent.Executors.newCachedThreadPool();
+
+    /** One HTTPS call to the paired office PC with its certificate pinned (see PinnedHttp).
+     * The body goes in and comes back as base64, so uploads and PDFs survive the trip. */
+    @PluginMethod
+    public void request(final PluginCall call) {
+        final String url = call.getString("url");
+        final String method = call.getString("method", "GET");
+        final JSObject headers = call.getObject("headers");
+        final String body = call.getString("body");
+        final Integer timeoutValue = call.getInt("timeout", 60000);
+        final int timeout = timeoutValue == null ? 60000 : timeoutValue;
+        if (url == null) {
+            call.reject("url is required");
+            return;
+        }
+        network.execute(() -> {
+            try {
+                byte[] payload = body == null || body.isEmpty() ? null : android.util.Base64.decode(body, android.util.Base64.DEFAULT);
+                PinnedHttp.Reply reply = PinnedHttp.execute(getContext(), url, method, headers, payload, timeout);
+                JSObject ret = new JSObject();
+                ret.put("status", reply.status);
+                ret.put("headers", reply.headers);
+                ret.put("body", reply.bodyBase64);
+                call.resolve(ret);
+            } catch (java.net.SocketTimeoutException e) {
+                call.reject("The office PC took too long to answer", "TIMEOUT");
+            } catch (Exception e) {
+                call.reject(e.getMessage() == null ? "Could not reach the office PC" : e.getMessage(), "NETWORK");
+            }
+        });
+    }
 
     @PluginMethod
     public void save(PluginCall call) {

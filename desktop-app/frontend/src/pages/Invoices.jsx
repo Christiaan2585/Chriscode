@@ -256,7 +256,7 @@ const Invoices = () => {
             onDone={() => queryClient.invalidateQueries({ queryKey: ["invoices"] })} />
         </div>
         <div className="relative overflow-x-auto">
-        <table className="w-full text-left">
+        <table className="card-table w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
             <tr>
               <SelectAllTh selection={selection} />
@@ -272,15 +272,15 @@ const Invoices = () => {
             {filteredInvoices.map((inv) => (
               <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
                 <SelectTd selection={selection} id={inv.id} label={`Select ${((id) => invoices?.find((r) => r.id === id)?.number || `#${id}`)(inv.id)}`} />
-                <td className="px-6 py-4 text-slate-600 font-medium">
+                <td data-primary className="px-6 py-4 text-slate-600 font-medium">
                   <DocumentHover kind="invoice" doc={inv} clientName={clientName(inv.client_id)}>{inv.number || `#${inv.id}`}</DocumentHover>
                 </td>
-                <td className="px-6 py-4 text-slate-600">{new Date(inv.date).toLocaleDateString()}</td>
-                <td className="px-6 py-4 text-slate-600">
+                <td data-label="Date" className="px-6 py-4 text-slate-600">{new Date(inv.date).toLocaleDateString()}</td>
+                <td data-label="Client" className="px-6 py-4 text-slate-600">
                   <ClientHover client={clients?.find((c) => c.id === inv.client_id)}>{clientName(inv.client_id)}</ClientHover>
                 </td>
-                <td className="px-6 py-4 font-medium text-slate-800">R {inv.total_amount.toLocaleString()}</td>
-                <td className="px-6 py-4">
+                <td data-label="Total" className="px-6 py-4 font-medium text-slate-800">R {inv.total_amount.toLocaleString()}</td>
+                <td data-label="Status" className="px-6 py-4">
                   <span
                     className={`px-2 py-1 rounded-full text-xs font-bold ${
                       inv.status === "paid"
@@ -293,7 +293,7 @@ const Invoices = () => {
                     {inv.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-right flex justify-end gap-2">
+                <td data-actions className="px-6 py-4 text-right flex justify-end gap-2">
                   <button
                     onClick={() => setPreview({ kind: "invoice", id: inv.id, title: inv.number })}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
@@ -343,7 +343,7 @@ const Invoices = () => {
 
       <Modal isOpen={isModalOpen} onClose={closeModal} size="lg" title={editingId ? `Edit Invoice ${invoices?.find((i) => i.id === editingId)?.number || `#${editingId}`}` : "New Invoice"}>
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Client</label>
               <SearchableSelect
@@ -368,7 +368,7 @@ const Invoices = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Reference</label>
               <input

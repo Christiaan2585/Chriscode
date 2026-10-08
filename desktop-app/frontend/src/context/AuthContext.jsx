@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { authService } from '../api/authService';
-import { setAccessToken, setUnauthorizedHandler } from '../api/client';
+import { setAccessToken, setUnauthorizedHandler, unreachableMessage } from '../api/client';
 import { signInWithGoogle, isElectron } from '../utils/googleLogin';
 
 const REMEMBER_TOKEN_KEY = 'sandveld_remember_token';
@@ -78,7 +78,7 @@ export function AuthProvider({ children }) {
           setScreen('login');
         }
       } catch {
-        setError('Could not reach the backend. Is it running?');
+        setError(unreachableMessage());
         setScreen('login');
       }
     })();

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { nativeAdapter } from './nativeHttp';
 
 // VITE_API_URL: dev only, e.g. a test backend on another port while the installed app holds 8000.
 const LOCAL_BACKEND = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -32,10 +33,19 @@ export function setDeviceConnection(pairing) {
   if (pairing?.host) {
     apiClient.defaults.baseURL = `https://${pairing.host}:${pairing.port}`;
     apiClient.defaults.headers.common['X-Device-Token'] = pairing.token;
+    apiClient.defaults.adapter = nativeAdapter; // the WebView would refuse the PC's self-signed certificate
   } else {
+    apiClient.defaults.adapter = axios.defaults.adapter;
     apiClient.defaults.baseURL = LOCAL_BACKEND;
     delete apiClient.defaults.headers.common['X-Device-Token'];
   }
+}
+
+// What to say when nothing answers: a phone talks to the office PC, the desktop app to its own backend.
+export function unreachableMessage() {
+  return apiClient.defaults.adapter === nativeAdapter
+    ? "Could not reach the office PC. Is the Sandveld app open on it, and is this phone on the office Wi-Fi?"
+    : "Could not reach the backend. Is it running?";
 }
 
 export function setUnauthorizedHandler(handler) {
@@ -76,7 +86,7 @@ apiClient.interceptors.response.use(
       const message =
         error.response?.data?.detail ||
         (error.request && !error.response
-          ? "Could not reach the backend. Is it running?"
+          ? unreachableMessage()
           : "Something went wrong. Please try again.");
       notifyError(typeof message === "string" ? message : "Something went wrong. Please try again.");
     }

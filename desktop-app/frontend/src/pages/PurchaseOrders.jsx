@@ -65,7 +65,7 @@ const SuppliersModal = ({ isOpen, onClose, suppliers }) => {
         <form className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4"
           onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
           <h4 className="text-sm font-semibold text-slate-800">{editingId ? "Edit supplier" : "Add a supplier"}</h4>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {[["name", "Name"], ["vat_number", "VAT number"], ["contact_person", "Contact person"], ["phone", "Phone"], ["email", "Email"]].map(([key, label]) => (
               <label key={key}><Label>{label}</Label>
                 <input className={inputClass} value={form[key] || ""} onChange={(e) => setForm({ ...form, [key]: e.target.value })} required={key === "name"} />
@@ -214,7 +214,7 @@ const PurchaseOrders = () => {
             onDone={() => queryClient.invalidateQueries({ queryKey: ["purchase-orders"] })} />
         </div>
         <div className="relative overflow-x-auto">
-        <table className="w-full text-left">
+        <table className="card-table w-full text-left">
           <thead className="bg-slate-50 text-sm uppercase text-slate-500">
             <tr>
               <SelectAllTh selection={selection} />
@@ -226,13 +226,13 @@ const PurchaseOrders = () => {
             {filtered.map((o) => (
               <tr key={o.id} className="transition-colors hover:bg-slate-50">
                 <SelectTd selection={selection} id={o.id} label={`Select ${((id) => orders?.find((r) => r.id === id)?.number || `#${id}`)(o.id)}`} />
-                <td className="px-6 py-4 font-medium text-slate-600">{o.number || `#${o.id}`}</td>
-                <td className="px-6 py-4 text-slate-600">{shortDate(o.date)}</td>
-                <td className="px-6 py-4 text-slate-600">{supplierName(o.supplier_id)}</td>
-                <td className="px-6 py-4 text-slate-600">{shortDate(o.delivery_date)}</td>
-                <td className="px-6 py-4 font-medium text-slate-800">{money(o.total_amount)}</td>
-                <td className="px-6 py-4"><span className={`rounded-full px-2 py-1 text-xs font-bold ${statusStyle(o.status)}`}>{o.status}</span></td>
-                <td className="flex justify-end gap-2 px-6 py-4 text-right">
+                <td data-primary className="px-6 py-4 font-medium text-slate-600">{o.number || `#${o.id}`}</td>
+                <td data-label="Date" className="px-6 py-4 text-slate-600">{shortDate(o.date)}</td>
+                <td data-label="Supplier" className="px-6 py-4 text-slate-600">{supplierName(o.supplier_id)}</td>
+                <td data-label="Delivery" className="px-6 py-4 text-slate-600">{shortDate(o.delivery_date)}</td>
+                <td data-label="Total" className="px-6 py-4 font-medium text-slate-800">{money(o.total_amount)}</td>
+                <td data-label="Status" className="px-6 py-4"><span className={`rounded-full px-2 py-1 text-xs font-bold ${statusStyle(o.status)}`}>{o.status}</span></td>
+                <td data-actions className="flex justify-end gap-2 px-6 py-4 text-right">
                   <button title="Preview" onClick={() => setPreview({ kind: "purchase-order", id: o.id, title: o.number })}
                     className="p-2 text-slate-400 transition-colors hover:text-emerald-600"><Eye size={18} /></button>
                   <button title="Download PDF" onClick={() => downloadDocumentPdf("purchase-order", o.id, o.number)}
@@ -257,7 +257,7 @@ const PurchaseOrders = () => {
       <Modal isOpen={editing !== null} onClose={close} size="lg"
         title={editing === "new" ? "New Purchase Order" : `Edit ${editing?.number || "Purchase Order"}`}>
         <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label>Supplier</Label>
               <SearchableSelect value={order.supplier_id} onChange={(v) => setOrder({ ...order, supplier_id: v })}

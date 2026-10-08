@@ -29,7 +29,7 @@ export function useProductPatch() {
 
 const Switch = ({ checked, onChange, label }) => (
   <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)}
-    className="flex items-center gap-2 text-xs font-medium text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded">
+    className="flex min-h-11 items-center gap-2 text-xs font-medium text-slate-600 focus:outline-none sm:min-h-0 focus-visible:ring-2 focus-visible:ring-emerald-500 rounded">
     <span className={`flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors ${checked ? "justify-end bg-emerald-500" : "justify-start bg-slate-300"}`}>
       <span className="h-4 w-4 rounded-full bg-white shadow" />
     </span>
@@ -58,7 +58,7 @@ const CardPicture = ({ product, src, onOpen }) => {
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={(e) => { e.preventDefault(); setDragging(false); pick(e.dataTransfer.files?.[0]); }}
-      className={`relative flex h-36 items-center justify-center overflow-hidden rounded-t-xl bg-slate-50 ${dragging ? "ring-2 ring-inset ring-emerald-500" : ""}`}
+      className={`relative flex h-52 items-center justify-center overflow-hidden rounded-t-xl sm:h-36 bg-slate-50 ${dragging ? "ring-2 ring-inset ring-emerald-500" : ""}`}
     >
       {src ? (
         <button type="button" onClick={() => onOpen(product)} className="h-full w-full" title={`View picture of ${product.name}`}>
@@ -67,12 +67,13 @@ const CardPicture = ({ product, src, onOpen }) => {
       ) : (
         <div className="flex flex-col items-center gap-1 text-xs text-slate-400">
           <Package size={28} aria-hidden="true" />
-          Drop a picture here
+          <span className="sm:hidden">Tap the camera to add a picture</span>
+          <span className="hidden sm:inline">Drop a picture here</span>
         </div>
       )}
       <button type="button" onClick={() => inputRef.current?.click()} title={src ? "Change picture" : "Add picture"}
         aria-label={`${src ? "Change" : "Add"} picture for ${product.name}`}
-        className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-slate-600 shadow hover:text-emerald-700">
+        className="absolute right-2 top-2 rounded-full bg-white/90 p-2.5 text-slate-600 sm:p-1.5 shadow hover:text-emerald-700">
         <Camera size={15} />
       </button>
       {upload.isPending && <span className="absolute inset-x-0 bottom-0 bg-white/80 py-1 text-center text-xs text-slate-600">Uploading…</span>}
@@ -91,10 +92,10 @@ const ProductCard = ({ product, thumb, onOpenPicture, onEdit, onDelete, priceLab
   return (
     <article aria-label={product.name}
       className={`relative flex flex-col rounded-xl border bg-white shadow-sm ${selection?.has(product.id) ? "border-emerald-500 ring-2 ring-emerald-200" : "border-slate-200"} ${hidden ? "opacity-60" : ""}`}>
-      {selection && <SelectBox selection={selection} id={product.id} label={`Select ${product.name}`} className="absolute left-2 top-2 z-10 bg-white" />}
+      {selection && <SelectBox selection={selection} id={product.id} label={`Select ${product.name}`} className="absolute left-2 top-2 z-10 h-6! w-6! bg-white sm:h-4! sm:w-4!" />}
       <CardPicture product={product} src={thumb} onOpen={onOpenPicture} />
       <div className="flex-1 space-y-1.5 p-3 text-sm">
-        <InlineEdit value={product.name} onSave={save("name")} label="Name" required className="font-semibold text-slate-800" />
+        <InlineEdit value={product.name} onSave={save("name")} label="Name" required className="text-base font-semibold text-slate-800 sm:text-sm" />
         <div className="flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
           <InlineEdit value={product.code} onSave={save("code")} label="Code" placeholder="Add code" />
           <span aria-hidden="true">·</span>
@@ -106,12 +107,12 @@ const ProductCard = ({ product, thumb, onOpenPicture, onEdit, onDelete, priceLab
           <div className="space-y-0.5">
             <div className="flex items-baseline gap-1.5">
               <InlineEdit value={product.price} onSave={save("price")} label={`${priceLabel} incl VAT`} type="number" required format={money}
-                className="text-base font-bold text-slate-800" />
+                className="text-xl font-bold text-slate-800 sm:text-base" />
               <span className="text-xs text-slate-500">incl. VAT</span>
             </div>
             <div className="flex items-baseline gap-1.5">
               <InlineEdit value={priceExcl(product)} onSave={save("price_excl_vat")} label={`${priceLabel} excl VAT`} type="number" format={money}
-                className="text-sm text-slate-600" />
+                className="text-base text-slate-600 sm:text-sm" />
               <span className="text-xs text-slate-500">excl. VAT</span>
             </div>
           </div>
@@ -124,13 +125,13 @@ const ProductCard = ({ product, thumb, onOpenPicture, onEdit, onDelete, priceLab
         <Switch checked={isInStock(product)} onChange={(v) => save("in_stock")(v)} label={isInStock(product) ? "In stock" : "Out of stock"} />
         <div className="flex items-center gap-0.5">
           <button type="button" onClick={() => save("is_active")(hidden)} title={hidden ? "Show again" : "Hide (keeps old invoices intact)"}
-            aria-label={`${hidden ? "Show" : "Hide"} ${product.name}`} className="p-1.5 text-slate-400 hover:text-emerald-600">
+            aria-label={`${hidden ? "Show" : "Hide"} ${product.name}`} className="p-2.5 text-slate-400 hover:text-emerald-600 sm:p-1.5">
             {hidden ? <Eye size={16} /> : <EyeOff size={16} />}
           </button>
           <button type="button" onClick={() => onEdit(product)} title="All details" aria-label={`Edit all details of ${product.name}`}
-            className="p-1.5 text-slate-400 hover:text-emerald-600"><Edit size={16} /></button>
+            className="p-2.5 text-slate-400 hover:text-emerald-600 sm:p-1.5"><Edit size={16} /></button>
           <button type="button" onClick={() => onDelete(product)} title="Delete" aria-label={`Delete ${product.name}`}
-            className="p-1.5 text-slate-400 hover:text-red-600"><Trash2 size={16} /></button>
+            className="p-2.5 text-slate-400 hover:text-red-600 sm:p-1.5"><Trash2 size={16} /></button>
         </div>
       </footer>
     </article>
@@ -150,7 +151,7 @@ const ProductCatalog = ({ products, thumbnails, onOpenPicture, onEdit, onDelete,
 
   if (!groups.length) return <p className="p-12 text-center text-slate-400">No products match.</p>;
   return (
-    <div className="space-y-8 p-4">
+    <div className="space-y-8 p-3 sm:p-4">
       {groups.map(([name, items]) => (
         <section key={name} aria-labelledby={`cat-${name}`}>
           <h3 id={`cat-${name}`} className="mb-3 flex items-baseline gap-2 border-b border-slate-200 pb-1 text-lg font-bold text-slate-800">

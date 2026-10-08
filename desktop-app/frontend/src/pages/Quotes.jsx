@@ -285,7 +285,7 @@ const Quotes = () => {
             onDone={() => queryClient.invalidateQueries({ queryKey: ["quotes"] })} />
         </div>
         <div className="relative overflow-x-auto">
-        <table className="w-full text-left">
+        <table className="card-table w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
             <tr>
               <SelectAllTh selection={selection} />
@@ -301,7 +301,7 @@ const Quotes = () => {
             {filteredQuotes.map(q => (
               <tr key={q.id} className="hover:bg-slate-50 transition-colors">
                 <SelectTd selection={selection} id={q.id} label={`Select ${((id) => quotes?.find((r) => r.id === id)?.number || `#${id}`)(q.id)}`} />
-                <td className="px-6 py-4 text-slate-600">
+                <td data-primary className="px-6 py-4 text-slate-600">
                   <DocumentHover kind="quote" doc={q} clientName={clientName(q.client_id)}>{q.number || `#${q.id}`}</DocumentHover>
                   {q.program_id && (
                     <Link to={`/programs/${q.program_id}`} title="This quote is a herding program - open it"
@@ -310,12 +310,12 @@ const Quotes = () => {
                     </Link>
                   )}
                 </td>
-                <td className="px-6 py-4 text-slate-600">{new Date(q.date).toLocaleDateString()}</td>
-                <td className="px-6 py-4 text-slate-600">
+                <td data-label="Date" className="px-6 py-4 text-slate-600">{new Date(q.date).toLocaleDateString()}</td>
+                <td data-label="Client" className="px-6 py-4 text-slate-600">
                   <ClientHover client={clients?.find((c) => c.id === q.client_id)}>{clientName(q.client_id)}</ClientHover>
                 </td>
-                <td className="px-6 py-4 font-medium text-slate-800">R {q.total_amount.toLocaleString()}</td>
-                <td className="px-6 py-4">
+                <td data-label="Total" className="px-6 py-4 font-medium text-slate-800">R {q.total_amount.toLocaleString()}</td>
+                <td data-label="Status" className="px-6 py-4">
                   <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                     q.status === 'Accepted' ? 'bg-emerald-100 text-emerald-700' :
                     q.status === 'Sent' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'
@@ -323,7 +323,7 @@ const Quotes = () => {
                     {q.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-right flex justify-end gap-2">
+                <td data-actions className="px-6 py-4 text-right flex justify-end gap-2">
                   <button
                     onClick={() => setPreview({ kind: "quote", id: q.id, title: q.number })}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
@@ -375,7 +375,7 @@ const Quotes = () => {
 
       <Modal isOpen={isModalOpen} onClose={closeModal} size="lg" title={editingId ? `Edit Quote ${quotes?.find((q) => q.id === editingId)?.number || `#${editingId}`}` : "Quote Builder"}>
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Client</label>
               <SearchableSelect
@@ -400,7 +400,7 @@ const Quotes = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Reference</label>
               <input value={quote.reference} onChange={(e) => setQuote({ ...quote, reference: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />

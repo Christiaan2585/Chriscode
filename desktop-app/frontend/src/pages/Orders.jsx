@@ -165,7 +165,7 @@ const Orders = () => {
             onDone={() => queryClient.invalidateQueries({ queryKey: ["orders"] })} />
         </div>
         <div className="relative overflow-x-auto">
-        <table className="w-full text-left">
+        <table className="card-table w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
             <tr>
               <SelectAllTh selection={selection} />
@@ -187,10 +187,10 @@ const Orders = () => {
             {filteredOrders.map(order => (
               <tr key={order.id} className="hover:bg-slate-50 transition-colors">
                 <SelectTd selection={selection} id={order.id} label={`Select ${((id) => `Order #${id}`)(order.id)}`} />
-                <td className="px-6 py-4 text-slate-600 font-medium">#{order.id}</td>
-                <td className="px-6 py-4 text-slate-600">{clientName(order.client_id)}</td>
-                <td className="px-6 py-4 font-medium text-slate-800">R {order.total_amount.toLocaleString()}</td>
-                <td className="px-6 py-4">
+                <td data-primary className="px-6 py-4 text-slate-600 font-medium">#{order.id}</td>
+                <td data-label="Client" className="px-6 py-4 text-slate-600">{clientName(order.client_id)}</td>
+                <td data-label="Total" className="px-6 py-4 font-medium text-slate-800">R {order.total_amount.toLocaleString()}</td>
+                <td data-label="Status" className="px-6 py-4">
                   <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                     order.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' :
                     order.status === 'Shipped' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
@@ -198,7 +198,7 @@ const Orders = () => {
                     {order.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-right flex justify-end gap-2">
+                <td data-actions className="px-6 py-4 text-right flex justify-end gap-2">
                   <button onClick={() => openEditModal(order)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors" title="Edit">
                     <Edit size={18} />
                   </button>
@@ -223,7 +223,7 @@ const Orders = () => {
 
       <Modal isOpen={isModalOpen} onClose={closeModal} title={editingId ? `Edit Order #${editingId}` : "Create New Order"}>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Client</label>
               <SearchableSelect
@@ -250,7 +250,7 @@ const Orders = () => {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Total Amount</label>
               <input

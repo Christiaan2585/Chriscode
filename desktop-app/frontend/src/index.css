@@ -237,3 +237,39 @@ html.theme-dark {
 .theme-dark .name-color-amber, .theme-dark .name-color-amber * { color: #fcd34d; }
 .name-color-teal, .name-color-teal * { color: #0f766e; }
 .theme-dark .name-color-teal, .theme-dark .name-color-teal * { color: #5eead4; }
+
+/* Phone-friendly lists: on a narrow screen (under 1024px - the sidebar leaves a table too little room) every list table (class `card-table`) turns into one
+   card per row - the main detail as a heading, each other detail labelled (data-label), the
+   buttons in a row of large touch targets. Wider screens keep the normal table. Cells carry
+   data-primary / data-wide / data-actions / data-select (BulkSelect's tick box). */
+@media (max-width: 1023px) {
+  .card-table, .card-table tbody { display: block; width: 100%; }
+  .card-table thead { display: none; }
+  .card-table tr {
+    position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem 1rem;
+    padding: 1rem; border-bottom: 1px solid var(--color-slate-200);
+  }
+  .card-table td { display: block; padding: 0; min-width: 0; font-size: 1rem; text-align: left; overflow-wrap: anywhere; }
+  .card-table td[data-label]::before {
+    content: attr(data-label); display: block; margin-bottom: 0.1rem; font-size: 0.7rem; font-weight: 600;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-slate-400);
+  }
+  .card-table td[data-primary] { order: -2; grid-column: 1 / -1; padding-right: 2.5rem; font-size: 1.1rem; font-weight: 600; }
+  .card-table td[data-key] { order: -1; font-size: 1.15rem; font-weight: 700; }
+  .card-table td[data-wide] { grid-column: 1 / -1; }
+  .card-table td[data-select] { position: absolute; top: 0.9rem; right: 0.9rem; width: auto; }
+  .card-table td[data-select] input { width: 1.5rem; height: 1.5rem; }
+  .card-table td[data-actions] {
+    grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 0.5rem;
+    padding-top: 0.5rem; border-top: 1px solid var(--color-slate-100);
+  }
+  .card-table td[data-actions] > *, .card-table td[data-actions] .flex { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-start; }
+  .card-table td[data-actions] :is(button, a) {
+    display: inline-flex; align-items: center; justify-content: center; min-width: 2.75rem; min-height: 2.75rem;
+    border: 1px solid var(--color-slate-200); border-radius: 0.75rem;
+  }
+  .card-table td[colspan] { grid-column: 1 / -1; text-align: center; }
+  .card-table td[colspan]::before { display: none; }
+  /* A phone keyboard zooms in on small inputs; keep them comfortably large. */
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 1rem; }
+}

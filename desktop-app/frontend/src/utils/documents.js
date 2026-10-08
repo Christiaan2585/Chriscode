@@ -1,4 +1,5 @@
 import apiClient from "../api/client";
+import { isNativeApp, shareBlob } from "./nativeFiles";
 
 const API_PATH = { invoice: "invoices", quote: "quotes", "purchase-order": "purchase-orders" };
 
@@ -10,6 +11,7 @@ export async function fetchDocumentPdf(kind, id, url) {
 }
 
 export function saveBlob(blob, filename) {
+  if (isNativeApp()) return shareBlob(blob, filename, { title: filename }); // the phone's share sheet: open, send or print
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

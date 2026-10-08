@@ -144,7 +144,7 @@ const Clients = () => {
             onDone={() => queryClient.invalidateQueries({ queryKey: ["clients"] })} />
         </div>
         <div className="relative overflow-x-auto">
-        <table className="w-full text-left">
+        <table className="card-table w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
             <tr>
               <SelectAllTh selection={selection} />
@@ -165,7 +165,7 @@ const Clients = () => {
                   className="hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                 <SelectTd selection={selection} id={client.id} label={`Select ${((id) => farmLabel(clients?.find((r) => r.id === id)) || `#${id}`)(client.id)}`} />
-                  <td className="px-6 py-4 flex items-center gap-3">
+                  <td data-primary className="px-6 py-4 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 shrink-0">
                       <User size={16} />
                     </div>
@@ -174,12 +174,12 @@ const Clients = () => {
                       {client.farm_name && <div className="text-xs text-slate-400">{client.name}</div>}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-slate-600">
+                  <td data-label="Contact" data-wide className="px-6 py-4 text-slate-600">
                     <div>{client.email || "—"}</div>
                     <div className="text-xs text-slate-400">{client.phone || ""}</div>
                   </td>
-                  <td className="px-6 py-4 text-slate-600">{client.address}</td>
-                  <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                  <td data-label="Location" data-wide className="px-6 py-4 text-slate-600">{client.address}</td>
+                  <td data-actions className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-1">
                       {telLink && (
                         <a
@@ -256,7 +256,7 @@ const Clients = () => {
               className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
               <input
@@ -277,7 +277,7 @@ const Clients = () => {
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Physical Address</label>
               <textarea

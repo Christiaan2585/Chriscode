@@ -199,7 +199,7 @@ const SupplierCatalogue = ({ book, products, canEdit }) => {
 // Shown above the card catalog until a book is loaded.
 export const LoadBookPrompt = ({ canEdit }) => (
   <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-    <span className="flex-1">
+    <span className="min-w-full flex-1 sm:min-w-0">
       {canEdit
         ? "Load Kyron's catalogue PDFs (English and Afrikaans) to show the real catalogue here, with your prices beside each product."
         : "An admin can load Kyron's catalogue PDFs to show the real catalogue here."}

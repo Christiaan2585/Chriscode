@@ -205,6 +205,27 @@ class SignOutEverywhereTests(AuthCase):
         self.assertTrue(self.other.must_change_password)
         self.assertTrue(self.login("Temp-Kraal-Pass-12", "koos@example.com").user.must_change_password)
 
+    def test_an_admin_cannot_reset_their_own_password_or_two_step_without_proof(self):
+        for call in (lambda: auth.admin_reset_password(self.user.id, auth.AdminPasswordReset(new_password="Temp-Kraal-Pass-12"), admin=self.user, session=self.s),
+                     lambda: auth.admin_reset_two_step(self.user.id, admin=self.user, session=self.s)):
+            with self.assertRaises(HTTPException) as ctx:
+                call()
+            self.assertEqual(ctx.exception.status_code, 400)
+
+    def test_google_sign_in_does_not_skip_two_step_or_the_lock(self):
+        profile = {"sub": "g-1", "email": "koos@example.com", "name": "Koos"}
+        request = auth.GoogleCallbackRequest(code="c", code_verifier="v", redirect_uri="http://127.0.0.1:1/", nonce="n")
+        with mock.patch.object(auth, "exchange_code_for_profile", return_value=profile):
+            self.assertTrue(auth.google_callback(request, session=self.s).access_token)  # plain account: fine
+            self.other.login_locked_until = datetime.utcnow() + timedelta(minutes=5)
+            with self.assertRaises(HTTPException) as locked:
+                auth.google_callback(request, session=self.s)
+            self.assertEqual(locked.exception.status_code, 429)
+            self.other.login_locked_until, self.other.totp_enabled = None, True
+            with self.assertRaises(HTTPException) as two_step:
+                auth.google_callback(request, session=self.s)
+            self.assertEqual(two_step.exception.status_code, 403)
+
     def test_a_reset_password_must_be_a_good_one(self):
         with self.assertRaises(HTTPException):
             auth.admin_reset_password(self.other.id, auth.AdminPasswordReset(new_password="password123"), admin=self.user, session=self.s)
