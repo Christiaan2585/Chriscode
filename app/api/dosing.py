@@ -24,6 +24,7 @@ def dosing_for_product(product_id: int, session: Session = Depends(get_session))
 
 @router.post("/", response_model=ProductDosing)
 def create_dosing(dosing: ProductDosing, session: Session = Depends(get_session)):
+    dosing.id = None  # the database picks the number
     """Add a dosing rule by hand - e.g. a product that has none yet, entered
     straight off the physical label. Marked "unverified" unless the caller says
     otherwise, since nothing cross-checked it."""

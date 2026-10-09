@@ -353,7 +353,7 @@ const Quotes = () => {
                       }
                     }}
                     className="p-2 text-slate-400 hover:text-red-600 transition-colors"
-                    title="Delete"
+                    title="Delete" data-admin-only
                   >
                     <Trash2 size={18} />
                   </button>

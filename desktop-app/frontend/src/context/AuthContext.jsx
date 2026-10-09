@@ -7,8 +7,8 @@ import { clearOfflineLogin, offlineLoginExists, saveOfflineLogin, tryOfflineUnlo
 import { meta, secure, wipeOfflineData, wipeSavedCopy } from '../offline/store';
 import { forgetSyncState } from '../offline/sync';
 import { signInWithGoogle, isElectron } from '../utils/googleLogin';
+import { getRememberToken, loadRememberToken, removeRememberToken, setRememberToken } from '../utils/rememberToken';
 
-const REMEMBER_TOKEN_KEY = 'sandveld_remember_token';
 const REMEMBERED_USER_KEY = 'sandveld_remembered_user';
 
 // Screens the app can be on, in the order a brand-new install walks through
@@ -42,7 +42,7 @@ export function AuthProvider({ children }) {
   const [offlineNote, setOfflineNote] = useState(false);
   const pinRef = useRef(null);
 
-  const rememberedToken = () => localStorage.getItem(REMEMBER_TOKEN_KEY);
+  const rememberedToken = () => getRememberToken(); // read once at start (below), then kept in memory
 
   // What the lock screen shows before anyone has signed in: name and photo.
   const rememberUser = useCallback((u) => {
@@ -71,7 +71,7 @@ export function AuthProvider({ children }) {
   // check the PIN itself. A full password / Google sign-in forgets it, so the PIN is asked for once afterwards.
   const persistSession = useCallback((result, { pin } = {}) => {
     setAccessToken(result.access_token);
-    localStorage.setItem(REMEMBER_TOKEN_KEY, result.remember_token);
+    setRememberToken(result.remember_token);
     rememberUser(result.user);
     setUser(result.user);
     setOfflineNote(false);
@@ -99,8 +99,15 @@ export function AuthProvider({ children }) {
     setUnauthorizedHandler(goToSignedOut);
   }, [goToSignedOut]);
 
+  // Deleting clients, paperwork, products and programs is for admins (the server refuses anyone else): staff
+  // simply don't see those buttons. index.css hides everything marked data-admin-only while this class is on.
+  useEffect(() => {
+    document.documentElement.classList.toggle('staff-user', Boolean(user) && !user.is_admin);
+  }, [user]);
+
   useEffect(() => {
     (async () => {
+      await loadRememberToken().catch(() => null); // before anything asks whether this device is remembered
       try {
         const status = await authService.status();
         setGoogleEnabled(status.google_enabled);
@@ -294,7 +301,7 @@ export function AuthProvider({ children }) {
         // best-effort - still clear locally even if the backend call fails
       }
     }
-    localStorage.removeItem(REMEMBER_TOKEN_KEY);
+    await removeRememberToken();
     localStorage.removeItem(REMEMBERED_USER_KEY);
     if (isNative()) {
       // Nothing of the office data stays on a phone that has signed out completely.

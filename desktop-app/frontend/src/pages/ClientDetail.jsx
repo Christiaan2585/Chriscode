@@ -552,7 +552,7 @@ const ClientDetail = () => {
                             }
                           }}
                           className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                          title="Delete"
+                          title="Delete" data-admin-only
                         >
                           <Trash2 size={16} />
                         </button>
@@ -603,7 +603,7 @@ const ClientDetail = () => {
                             }
                           }}
                           className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                          title="Delete"
+                          title="Delete" data-admin-only
                         >
                           <Trash2 size={16} />
                         </button>
@@ -666,7 +666,7 @@ const ClientDetail = () => {
                             }
                           }}
                           className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                          title="Delete"
+                          title="Delete" data-admin-only
                         >
                           <Trash2 size={16} />
                         </button>

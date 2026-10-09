@@ -272,7 +272,7 @@ const ProgramCard = ({ program, onOpen, onDelete, onCopy }) => {
             className="p-1.5 text-slate-400 transition-colors hover:text-emerald-600">
             <Copy size={16} />
           </button>
-          <button type="button" onClick={onDelete} title="Delete program" aria-label={`Delete ${program.name}`}
+          <button type="button" onClick={onDelete} title="Delete program" data-admin-only aria-label={`Delete ${program.name}`}
             className="p-1.5 text-slate-400 transition-colors hover:text-red-600">
             <Trash2 size={16} />
           </button>

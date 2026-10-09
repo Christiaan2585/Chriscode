@@ -10,6 +10,7 @@ router = APIRouter(prefix="/animals", tags=["Animals"])
 
 @router.post("/", response_model=Animal)
 def create_animal(animal: Animal, session: Session = Depends(get_session)):
+    animal.id = None  # the database picks the number
     animal.birth_date = coerce_datetime(animal.birth_date)
     session.add(animal)
     session.commit()

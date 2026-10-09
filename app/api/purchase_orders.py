@@ -9,7 +9,7 @@ from app.api.business import get_business, next_document_number, price_line, pro
 from app.core.dates import coerce_datetime
 from app.core.db import get_session
 from app.core.pdf import generate_purchase_order_pdf
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.models.product import Product
 from app.models.user import User
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem, Supplier
@@ -57,7 +57,7 @@ def update_supplier(supplier_id: int, data: Supplier, session: Session = Depends
     return supplier
 
 
-@router.delete("/suppliers/{supplier_id}")
+@router.delete("/suppliers/{supplier_id}", dependencies=[Depends(require_admin)])
 def delete_supplier(supplier_id: int, session: Session = Depends(get_session)):
     supplier = _get_or_404(session, Supplier, supplier_id, "Supplier")
     orders = session.exec(select(PurchaseOrder).where(PurchaseOrder.supplier_id == supplier_id)).all()
@@ -108,7 +108,7 @@ def update_purchase_order(po_id: int, data: PurchaseOrder, session: Session = De
     return po
 
 
-@router.delete("/purchase-orders/{po_id}")
+@router.delete("/purchase-orders/{po_id}", dependencies=[Depends(require_admin)])
 def delete_purchase_order(po_id: int, session: Session = Depends(get_session)):
     po = _get_or_404(session, PurchaseOrder, po_id, "Purchase order")
     for item in session.exec(select(PurchaseOrderItem).where(PurchaseOrderItem.purchase_order_id == po_id)).all():

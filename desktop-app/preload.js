@@ -24,6 +24,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openSendLink: (url) => ipcRenderer.invoke('open-send-link', url),
   // The document preview's Print button (the built-in PDF viewer's own one does nothing).
   printPdf: (data) => ipcRenderer.invoke('print-pdf', data),
+  // The "remember this device" token, encrypted by Windows (see secret-store.js). Only that one name is accepted.
+  secretGet: (key) => ipcRenderer.invoke('secret-get', key),
+  secretSet: (key, value) => ipcRenderer.invoke('secret-set', key, value),
+  secretRemove: (key) => ipcRenderer.invoke('secret-remove', key),
   onUpdateStatus: (callback) => {
     const listener = (_event, status) => callback(status);
     ipcRenderer.on('update-status', listener);

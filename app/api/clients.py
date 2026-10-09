@@ -46,6 +46,7 @@ _COLUMN_ALIASES = {
 
 @router.post("/", response_model=Client)
 def create_client(client: Client, session: Session = Depends(get_session)):
+    client.id = None  # the database picks the number
     client.standard_program_at = client.erased_at = None  # not something a caller sets
     session.add(client)
     session.commit()
@@ -272,7 +273,7 @@ def update_client(client_id: int, client_data: Client, session: Session = Depend
     session.refresh(db_client)
     return db_client
 
-@router.delete("/{client_id}")
+@router.delete("/{client_id}", dependencies=[Depends(require_admin)])
 def delete_client(client_id: int, session: Session = Depends(get_session)):
     client = session.get(Client, client_id)
     if not client:

@@ -9,6 +9,7 @@ router = APIRouter(prefix="/weights", tags=["Weight Tracking"])
 
 @router.post("/", response_model=WeightLog)
 def add_weight(log: WeightLog, session: Session = Depends(get_session)):
+    log.id = None  # the database picks the number
     log.date = coerce_datetime(log.date)
     session.add(log)
     session.commit()

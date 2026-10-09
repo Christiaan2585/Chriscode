@@ -39,6 +39,8 @@ CORS_EXPOSE = "content-disposition, content-type"
 PAIRING_CODE_LIFETIME = timedelta(minutes=10)
 MAX_PAIRING_ATTEMPTS = 5
 LAST_SEEN_EVERY = timedelta(minutes=1)
+# A phone nobody has used for this long has to be paired again (a lost or retired phone doesn't stay trusted forever).
+DEVICE_IDLE_LIFETIME = timedelta(days=90)
 _CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O or 1/I to misread
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -184,6 +186,10 @@ class DeviceGuard:
         with self._sessions() as session:
             device = session.exec(select(PairedDevice).where(PairedDevice.token_hash == hash_token(token))).first()
             if device is None:
+                return False
+            if _now() - (device.last_seen_at or device.created_at) > DEVICE_IDLE_LIFETIME:
+                session.delete(device)
+                session.commit()
                 return False
             if device.last_seen_at is None or _now() - device.last_seen_at > LAST_SEEN_EVERY:
                 device.last_seen_at = _now()

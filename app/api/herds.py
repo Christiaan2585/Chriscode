@@ -9,6 +9,7 @@ router = APIRouter(prefix="/herds", tags=["Herds"])
 
 @router.post("/", response_model=Herd)
 def create_herd(herd: Herd, session: Session = Depends(get_session)):
+    herd.id = None  # the database picks the number
     session.add(herd)
     session.commit()
     session.refresh(herd)

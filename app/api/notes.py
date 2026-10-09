@@ -9,6 +9,7 @@ router = APIRouter(prefix="/notes", tags=["Notes & Reminders"])
 
 @router.post("/", response_model=ClientNote)
 def create_note(note: ClientNote, session: Session = Depends(get_session)):
+    note.id = None  # the database picks the number
     note.reminder_date = coerce_datetime(note.reminder_date)
     session.add(note)
     session.commit()

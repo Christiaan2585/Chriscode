@@ -10,7 +10,7 @@ from app.core import audit, herding
 from app.core.db import create_db_and_tables, database_file_path, engine
 from app.core.backup import backup_on_version_change, start_scheduler
 from app.core.local_secret import LocalSecretGuard, configured_secret
-from app.core.security import get_current_user
+from app.core.security import require_settled_password
 from app.api import audit as audit_api, auth, clients, animals, rams, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups, exports, business, purchase_orders, devices, catalogue
 
 logger = logging.getLogger("uvicorn.error")
@@ -82,7 +82,7 @@ app.include_router(devices.router)
 # above this line (unprotected: you need to be able to log in before you
 # have a token), and / and /version stay open below (so the desktop app's
 # own boot-time backend health check keeps working without a token).
-_protected = [Depends(get_current_user)]
+_protected = [Depends(require_settled_password)]
 app.include_router(clients.router, dependencies=_protected)
 app.include_router(animals.router, dependencies=_protected)
 app.include_router(rams.router, dependencies=_protected)

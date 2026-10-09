@@ -93,6 +93,15 @@ def get_current_user(
     return user
 
 
+def require_settled_password(user: User = Depends(get_current_user)) -> User:
+    """Signed in AND not still on a temporary password an admin set: every business route needs this (main.py), so
+    a temporary password only opens the screen that replaces it - the /auth routes use get_current_user instead."""
+    if user.must_change_password:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={
+            "code": "password_change_required", "message": "Choose your own password first (Settings, or the sign-in screen)."})
+    return user
+
+
 def require_admin(user: User = Depends(get_current_user)) -> User:
     if not user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only an admin can do this")

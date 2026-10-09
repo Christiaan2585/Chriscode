@@ -10,7 +10,7 @@ from app.models.product import Product
 from app.core.pdf import generate_invoice_pdf
 from app.api.business import default_due_date, document_lines, get_business, next_document_number, price_line, sales_rep_for, totals_for
 from app.models.client import Client
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.models.user import User
 
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
@@ -23,6 +23,7 @@ def _recalculate_total(session: Session, invoice: Invoice) -> None:
 
 @router.post("/", response_model=Invoice)
 def create_invoice(invoice: Invoice, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    invoice.id = None  # the database picks the number
     invoice.date = coerce_datetime(invoice.date) or datetime.utcnow()
     invoice.due_date = coerce_datetime(invoice.due_date) or default_due_date(session, invoice.date)
     invoice.number = next_document_number(session, Invoice)  # only ever assigned here - never taken from the request
@@ -64,7 +65,7 @@ def update_invoice(invoice_id: int, invoice_data: Invoice, session: Session = De
     session.refresh(db_invoice)
     return db_invoice
 
-@router.delete("/{invoice_id}")
+@router.delete("/{invoice_id}", dependencies=[Depends(require_admin)])
 def delete_invoice(invoice_id: int, session: Session = Depends(get_session)):
     invoice = session.get(Invoice, invoice_id)
     if not invoice:
@@ -79,6 +80,7 @@ def delete_invoice(invoice_id: int, session: Session = Depends(get_session)):
 
 @router.post("/items/", response_model=InvoiceItem)
 def add_invoice_item(item: InvoiceItem, session: Session = Depends(get_session)):
+    item.id = None  # the database picks the number
     if not session.get(Product, item.product_id):
         raise HTTPException(status_code=404, detail="Product not found")
     invoice = session.get(Invoice, item.invoice_id)

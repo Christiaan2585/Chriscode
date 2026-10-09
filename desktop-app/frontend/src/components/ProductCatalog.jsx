@@ -130,7 +130,7 @@ const ProductCard = ({ product, thumb, onOpenPicture, onEdit, onDelete, priceLab
           </button>
           <button type="button" onClick={() => onEdit(product)} title="All details" aria-label={`Edit all details of ${product.name}`}
             className="p-2.5 text-slate-400 hover:text-emerald-600 sm:p-1.5"><Edit size={16} /></button>
-          <button type="button" onClick={() => onDelete(product)} title="Delete" aria-label={`Delete ${product.name}`}
+          <button type="button" onClick={() => onDelete(product)} title="Delete" data-admin-only aria-label={`Delete ${product.name}`}
             className="p-2.5 text-slate-400 hover:text-red-600 sm:p-1.5"><Trash2 size={16} /></button>
         </div>
       </footer>

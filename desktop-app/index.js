@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog, session } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, session, safeStorage } = require('electron');
 const { pathToFileURL } = require('url');
 const path = require('path');
 const fs = require('fs');
@@ -6,6 +6,7 @@ const http = require('http');
 const crypto = require('crypto');
 const { spawn, execFile } = require('child_process');
 const localSecret = require('./local-secret');
+const secretStore = require('./secret-store');
 const { autoUpdater } = require('electron-updater');
 
 // Not using the `electron-is-dev` package: its current release is ESM-only
@@ -720,6 +721,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.whenReady().then(() => {
     registerPermissionHandler();
+    secretStore.install({ ipcMain, safeStorage, dir: app.getPath('userData') });
     registerContentSecurityPolicy();
     localSecret.installHeader(session.defaultSession, LOCAL_SECRET, [`http://${BACKEND_HOST}:${BACKEND_PORT}/*`, `http://localhost:${BACKEND_PORT}/*`]);
     createWindow();

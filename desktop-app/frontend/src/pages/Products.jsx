@@ -86,7 +86,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
                   <button onClick={() => onEdit(p)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors" title="All details" aria-label={`Edit all details of ${p.name}`}>
                     <Edit size={18} />
                   </button>
-                  <button onClick={() => onDelete(p)} className="p-2 text-slate-400 hover:text-red-600 transition-colors" title="Delete" aria-label={`Delete ${p.name}`}>
+                  <button onClick={() => onDelete(p)} className="p-2 text-slate-400 hover:text-red-600 transition-colors" title="Delete" data-admin-only aria-label={`Delete ${p.name}`}>
                     <Trash2 size={18} />
                   </button>
                 </div>

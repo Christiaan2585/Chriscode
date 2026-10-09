@@ -435,6 +435,25 @@ class ParallelGuessTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 429)  # still locked, exactly like a real account would be
 
 
+class ForcedPasswordChangeTests(unittest.TestCase):
+    """An admin-set temporary password must be replaced before anything else - enforced by the server, not just the screen."""
+
+    def test_the_business_routes_refuse_someone_who_still_has_to_change_their_password(self):
+        user = User(id=1, name="Koos", email="koos@example.com", must_change_password=True)
+        with self.assertRaises(HTTPException) as ctx:
+            security.require_settled_password(user)
+        self.assertEqual(ctx.exception.status_code, 403)
+        self.assertEqual(ctx.exception.detail["code"], "password_change_required")
+
+    def test_everyone_else_passes(self):
+        user = User(id=1, name="Koos", email="koos@example.com", must_change_password=False)
+        self.assertIs(security.require_settled_password(user), user)
+
+    def test_every_business_router_uses_it_but_the_auth_router_does_not(self):
+        from app import main
+        self.assertTrue(all(d.dependency is security.require_settled_password for d in main._protected))
+
+
 class UnhandledErrorTests(unittest.TestCase):
     def test_a_crash_inside_a_route_does_not_leak_its_message(self):
         import asyncio

@@ -6,7 +6,7 @@ const box = "h-4 w-4 cursor-pointer rounded border-slate-300 accent-emerald-600"
 
 // The tick box in a table's header row: ticks or clears everything shown.
 export const SelectAllTh = ({ selection, label = "Select all" }) => (
-  <th className="w-10 px-4 py-3">
+  <th data-admin-only className="w-10 px-4 py-3">
     <input type="checkbox" className={box} aria-label={label} checked={selection.allSelected}
       ref={(el) => { if (el) el.indeterminate = selection.count > 0 && !selection.allSelected; }}
       onChange={selection.toggleAll} onClick={(e) => e.stopPropagation()} />
@@ -15,14 +15,14 @@ export const SelectAllTh = ({ selection, label = "Select all" }) => (
 
 // The tick box at the start of a row.
 export const SelectTd = ({ selection, id, label }) => (
-  <td data-select className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
+  <td data-select data-admin-only className="w-10 px-4 py-3" onClick={(e) => e.stopPropagation()}>
     <input type="checkbox" className={box} aria-label={label} checked={selection.has(id)} onChange={() => selection.toggle(id)} />
   </td>
 );
 
 // A tick box for a card (the product catalog).
 export const SelectBox = ({ selection, id, label, className = "" }) => (
-  <input type="checkbox" className={`${box} ${className}`} aria-label={label} checked={selection.has(id)} onChange={() => selection.toggle(id)} />
+  <input type="checkbox" data-admin-only className={`${box} ${className}`} aria-label={label} checked={selection.has(id)} onChange={() => selection.toggle(id)} />
 );
 
 // Appears once something is ticked: "3 selected - Delete selected". Asks first,

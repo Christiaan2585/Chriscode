@@ -10,7 +10,7 @@ from app.models.quote_item import QuoteItem
 from app.models.program import HerdingProgram
 from app.core import herding, program_quote
 from app.models.client import Client
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin
 from app.models.user import User
 from app.core.pdf import generate_quote_pdf
 from app.core.order_form import NotAnOrderForm, read_order_form
@@ -27,6 +27,7 @@ def _recalculate_total(session: Session, quote: Quote) -> None:
 
 @router.post("/", response_model=Quote)
 def create_quote(quote: Quote, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    quote.id = None  # the database picks the number
     quote.date = coerce_datetime(quote.date) or datetime.utcnow()
     quote.expiry_date = coerce_datetime(quote.expiry_date) or default_expiry_date(session, quote.date)
     quote.number = next_document_number(session, Quote)  # only ever assigned here - never taken from the request
@@ -126,7 +127,7 @@ def update_quote(quote_id: int, quote_data: Quote, session: Session = Depends(ge
     session.refresh(db_quote)
     return db_quote
 
-@router.delete("/{quote_id}")
+@router.delete("/{quote_id}", dependencies=[Depends(require_admin)])
 def delete_quote(quote_id: int, session: Session = Depends(get_session)):
     quote = session.get(Quote, quote_id)
     if not quote:
@@ -145,6 +146,7 @@ def delete_quote(quote_id: int, session: Session = Depends(get_session)):
 
 @router.post("/{quote_id}/items", response_model=QuoteItem)
 def add_quote_item(quote_id: int, item: QuoteItem, session: Session = Depends(get_session)):
+    item.id = None  # the database picks the number
     quote = session.get(Quote, quote_id)
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found")

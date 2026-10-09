@@ -9,6 +9,7 @@ router = APIRouter(prefix="/medical", tags=["Medical Records"])
 
 @router.post("/", response_model=MedicalRecord)
 def create_record(record: MedicalRecord, session: Session = Depends(get_session)):
+    record.id = None  # the database picks the number
     record.date = coerce_datetime(record.date)
     session.add(record)
     session.commit()

@@ -10,6 +10,7 @@ router = APIRouter(prefix="/schedules", tags=["Health Schedules"])
 
 @router.post("/", response_model=HealthSchedule)
 def create_schedule(schedule: HealthSchedule, session: Session = Depends(get_session)):
+    schedule.id = None  # the database picks the number
     schedule.last_date = coerce_datetime(schedule.last_date)
     session.add(schedule)
     session.commit()

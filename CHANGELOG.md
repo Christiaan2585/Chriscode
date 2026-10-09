@@ -16,6 +16,11 @@ All notable changes to Sandveld Vee Dienste. Newest first.
 - Importing a client, product or program spreadsheet now refuses files over 10 MB instead of loading them whole.
 - The desktop window can no longer be made to open another website inside the app (links open in your normal browser).
 - Removed two old program routes that could change animal numbers without respecting an accepted quote's lock.
+- **Only admins can delete** clients, invoices, quotes, orders, products, programs and purchase orders (staff still edit them and don't see the delete buttons).
+- A temporary password an admin sets can now only be used to choose a new one - the server refuses everything else until it is changed.
+- A phone that hasn't been used for 90 days has to be paired again.
+- Records can't be created with a number picked by the sender.
+- The "remember this device" sign-in is now locked with Windows' own encryption on the PC (and the phone's secure store on Android) instead of sitting readable in the app's storage.
 - The installer is 68 MB smaller (the program engine was being packed twice) and no longer carries libraries it never uses.
 
 ## 1.0.9 - 2026-10-07

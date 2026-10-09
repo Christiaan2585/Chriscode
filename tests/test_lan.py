@@ -183,6 +183,25 @@ class DeviceGuardTests(unittest.TestCase):
             devices.remove_device(device.id, session=s)
         self.assertEqual(self.phone.get("/version", headers={"X-Device-Token": token}).status_code, 401)
 
+    def _last_seen(self, days_ago):
+        with Session(self.engine) as s:
+            device = s.exec(select(PairedDevice)).one()
+            device.last_seen_at = datetime.utcnow() - timedelta(days=days_ago)
+            s.add(device)
+            s.commit()
+
+    def test_a_phone_not_seen_for_three_months_has_to_pair_again(self):
+        token = self.pair().json()["device_token"]
+        self._last_seen(lan.DEVICE_IDLE_LIFETIME.days + 1)
+        self.assertEqual(self.phone.get("/version", headers={"X-Device-Token": token}).status_code, 401)
+        with Session(self.engine) as s:
+            self.assertEqual(s.exec(select(PairedDevice)).all(), [])  # the stale pairing is gone, not just ignored
+
+    def test_a_phone_used_recently_carries_on(self):
+        token = self.pair().json()["device_token"]
+        self._last_seen(lan.DEVICE_IDLE_LIFETIME.days - 1)
+        self.assertEqual(self.phone.get("/version", headers={"X-Device-Token": token}).status_code, 200)
+
     def test_pc_only_settings_refused_over_the_phone_link(self):
         token = self.pair().json()["device_token"]
         self.assertEqual(self.phone.get("/local-only", headers={"X-Device-Token": token}).status_code, 403)

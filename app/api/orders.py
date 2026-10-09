@@ -3,12 +3,14 @@ from sqlmodel import Session, select
 from typing import List
 from app.core.db import get_session
 from app.core.dates import coerce_datetime
+from app.core.security import require_admin
 from app.models.order import Order
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
 @router.post("/", response_model=Order)
 def create_order(order: Order, session: Session = Depends(get_session)):
+    order.id = None  # the database picks the number
     order.date = coerce_datetime(order.date)
     session.add(order)
     session.commit()
@@ -51,7 +53,7 @@ def update_order(order_id: int, order_data: Order, session: Session = Depends(ge
     session.refresh(db_order)
     return db_order
 
-@router.delete("/{order_id}")
+@router.delete("/{order_id}", dependencies=[Depends(require_admin)])
 def delete_order(order_id: int, session: Session = Depends(get_session)):
     order = session.get(Order, order_id)
     if not order:

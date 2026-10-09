@@ -5,6 +5,7 @@ import re
 import io
 from openpyxl import load_workbook
 from app.core.db import get_session
+from app.core.security import require_admin
 from app.core.uploads import read_capped
 from app.core import cascade
 import base64
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/products", tags=["Products"])
 
 @router.post("/", response_model=Product)
 def create_product(product: Product, session: Session = Depends(get_session)):
+    product.id = None  # the database picks the number
     session.add(product)
     session.commit()
     session.refresh(product)
@@ -159,7 +161,7 @@ def update_product(product_id: int, product_data: Product, session: Session = De
     return db_product
 
 
-@router.delete("/{product_id}")
+@router.delete("/{product_id}", dependencies=[Depends(require_admin)])
 def delete_product(product_id: int, session: Session = Depends(get_session)):
     product = session.get(Product, product_id)
     if not product:

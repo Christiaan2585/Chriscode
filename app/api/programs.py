@@ -120,7 +120,7 @@ def copy_program(program_id: int, data: CopyProgram, session: Session = Depends(
     return copy
 
 
-@router.delete("/{program_id}")
+@router.delete("/{program_id}", dependencies=[Depends(require_admin)])
 def delete_program(program_id: int, session: Session = Depends(get_session)):
     program = session.get(HerdingProgram, program_id)
     if not program:

@@ -9,6 +9,7 @@ router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
 @router.post("/", response_model=Appointment)
 def create_appointment(appointment: Appointment, session: Session = Depends(get_session)):
+    appointment.id = None  # the database picks the number
     appointment.date = coerce_datetime(appointment.date)
     session.add(appointment)
     session.commit()

@@ -54,7 +54,7 @@ const SuppliersModal = ({ isOpen, onClose, suppliers }) => {
               <div className="flex gap-1">
                 <button type="button" title="Edit" onClick={() => { setEditingId(s.id); setForm({ ...emptySupplier, ...s }); }}
                   className="p-1.5 text-slate-400 hover:text-emerald-600"><Edit size={16} /></button>
-                <button type="button" title="Delete" onClick={() => window.confirm(`Delete ${s.name}?`) && remove.mutate(s.id)}
+                <button type="button" title="Delete" data-admin-only onClick={() => window.confirm(`Delete ${s.name}?`) && remove.mutate(s.id)}
                   className="p-1.5 text-slate-400 hover:text-red-600"><Trash2 size={16} /></button>
               </div>
             </li>
@@ -239,7 +239,7 @@ const PurchaseOrders = () => {
                     className="p-2 text-slate-400 transition-colors hover:text-emerald-600"><Download size={18} /></button>
                   <button title="Edit" onClick={() => openEdit(o)}
                     className="p-2 text-slate-400 transition-colors hover:text-emerald-600"><Edit size={18} /></button>
-                  <button title="Delete" onClick={() => window.confirm(`Delete ${o.number || "this order"}? This can't be undone.`) && remove.mutate(o.id)}
+                  <button title="Delete" data-admin-only onClick={() => window.confirm(`Delete ${o.number || "this order"}? This can't be undone.`) && remove.mutate(o.id)}
                     className="p-2 text-slate-400 transition-colors hover:text-red-600"><Trash2 size={18} /></button>
                 </td>
               </tr>
