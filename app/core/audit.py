@@ -31,8 +31,6 @@ _SPECIAL = [
     ("POST", r"^/backups/run$", "Ran a backup", "backup"),
     ("PUT", r"^/backups/settings$", "Changed backup settings", "backup"),
     ("GET", r"^/exports/", "Exported all data to Excel", "export"),
-    ("GET", r"^/clients/(\d+)/export$", "Exported a client's data", "client"),
-    ("POST", r"^/clients/(\d+)/erase$", "Erased a client's personal details", "client"),
     ("GET", r"^/clients/(\d+)/tax-certificate$", "Downloaded tax certificate of client", "client"),
     ("PUT", r"^/clients/(\d+)/tax-certificate$", "Added tax certificate to client", "client"),
     ("DELETE", r"^/clients/(\d+)/tax-certificate$", "Deleted tax certificate from client", "client"),

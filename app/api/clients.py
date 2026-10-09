@@ -9,7 +9,6 @@ from datetime import datetime
 from sqlmodel import Session, func, select
 from typing import List, Optional
 import io
-import json
 import os
 import re
 import pandas as pd
@@ -20,10 +19,6 @@ from app.core import cascade, herding
 from pydantic import BaseModel
 from app.core.security import require_admin
 from app.models.animal import Animal
-from app.models.appointment import Appointment
-from app.models.herd import Herd
-from app.models.note import ClientNote
-from app.models.order import Order
 from app.models.user import User
 from app.models.client import Client
 from app.models.client_document import ClientDocument
@@ -130,79 +125,6 @@ def delete_tax_certificate(client_id: int, session: Session = Depends(get_sessio
         session.delete(doc)
         session.commit()
     return {"ok": True}
-
-
-# --- Privacy: an access request, and erasure ---
-
-@router.get("/{client_id}/export")
-def export_client_data(client_id: int, _: User = Depends(require_admin), session: Session = Depends(get_session)):
-    """Everything held about one client as a JSON file, for when they ask what you keep about them.
-    The tax certificate is listed but its file isn't included (download it from the client's page)."""
-    from fastapi.encoders import jsonable_encoder
-    from app.models.invoice import InvoiceItem
-    from app.models.quote_item import QuoteItem
-
-    client = session.get(Client, client_id)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
-
-    def rows(model, column, value):
-        return [r.model_dump() for r in session.exec(select(model).where(column == value)).all()]
-
-    def with_items(model, item_model, link):
-        out = []
-        for r in session.exec(select(model).where(model.client_id == client_id)).all():
-            out.append({**r.model_dump(), "items": rows(item_model, getattr(item_model, link), r.id)})
-        return out
-
-    programs = []
-    for p in session.exec(select(HerdingProgram).where(HerdingProgram.client_id == client_id)).all():
-        programs.append({**p.model_dump(), "animal_groups": rows(AnimalGroup, AnimalGroup.program_id, p.id)})
-    certificate = _tax_certificate(session, client_id)
-    data = {
-        "exported_at": datetime.utcnow(), "client": client.model_dump(),
-        "notes": rows(ClientNote, ClientNote.client_id, client_id),
-        "appointments": rows(Appointment, Appointment.client_id, client_id),
-        "animals": rows(Animal, Animal.client_id, client_id), "herds": rows(Herd, Herd.client_id, client_id),
-        "herding_programs": programs,
-        "invoices": with_items(Invoice, InvoiceItem, "invoice_id"), "quotes": with_items(Quote, QuoteItem, "quote_id"),
-        "orders": rows(Order, Order.client_id, client_id),
-        "tax_certificate": None if certificate is None else {"filename": certificate.filename, "size": certificate.size,
-                                                             "uploaded_at": certificate.uploaded_at},
-    }
-    body = json.dumps(jsonable_encoder(data), indent=2, ensure_ascii=False)
-    name = re.sub(r"[^A-Za-z0-9]+", "-", client.farm_name or client.name).strip("-") or f"client-{client_id}"
-    return Response(content=body, media_type="application/json",
-                    headers={"Content-Disposition": f'attachment; filename="client-data-{name}.json"'})
-
-
-class EraseRequest(BaseModel):
-    confirm_name: str
-
-
-@router.post("/{client_id}/erase")
-def erase_client_personal_data(client_id: int, payload: EraseRequest, _: User = Depends(require_admin),
-                               session: Session = Depends(get_session)):
-    """For a client who asks to be forgotten. Their name and contact details, tax number, notes, visits,
-    animals and tax certificate go. Their invoices, quotes and orders stay (the law has you keep the
-    books for years) but now belong to "Erased client #n". Type the client's name to confirm."""
-    client = session.get(Client, client_id)
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
-    typed = " ".join((payload.confirm_name or "").split()).lower()
-    if not typed or typed not in {" ".join((v or "").split()).lower() for v in (client.farm_name, client.name)}:
-        raise HTTPException(status_code=400, detail="Type the client's name exactly to confirm")
-    for model in (Appointment, ClientNote, Herd, ClientDocument):
-        for row in session.exec(select(model).where(model.client_id == client_id)).all():
-            session.delete(row)
-    for animal in session.exec(select(Animal).where(Animal.client_id == client_id)).all():
-        cascade.delete_animal(session, animal)
-    client.name = f"Erased client #{client_id}"
-    client.email = client.phone = client.address = client.postal_address = client.vat_number = client.farm_name = None
-    client.erased_at = datetime.utcnow()
-    session.add(client)
-    session.commit()
-    return {"erased": True}
 
 
 @router.get("/", response_model=List[Client])

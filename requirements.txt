@@ -2,7 +2,6 @@ fastapi
 sqlmodel
 uvicorn
 pydantic
-streamlit
 requests
 pandas
 openpyxl

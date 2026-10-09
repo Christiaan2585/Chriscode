@@ -21,6 +21,7 @@ All notable changes to Sandveld Vee Dienste. Newest first.
 - A phone that hasn't been used for 90 days has to be paired again.
 - Records can't be created with a number picked by the sender.
 - The "remember this device" sign-in is now locked with Windows' own encryption on the PC (and the phone's secure store on Android) instead of sitting readable in the app's storage.
+- Removed things nothing used: the old Streamlit dashboard, the client data export / erase routes (the Privacy card went earlier), the dosing edit routes and the old program-assignment routes.
 - The installer is 68 MB smaller (the program engine was being packed twice) and no longer carries libraries it never uses.
 
 ## 1.0.9 - 2026-10-07

@@ -86,7 +86,7 @@ REM that PyInstaller's static import analysis can't see on its own - most
 REM importantly SQLAlchemy's sqlite dialect and uvicorn's event-loop/protocol
 REM implementations, which fail SILENTLY at import time otherwise (the exe
 REM starts, then immediately errors out or hangs). --exclude-module drops the
-REM Streamlit-only dependencies (the secondary frontend/app.py dashboard) that
+REM heavy packages (left over from the old Streamlit dashboard) that
 REM the packaged FastAPI backend never imports, to keep the bundle smaller.
 REM --add-data version.json: GET /version (and the pre-update backup that
 REM keys off it) read this file; without it every install reported "0.0.0".
