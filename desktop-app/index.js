@@ -258,6 +258,7 @@ async function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       preload: path.join(__dirname, 'preload.js'),
     },
     title: 'Sandveld Vee Dienste',
@@ -295,6 +296,19 @@ async function createWindow() {
   }
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
+
+  // The window only ever shows this app. A link or window.open must never make
+  // it load someone else's page - such a page would inherit the preload bridge
+  // (window.electronAPI) - so navigation away is refused and new windows are
+  // never made: ordinary web links go to the user's own browser instead.
+  const appOrigin = isDev ? 'http://localhost:5173' : 'file://';
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith(appOrigin)) event.preventDefault();
+  });
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^(https:|mailto:)/i.test(url)) shell.openExternal(url).catch(() => {});
+    return { action: 'deny' };
+  });
 
   // A "black, frozen window" can come from the renderer process itself
   // crashing or hanging (a GPU/driver hiccup, an out-of-memory spike from a

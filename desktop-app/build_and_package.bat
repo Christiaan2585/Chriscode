@@ -105,6 +105,7 @@ python -m PyInstaller --noconfirm --clean --onedir --name sandveld-backend ^
     --collect-all dns ^
     --collect-all bcrypt ^
     --collect-all openpyxl ^
+    --collect-all defusedxml ^
     --collect-all reportlab ^
     --collect-all pypdf ^
     --collect-all cryptography ^

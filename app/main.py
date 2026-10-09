@@ -48,7 +48,8 @@ async def catch_unhandled_exceptions(request: Request, call_next):
         return await call_next(request)
     except Exception as exc:
         logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
-        return JSONResponse(status_code=500, content={"detail": f"Server error: {exc}"})
+        # The reason stays in the log; the caller gets none (it can hold file paths or database details).
+        return JSONResponse(status_code=500, content={"detail": "Something went wrong on the server. Please try again; if it keeps happening, tell whoever supports this app."})
 
 
 # Only the dev frontend (Vite) is a browser origin that legitimately calls

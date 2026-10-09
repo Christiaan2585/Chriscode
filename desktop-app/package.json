@@ -21,13 +21,7 @@
     "electron-builder": "^24.13.3"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.50.0",
-    "axios": "^1.7.0",
-    "electron-updater": "^6.8.9",
-    "lucide-react": "^0.400.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-router-dom": "^7.18.4"
+    "electron-updater": "^6.8.9"
   },
   "build": {
     "appId": "com.sandveldveedienste.app",
@@ -59,7 +53,9 @@
       "!**/keystore.properties",
       "!**/local.properties",
       "!**/*.jks",
-      "!scripts"
+      "!scripts",
+      "!backend",
+      "!build_and_package.bat"
     ],
     "extraResources": [
       {

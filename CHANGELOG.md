@@ -10,6 +10,14 @@ All notable changes to Sandveld Vee Dienste. Newest first.
 - **New header animation**: the sheep, cow, collie and bakkie now run in that order, with a more realistic red-and-white collie (like the photo you sent) and the bakkie drawn as a 2006 Land Cruiser 79 with a bullbar, snorkel, cattle rails, a farmer at the wheel and a collie riding on the back.
 - **The phone keeps a copy of the office data and syncs it** (Android): right after pairing and signing in, the app downloads the clients (with their pages), products and pictures, invoices, quotes, orders, purchase orders, programs, calendar, visits and the dashboard. Out of the office Wi-Fi, an "Offline" badge shows and everything still opens from that copy; your PIN opens the app without the office PC (5 wrong tries switch that off until you sign in online again). New quotes and ticked program dates are kept and sent when the PC is back, then the phone signs in again by itself and refreshes. Unlocking without the PC stops working a week after the phone last checked in with it (or at once if the PC refuses the phone), and guessing PINs in parallel cannot get round the five-try limit. Settings -> Phones shows when it last refreshed and has Download everything again / Remove saved data. A half-sent quote no longer risks being made twice.
 
+### Security and tidying (found by a full audit)
+- **Guessing passwords in parallel could not be stopped by the five-try limit** - a burst of guesses sent at the same moment each got an answer. Sign-in, PIN, changing a password and turning off two-step now take one guess at a time.
+- A made-up email no longer gets its "wrong" answer faster than a real one, and error messages no longer reveal file paths or database details.
+- Importing a client, product or program spreadsheet now refuses files over 10 MB instead of loading them whole.
+- The desktop window can no longer be made to open another website inside the app (links open in your normal browser).
+- Removed two old program routes that could change animal numbers without respecting an accepted quote's lock.
+- The installer is 68 MB smaller (the program engine was being packed twice) and no longer carries libraries it never uses.
+
 ## 1.0.9 - 2026-10-07
 
 ### Security

@@ -5,6 +5,7 @@ import re
 import io
 from openpyxl import load_workbook
 from app.core.db import get_session
+from app.core.uploads import read_capped
 from app.core import cascade
 import base64
 from datetime import datetime
@@ -220,7 +221,7 @@ async def import_products(file: UploadFile = File(...), session: Session = Depen
     if not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="File must be an Excel sheet (.xlsx or .xls)")
 
-    contents = await file.read()
+    contents = await read_capped(file)
     try:
         wb = load_workbook(io.BytesIO(contents), data_only=True)
         ws = wb.worksheets[0]

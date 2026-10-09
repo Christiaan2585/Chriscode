@@ -1,4 +1,5 @@
 import base64
+import functools
 import hashlib
 import re
 import secrets
@@ -195,6 +196,8 @@ class _LoginThrottle:
 
     def get(self, email: str):
         with self._lock:
+            if len(self._rows) >= 5000 and email not in self._rows:  # a flood of made-up emails can't fill the memory
+                self._rows.clear()
             return self._rows.setdefault(email, SimpleNamespace(failed_login_attempts=0, lockout_count=0, login_locked_until=None))
 
     def clear(self):
@@ -203,6 +206,31 @@ class _LoginThrottle:
 
 
 THROTTLE = _LoginThrottle()
+
+# Every check that counts wrong tries (sign-in, PIN, changing a password, turning off two-step) runs one at a
+# time. Without this, a flood of guesses sent at the same moment all read the same "tries left" before any of
+# them wrote its failure, so the five-try limit could be walked straight past. Sign-ins are rare, so the
+# queueing costs nothing a person would notice.
+_COUNTING_LOCK = threading.RLock()
+
+
+def _one_at_a_time(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        with _COUNTING_LOCK:
+            return fn(*args, **kwargs)
+    return wrapper
+
+
+_DUMMY_HASH = None
+
+
+def _spend_a_password_check(password: str) -> None:
+    """A wrong email takes as long to refuse as a wrong password, so the time taken doesn't reveal which emails have accounts."""
+    global _DUMMY_HASH
+    if _DUMMY_HASH is None:
+        _DUMMY_HASH = hash_secret("not-a-real-password")
+    verify_secret(password, _DUMMY_HASH)
 
 
 def _gate(session: Session, email: str, user: Optional[User]):
@@ -281,6 +309,7 @@ def _accept_second_step(user: User, code: Optional[str], session: Session) -> bo
 
 
 @router.post("/login", response_model=AuthResult)
+@_one_at_a_time
 def login(payload: LoginRequest, request: Request = None, session: Session = Depends(get_session)):
     user = session.exec(select(User).where(User.email == payload.email.lower())).first()
     now = _utcnow()
@@ -295,7 +324,10 @@ def login(payload: LoginRequest, request: Request = None, session: Session = Dep
                      result="failed", via=via)
         return error
 
-    if not user or not user.is_active or not verify_secret(payload.password, user.password_hash):
+    if not user or not user.is_active:
+        _spend_a_password_check(payload.password)
+        raise failed("Incorrect email or password")
+    if not verify_secret(payload.password, user.password_hash):
         raise failed("Incorrect email or password")
     if user.totp_enabled:
         if not payload.code:  # password was right; only the second step is missing - not a wrong try
@@ -311,7 +343,7 @@ def login(payload: LoginRequest, request: Request = None, session: Session = Dep
 
 
 @router.post("/google/callback", response_model=AuthResult)
-def google_callback(payload: GoogleCallbackRequest, session: Session = Depends(get_session)):
+def google_callback(payload: GoogleCallbackRequest, request: Request = None, session: Session = Depends(get_session)):
     try:
         profile = exchange_code_for_profile(payload.code, payload.code_verifier, payload.redirect_uri, payload.nonce)
     except RuntimeError as exc:
@@ -351,7 +383,9 @@ def google_callback(payload: GoogleCallbackRequest, session: Session = Depends(g
     session.add(user)
     session.commit()
     session.refresh(user)
-    return _issue_auth_result(user, session)
+    result = _issue_auth_result(user, session, phone=_on_phone(request))
+    audit.record(session, user, "Signed in", summary="with Google", via="phone" if _on_phone(request) else "pc")
+    return result
 
 
 @router.post("/pin/setup")
@@ -365,6 +399,7 @@ def setup_pin(payload: PinSetupRequest, user: User = Depends(get_current_user), 
 
 
 @router.post("/pin/verify", response_model=AuthResult)
+@_one_at_a_time
 def verify_pin(payload: PinVerifyRequest, request: Request = None, session: Session = Depends(get_session)):
     token_hash = hash_remember_token(payload.remember_token)
     remember = session.exec(select(RememberToken).where(RememberToken.token_hash == token_hash)).first()
@@ -530,6 +565,7 @@ def _forget_all_sessions(user: User, session: Session) -> None:
 
 
 @router.put("/me/password", response_model=AuthResult)
+@_one_at_a_time
 def change_my_password(payload: PasswordChange, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Needs the current password (wrong tries count toward the lock like at sign-in), refuses weak new
     ones, and signs every other session and remembered device out. Returns fresh tokens for this one."""
@@ -635,6 +671,7 @@ def two_step_enable(payload: TwoStepCode, user: User = Depends(get_current_user)
 
 
 @router.post("/2fa/disable")
+@_one_at_a_time
 def two_step_disable(payload: TwoStepDisable, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     now = _utcnow()
     _refuse_if_locked(user, now)

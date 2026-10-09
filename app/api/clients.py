@@ -15,6 +15,7 @@ import re
 import pandas as pd
 from fastapi.responses import Response
 from app.core.db import get_session
+from app.core.uploads import read_capped
 from app.core import cascade, herding
 from pydantic import BaseModel
 from app.core.security import require_admin
@@ -320,7 +321,7 @@ async def import_clients(file: UploadFile = File(...), session: Session = Depend
     if not file.filename.endswith((".xlsx", ".xls", ".csv")):
         raise HTTPException(status_code=400, detail="File must be an Excel (.xlsx/.xls) or .csv file")
 
-    contents = await file.read()
+    contents = await read_capped(file)
     try:
         # dtype=str keeps every column as text. Without it, pandas guesses
         # column types and a phone/cell number column like "0821234567" gets

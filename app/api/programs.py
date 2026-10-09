@@ -11,6 +11,7 @@ from app.api.business import get_business, totals_for
 from app.api.invoices import create_invoice
 from app.core import herding, program_quote
 from app.core.db import get_session
+from app.core.uploads import read_capped
 from app.core.dates import coerce_datetime
 from app.core.pdf import generate_program_cost_pdf, generate_program_pdf
 from app.core.security import get_current_user, require_admin
@@ -153,23 +154,6 @@ def delete_program(program_id: int, session: Session = Depends(get_session)):
     session.commit()
     return {"ok": True}
 
-@router.get("/{program_id}/groups", response_model=List[AnimalGroup])
-def read_program_groups(program_id: int, session: Session = Depends(get_session)):
-    statement = select(AnimalGroup).where(AnimalGroup.program_id == program_id)
-    return session.exec(statement).all()
-
-@router.post("/{program_id}/groups", response_model=AnimalGroup)
-def add_program_group(program_id: int, group: AnimalGroup, session: Session = Depends(get_session)):
-    program = session.get(HerdingProgram, program_id)
-    if not program:
-        raise HTTPException(status_code=404, detail="Program not found")
-    group.id = None
-    group.program_id = program_id
-    session.add(group)
-    session.commit()
-    session.refresh(group)
-    return group
-
 class HeadCounts(BaseModel):
     counts: dict[str, int] = Field(max_length=20)
 
@@ -198,15 +182,6 @@ def set_head_counts(program_id: int, data: HeadCounts, session: Session = Depend
     program_quote.sync(session, program)
     return session.exec(select(AnimalGroup).where(AnimalGroup.program_id == program_id)).all()
 
-
-@router.delete("/groups/{group_id}")
-def delete_program_group(group_id: int, session: Session = Depends(get_session)):
-    group = session.get(AnimalGroup, group_id)
-    if not group:
-        raise HTTPException(status_code=404, detail="Group not found")
-    session.delete(group)
-    session.commit()
-    return {"ok": True}
 
 # --- Legacy individual-animal assignment endpoints, kept for the
 # standalone (no-longer-linked-in-nav) Herding Programs page. ---
@@ -307,7 +282,7 @@ async def import_programs(file: UploadFile = File(...), session: Session = Depen
     if not file.filename.endswith((".xlsx", ".xls", ".csv")):
         raise HTTPException(status_code=400, detail="File must be an Excel (.xlsx/.xls) or .csv file")
 
-    contents = await file.read()
+    contents = await read_capped(file)
     try:
         if file.filename.endswith(".csv"):
             df = pd.read_csv(io.BytesIO(contents), dtype=str, keep_default_na=False)

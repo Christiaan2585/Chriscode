@@ -344,5 +344,67 @@ class TwoStepTests(AuthCase):
         self.assertTrue(auth.UserOut.from_user(self.user, self.s).two_step_enabled)
 
 
+class ParallelGuessTests(unittest.TestCase):
+    """Guesses sent all at once must not each get a look at the same 'tries left'."""
+
+    def setUp(self):
+        import os, tempfile
+        self.dir = tempfile.mkdtemp()
+        self.engine = create_engine("sqlite:///" + os.path.join(self.dir, "t.db"), connect_args={"check_same_thread": False})
+        SQLModel.metadata.create_all(self.engine)
+        with Session(self.engine) as s:
+            s.add(User(name="Nico", email="nico@example.com", password_hash=hash_secret(GOOD), is_admin=True))
+            s.commit()
+
+    def tearDown(self):
+        import shutil
+        self.engine.dispose()
+        shutil.rmtree(self.dir, ignore_errors=True)
+        auth.THROTTLE.clear()
+
+    def test_twenty_wrong_passwords_at_once_still_only_get_five_tries(self):
+        import threading
+        results, lock = [], threading.Lock()
+
+        def guess():
+            with Session(self.engine) as s:
+                try:
+                    auth.login(auth.LoginRequest(email="nico@example.com", password="wrong-guess"), session=s)
+                except HTTPException as exc:
+                    with lock:
+                        results.append(exc.status_code)
+
+        threads = [threading.Thread(target=guess) for _ in range(20)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertEqual(len(results), 20)
+        self.assertLessEqual(results.count(401), auth.MAX_LOGIN_ATTEMPTS)  # the rest were refused as locked (429)
+
+    def test_an_email_that_is_not_an_account_costs_the_same_time_as_a_wrong_password(self):
+        with Session(self.engine) as s, mock.patch.object(auth, "verify_secret", return_value=False) as check:
+            with self.assertRaises(HTTPException):
+                auth.login(auth.LoginRequest(email="nobody@example.com", password="whatever-1234"), session=s)
+        check.assert_called_once()  # a password check still ran, so the reply time doesn't give the email away
+
+
+class UnhandledErrorTests(unittest.TestCase):
+    def test_a_crash_inside_a_route_does_not_leak_its_message(self):
+        import asyncio
+        import json
+        from app.main import catch_unhandled_exceptions
+
+        async def boom(_request):
+            raise RuntimeError("secret detail: /home/someone/kyron_agri.db")
+
+        class Req:
+            method, url = "GET", type("U", (), {"path": "/x"})()
+
+        response = asyncio.run(catch_unhandled_exceptions(Req(), boom))
+        self.assertEqual(response.status_code, 500)
+        self.assertNotIn("secret detail", json.loads(response.body)["detail"])
+
+
 if __name__ == "__main__":
     unittest.main()
