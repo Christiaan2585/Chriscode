@@ -74,18 +74,18 @@ html.theme-dark {
   --dk-card: #171e2e;
   --dk-line: #262f45;
   background: var(--dk-bg);
-  color: var(--dk-text, #c5cbda);
+  color: var(--dk-text, #e0e4ef);
 
   --color-slate-50: #1c2436;
   --color-slate-100: #222b40;
   --color-slate-200: #2a3349;
   --color-slate-300: #384260;
-  --color-slate-400: #7d879f;
-  --color-slate-500: #959eb5;
-  --color-slate-600: #abb3c7;
-  --color-slate-700: #c7cddb;
-  --color-slate-800: #e4e8f0;
-  --color-slate-900: #f3f5f9;
+  --color-slate-400: #9ba5be;
+  --color-slate-500: #b1bad0;
+  --color-slate-600: #c5ccdb;
+  --color-slate-700: #dadfeb;
+  --color-slate-800: #eff2f7;
+  --color-slate-900: #f8f9fc;
 
   --color-emerald-50: rgb(var(--acc-rgb, 16 185 129) / 0.10);
   --color-emerald-100: rgb(var(--acc-rgb, 16 185 129) / 0.16);
@@ -222,24 +222,24 @@ html.theme-dark {
 /* Colours for herding program and step names (utils/nameColors.js, herding.COLORS): a dark shade on the
    light theme, a light one on the dark theme, so every colour stays readable. Also recolours the
    text inside the name (InlineEdit's button). */
-.name-color-emerald, .name-color-emerald * { color: #047857; }
-.theme-dark .name-color-emerald, .theme-dark .name-color-emerald * { color: var(--acc-text-hi, #6ee7b7); }
-.name-color-sky, .name-color-sky * { color: #0369a1; }
-.theme-dark .name-color-sky, .theme-dark .name-color-sky * { color: #7dd3fc; }
-.name-color-blue, .name-color-blue * { color: #1d4ed8; }
-.theme-dark .name-color-blue, .theme-dark .name-color-blue * { color: #93c5fd; }
-.name-color-violet, .name-color-violet * { color: #6d28d9; }
-.theme-dark .name-color-violet, .theme-dark .name-color-violet * { color: #c4b5fd; }
-.name-color-pink, .name-color-pink * { color: #be185d; }
-.theme-dark .name-color-pink, .theme-dark .name-color-pink * { color: #f9a8d4; }
-.name-color-rose, .name-color-rose * { color: #be123c; }
-.theme-dark .name-color-rose, .theme-dark .name-color-rose * { color: #fda4af; }
-.name-color-orange, .name-color-orange * { color: #c2410c; }
-.theme-dark .name-color-orange, .theme-dark .name-color-orange * { color: #fdba74; }
-.name-color-amber, .name-color-amber * { color: #b45309; }
-.theme-dark .name-color-amber, .theme-dark .name-color-amber * { color: #fcd34d; }
-.name-color-teal, .name-color-teal * { color: #0f766e; }
-.theme-dark .name-color-teal, .theme-dark .name-color-teal * { color: #5eead4; }
+.name-color-emerald, .name-color-emerald * { color: #00a35c; }
+.theme-dark .name-color-emerald, .theme-dark .name-color-emerald * { color: #2de08a; }
+.name-color-sky, .name-color-sky * { color: #0a8fe0; }
+.theme-dark .name-color-sky, .theme-dark .name-color-sky * { color: #38c8ff; }
+.name-color-blue, .name-color-blue * { color: #2563ff; }
+.theme-dark .name-color-blue, .theme-dark .name-color-blue * { color: #5b9dff; }
+.name-color-violet, .name-color-violet * { color: #8a2be2; }
+.theme-dark .name-color-violet, .theme-dark .name-color-violet * { color: #b388ff; }
+.name-color-pink, .name-color-pink * { color: #e6007e; }
+.theme-dark .name-color-pink, .theme-dark .name-color-pink * { color: #ff5cb8; }
+.name-color-rose, .name-color-rose * { color: #f01040; }
+.theme-dark .name-color-rose, .theme-dark .name-color-rose * { color: #ff5470; }
+.name-color-orange, .name-color-orange * { color: #e85d04; }
+.theme-dark .name-color-orange, .theme-dark .name-color-orange * { color: #ff9330; }
+.name-color-amber, .name-color-amber * { color: #d07a00; }
+.theme-dark .name-color-amber, .theme-dark .name-color-amber * { color: #ffcc1a; }
+.name-color-teal, .name-color-teal * { color: #00968a; }
+.theme-dark .name-color-teal, .theme-dark .name-color-teal * { color: #1fe0cb; }
 
 /* Phone-friendly lists: on a narrow screen (under 1024px - the sidebar leaves a table too little room) every list table (class `card-table`) turns into one
    card per row - the main detail as a heading, each other detail labelled (data-label), the

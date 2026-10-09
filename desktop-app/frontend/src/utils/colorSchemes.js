@@ -35,7 +35,7 @@ export function contrast(a, b) {
 
 // Greys with a hint of the scheme's own hue, at Tailwind's own lightness steps.
 const LIGHT_NEUTRAL = [98, 95.5, 90, 82, 62, 41, 31, 23, 15, 9];
-const DARK_NEUTRAL = [17, 21, 25, 31, 56, 66, 74, 83, 92, 96];
+const DARK_NEUTRAL = [17, 21, 25, 31, 64, 73, 80, 88, 94, 97];
 const ramp = (hue, sat, lightness) => Object.fromEntries(STEPS.map((step, i) => [step, hslToHex(hue, sat, lightness[i])]));
 
 const GREEN = { 50: "#ecfdf5", 100: "#d1fae5", 200: "#a7f3d0", 300: "#6ee7b7", 400: "#34d399", 500: "#10b981", 600: "#059669", 700: "#047857", 800: "#065f46", 900: "#064e3b" };
@@ -87,7 +87,7 @@ export function schemeVariables(id, mode) {
       "--dk-sidebar": hslToHex(scheme.darkHue, 24, 10),
       "--dk-card": hslToHex(scheme.darkHue, 24, 14.5),
       "--dk-line": hslToHex(scheme.darkHue, 18, 21),
-      "--dk-text": hslToHex(scheme.darkHue, 14, 82),
+      "--dk-text": hslToHex(scheme.darkHue, 14, 90),
     });
   } else {
     const neutral = ramp(scheme.hue, scheme.sat, LIGHT_NEUTRAL);

@@ -2,15 +2,15 @@
 // COLORS in app/core/herding.py (the server only accepts these) and the
 // .name-color-* rules in index.css (which pick a shade per theme).
 export const NAME_COLORS = [
-  { key: "emerald", label: "Green", swatch: "#10b981" },
-  { key: "sky", label: "Light blue", swatch: "#0ea5e9" },
-  { key: "blue", label: "Blue", swatch: "#3b82f6" },
-  { key: "violet", label: "Purple", swatch: "#8b5cf6" },
-  { key: "pink", label: "Pink", swatch: "#ec4899" },
-  { key: "rose", label: "Red", swatch: "#f43f5e" },
-  { key: "orange", label: "Orange", swatch: "#f97316" },
-  { key: "amber", label: "Yellow", swatch: "#f59e0b" },
-  { key: "teal", label: "Teal", swatch: "#14b8a6" },
+  { key: "emerald", label: "Green", swatch: "#00d26a" },
+  { key: "sky", label: "Light blue", swatch: "#18b4ff" },
+  { key: "blue", label: "Blue", swatch: "#2f6bff" },
+  { key: "violet", label: "Purple", swatch: "#9b51ff" },
+  { key: "pink", label: "Pink", swatch: "#ff2d9a" },
+  { key: "rose", label: "Red", swatch: "#ff2d55" },
+  { key: "orange", label: "Orange", swatch: "#ff7a00" },
+  { key: "amber", label: "Yellow", swatch: "#ffc400" },
+  { key: "teal", label: "Teal", swatch: "#00d4c0" },
 ];
 
 const KNOWN = new Set(NAME_COLORS.map((c) => c.key));
