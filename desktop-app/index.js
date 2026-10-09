@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, shell, dialog, session } = require('electron');
+const { pathToFileURL } = require('url');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -301,10 +302,17 @@ async function createWindow() {
   // it load someone else's page - such a page would inherit the preload bridge
   // (window.electronAPI) - so navigation away is refused and new windows are
   // never made: ordinary web links go to the user's own browser instead.
-  const appOrigin = isDev ? 'http://localhost:5173' : 'file://';
-  mainWindow.webContents.on('will-navigate', (event, url) => {
-    if (!url.startsWith(appOrigin)) event.preventDefault();
-  });
+  // Exactly this app's own page (a #/route change inside it is not a navigation): the dev server in dev mode,
+  // the one bundled index.html when packaged - never "any file://", which would let a link open a local file.
+  const appPage = isDev ? 'http://localhost:5173/' : pathToFileURL(path.join(__dirname, 'frontend', 'dist', 'index.html')).href;
+  const isAppPage = (url) => {
+    const bare = url.split('#')[0];
+    return isDev ? bare.startsWith(appPage) : bare === appPage;
+  };
+  const refuse = (event, url) => { if (!isAppPage(url)) event.preventDefault(); };
+  mainWindow.webContents.on('will-navigate', refuse);
+  mainWindow.webContents.on('will-redirect', refuse);
+  mainWindow.webContents.on('will-attach-webview', (event) => event.preventDefault());
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^(https:|mailto:)/i.test(url)) shell.openExternal(url).catch(() => {});
     return { action: 'deny' };

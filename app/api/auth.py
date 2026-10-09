@@ -1,6 +1,7 @@
 import base64
 import functools
 import hashlib
+import inspect
 import re
 import secrets
 import threading
@@ -188,7 +189,11 @@ def _utcnow() -> datetime:
 
 
 class _LoginThrottle:
-    """Tries for emails that aren't accounts (accounts keep theirs on the user row)."""
+    """Tries for emails that aren't accounts (accounts keep theirs on the user row). Bounded, and it only ever
+    drops entries that are not locked, so a flood of made-up emails can't wipe a running lock - which would also
+    tell the sender which emails are real accounts (theirs would still be locked)."""
+
+    MAX_ROWS = 5000
 
     def __init__(self):
         self._lock = threading.Lock()
@@ -196,9 +201,18 @@ class _LoginThrottle:
 
     def get(self, email: str):
         with self._lock:
-            if len(self._rows) >= 5000 and email not in self._rows:  # a flood of made-up emails can't fill the memory
-                self._rows.clear()
-            return self._rows.setdefault(email, SimpleNamespace(failed_login_attempts=0, lockout_count=0, login_locked_until=None))
+            row = self._rows.get(email)
+            if row is not None:
+                return row
+            row = SimpleNamespace(failed_login_attempts=0, lockout_count=0, login_locked_until=None)
+            if len(self._rows) >= self.MAX_ROWS:
+                now = datetime.utcnow()
+                old = next((k for k, v in self._rows.items() if not (v.login_locked_until and v.login_locked_until > now)), None)
+                if old is None:
+                    return row  # every slot is a running lock: this one email just isn't remembered
+                del self._rows[old]
+            self._rows[email] = row
+            return row
 
     def clear(self):
         with self._lock:
@@ -208,18 +222,25 @@ class _LoginThrottle:
 THROTTLE = _LoginThrottle()
 
 # Every check that counts wrong tries (sign-in, PIN, changing a password, turning off two-step) runs one at a
-# time. Without this, a flood of guesses sent at the same moment all read the same "tries left" before any of
-# them wrote its failure, so the five-try limit could be walked straight past. Sign-ins are rare, so the
-# queueing costs nothing a person would notice.
-_COUNTING_LOCK = threading.RLock()
+# time PER ACCOUNT. Without this, a flood of guesses sent at the same moment all read the same "tries left" before
+# any of them wrote its failure, so the five-try limit could be walked straight past. It is per account (a fixed set
+# of locks picked by the account's key) so a flood against one email can't queue everyone else's sign-in.
+_STRIPES = tuple(threading.RLock() for _ in range(64))
 
 
-def _one_at_a_time(fn):
-    @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
-        with _COUNTING_LOCK:
-            return fn(*args, **kwargs)
-    return wrapper
+def _one_at_a_time(key_of):
+    """key_of(bound arguments) -> the string naming whose tries are being counted."""
+    def decorate(fn):
+        signature = inspect.signature(fn)
+
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            bound = signature.bind(*args, **kwargs)
+            key = key_of(bound.arguments)
+            with _STRIPES[int(hashlib.sha256(key.encode()).hexdigest()[:8], 16) % len(_STRIPES)]:
+                return fn(*args, **kwargs)
+        return wrapper
+    return decorate
 
 
 _DUMMY_HASH = None
@@ -309,7 +330,7 @@ def _accept_second_step(user: User, code: Optional[str], session: Session) -> bo
 
 
 @router.post("/login", response_model=AuthResult)
-@_one_at_a_time
+@_one_at_a_time(lambda a: "login:" + a["payload"].email.lower())
 def login(payload: LoginRequest, request: Request = None, session: Session = Depends(get_session)):
     user = session.exec(select(User).where(User.email == payload.email.lower())).first()
     now = _utcnow()
@@ -399,7 +420,7 @@ def setup_pin(payload: PinSetupRequest, user: User = Depends(get_current_user), 
 
 
 @router.post("/pin/verify", response_model=AuthResult)
-@_one_at_a_time
+@_one_at_a_time(lambda a: "pin:" + hash_remember_token(a["payload"].remember_token))
 def verify_pin(payload: PinVerifyRequest, request: Request = None, session: Session = Depends(get_session)):
     token_hash = hash_remember_token(payload.remember_token)
     remember = session.exec(select(RememberToken).where(RememberToken.token_hash == token_hash)).first()
@@ -565,7 +586,7 @@ def _forget_all_sessions(user: User, session: Session) -> None:
 
 
 @router.put("/me/password", response_model=AuthResult)
-@_one_at_a_time
+@_one_at_a_time(lambda a: "login:" + a["user"].email.lower())  # the same lock as signing in: one counter, one line
 def change_my_password(payload: PasswordChange, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Needs the current password (wrong tries count toward the lock like at sign-in), refuses weak new
     ones, and signs every other session and remembered device out. Returns fresh tokens for this one."""
@@ -671,7 +692,7 @@ def two_step_enable(payload: TwoStepCode, user: User = Depends(get_current_user)
 
 
 @router.post("/2fa/disable")
-@_one_at_a_time
+@_one_at_a_time(lambda a: "login:" + a["user"].email.lower())  # the same lock as signing in: one counter, one line
 def two_step_disable(payload: TwoStepDisable, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     now = _utcnow()
     _refuse_if_locked(user, now)

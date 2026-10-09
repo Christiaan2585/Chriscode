@@ -388,6 +388,52 @@ class ParallelGuessTests(unittest.TestCase):
                 auth.login(auth.LoginRequest(email="nobody@example.com", password="whatever-1234"), session=s)
         check.assert_called_once()  # a password check still ran, so the reply time doesn't give the email away
 
+    def test_a_slow_check_on_one_account_does_not_hold_up_another(self):
+        """The one-at-a-time rule is per account: a flood against one email can't queue everyone else's sign-in."""
+        import threading
+        with Session(self.engine) as s:
+            s.add(User(name="Koos", email="koos@example.com", password_hash=hash_secret("Another-Good-One-1")))
+            s.commit()
+        started, release, koos_done = threading.Event(), threading.Event(), threading.Event()
+        real = auth.verify_secret
+
+        def slow(raw, hashed):
+            if raw == "slow-guess":
+                started.set()
+                release.wait(10)
+            return real(raw, hashed)
+
+        def nico_guess():
+            with Session(self.engine) as s, self.assertRaises(HTTPException):
+                auth.login(auth.LoginRequest(email="nico@example.com", password="slow-guess"), session=s)
+
+        def koos_signs_in():
+            with Session(self.engine) as s:
+                auth.login(auth.LoginRequest(email="koos@example.com", password="Another-Good-One-1"), session=s)
+            koos_done.set()
+
+        with mock.patch.object(auth, "verify_secret", slow):
+            first = threading.Thread(target=nico_guess)
+            first.start()
+            self.assertTrue(started.wait(10))
+            second = threading.Thread(target=koos_signs_in)
+            second.start()
+            finished_while_first_blocked = koos_done.wait(5)
+            release.set()
+            first.join()
+            second.join()
+        self.assertTrue(finished_while_first_blocked)
+
+    def test_a_flood_of_made_up_emails_does_not_wipe_a_lock_that_is_still_running(self):
+        for _ in range(auth.MAX_LOGIN_ATTEMPTS):
+            with Session(self.engine) as s, self.assertRaises(HTTPException):
+                auth.login(auth.LoginRequest(email="ghost@example.com", password="wrong-guess-1"), session=s)
+        for i in range(auth._LoginThrottle.MAX_ROWS + 10):
+            auth.THROTTLE.get(f"flood{i}@example.com")
+        with Session(self.engine) as s, self.assertRaises(HTTPException) as ctx:
+            auth.login(auth.LoginRequest(email="ghost@example.com", password="wrong-guess-1"), session=s)
+        self.assertEqual(ctx.exception.status_code, 429)  # still locked, exactly like a real account would be
+
 
 class UnhandledErrorTests(unittest.TestCase):
     def test_a_crash_inside_a_route_does_not_leak_its_message(self):
