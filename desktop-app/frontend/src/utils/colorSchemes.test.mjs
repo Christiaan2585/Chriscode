@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_SCHEME, SCHEMES, contrast, schemeVariables, STEPS } from "./colorSchemes.js";
 
-const others = SCHEMES.filter((s) => s.id !== DEFAULT_SCHEME);
+const others = SCHEMES; // every scheme is held to the same readability rules, the original green included
 const hexOf = (vars, name) => vars[`--color-${name}`];
 
-test("there is the original look plus four farm schemes, each with a name and a few words about it", () => {
+test("there are five schemes - green first - each with a name and a few words about it", () => {
   assert.equal(SCHEMES[0].id, DEFAULT_SCHEME);
-  assert.equal(others.length, 4);
+  assert.equal(others.length, 5);
   assert.equal(new Set(SCHEMES.map((s) => s.id)).size, SCHEMES.length);
   for (const scheme of SCHEMES) {
     assert.ok(scheme.name.length > 3 && scheme.blurb.length > 10, scheme.id);
@@ -15,10 +15,11 @@ test("there is the original look plus four farm schemes, each with a name and a 
   }
 });
 
-test("the original look changes nothing (the stylesheet already is that look)", () => {
-  assert.deepEqual(schemeVariables(DEFAULT_SCHEME, "light"), {});
-  assert.deepEqual(schemeVariables(DEFAULT_SCHEME, "dark"), {});
-  assert.deepEqual(schemeVariables("no-such-scheme", "dark"), {}); // an unknown name falls back to the original
+test("green is a full scheme like the others, and an unknown name falls back to it", () => {
+  for (const mode of ["light", "dark"]) {
+    assert.ok(hexOf(schemeVariables(DEFAULT_SCHEME, mode), "emerald-600"));
+    assert.deepEqual(schemeVariables("no-such-scheme", mode), schemeVariables(DEFAULT_SCHEME, mode));
+  }
 });
 
 test("contrast maths: black on white is 21, a colour on itself is 1", () => {
@@ -30,12 +31,15 @@ for (const scheme of others) {
   test(`${scheme.name}: readable in the light look`, () => {
     const v = schemeVariables(scheme.id, "light");
     for (const step of STEPS) assert.match(hexOf(v, `emerald-${step}`), /^#[0-9a-f]{6}$/, `emerald-${step}`);
-    assert.ok(contrast("#ffffff", hexOf(v, "emerald-600")) >= 4.5, "white text on the main button colour");
+    const white = hexOf(v, "white");
+    assert.notEqual(white, "#ffffff", "cards are a soft off-white, not glaring pure white");
+    assert.ok(contrast(white, hexOf(v, "slate-50")) > 1.02 && contrast(white, hexOf(v, "slate-50")) < 1.15, "card slightly lighter than the page");
+    assert.ok(contrast(white, hexOf(v, "emerald-600")) >= 4.5, "white text on the main button colour");
     assert.ok(contrast(hexOf(v, "emerald-700"), hexOf(v, "emerald-50")) >= 4.5, "accent text on a pale accent wash");
     assert.ok(contrast(hexOf(v, "emerald-200"), hexOf(v, "emerald-900")) >= 4.5, "light text on the sidebar");
-    assert.ok(contrast(hexOf(v, "slate-500"), "#ffffff") >= 4.5, "secondary text on a white card");
+    assert.ok(contrast(hexOf(v, "slate-500"), white) >= 4.5, "secondary text on a card");
     assert.ok(contrast(hexOf(v, "slate-600"), hexOf(v, "slate-50")) >= 5, "body text on the page");
-    assert.ok(contrast(hexOf(v, "slate-800"), "#ffffff") >= 10, "headings on a white card");
+    assert.ok(contrast(hexOf(v, "slate-800"), white) >= 10, "headings on a card");
   });
 
   test(`${scheme.name}: readable in the dark look`, () => {
@@ -47,8 +51,11 @@ for (const scheme of others) {
     assert.ok(contrast(hexOf(v, "slate-500"), card) >= 4.5, "secondary text on a card");
     assert.ok(contrast(hexOf(v, "slate-400"), card) >= 3.2, "placeholder text on a card");
     assert.ok(contrast(v["--dk-text"], v["--dk-bg"]) >= 7, "body text on the page");
+    assert.ok(contrast(v["--dk-text"], v["--dk-bg"]) <= 13, "but not glaring: body text is a soft off-white");
+    assert.ok(contrast(hexOf(v, "slate-900"), v["--dk-card"]) <= 15, "even the strongest text is not pure white");
     assert.ok(contrast(hexOf(v, "slate-800"), card) >= 10, "headings on a card");
     assert.ok(contrast("#ffffff", hexOf(v, "emerald-600")) >= 4.5, "white text on the main button colour");
+    assert.equal(v["--color-white"], undefined, "dark look keeps white as white (its own rules handle cards)");
     assert.match(v["--acc-rgb"], /^\d+ \d+ \d+$/);
     // the card must be lighter than the page, and the line lighter than the card, or the layout flattens
     assert.ok(contrast(card, v["--dk-bg"]) > 1.02 && contrast(v["--dk-line"], card) > 1.1);

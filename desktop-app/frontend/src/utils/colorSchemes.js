@@ -1,7 +1,9 @@
 // Colour schemes: the app is built from Tailwind's emerald (accent) and slate (neutral) colours, which are
 // CSS variables, so a scheme is just a different set of values for those variables - set on the page by
-// theme.js. The first scheme is the original look and sets nothing (the stylesheet already is that look).
-// Each scheme has a light and a dark version; tests (colorSchemes.test.mjs) check that text stays readable.
+// theme.js. Every scheme, green included, has a light and a dark version, built to be easy on the eyes: the light
+// look uses a soft off-white for cards and a gently tinted page instead of glaring pure white, and the dark look
+// uses softened text and accent colours rather than near-white and neon. Tests (colorSchemes.test.mjs) hold every
+// scheme to readable contrast at both ends: strong enough to read, not so strong it glares.
 
 export const STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900];
 export const DEFAULT_SCHEME = "green";
@@ -34,15 +36,20 @@ export function contrast(a, b) {
 }
 
 // Greys with a hint of the scheme's own hue, at Tailwind's own lightness steps.
-const LIGHT_NEUTRAL = [98, 95.5, 90, 82, 62, 41, 31, 23, 15, 9];
-const DARK_NEUTRAL = [17, 21, 25, 31, 64, 73, 80, 88, 94, 97];
+const LIGHT_NEUTRAL = [96.5, 93.5, 88.5, 80, 62, 41, 31, 23, 15, 10];
+const DARK_NEUTRAL = [17, 21, 25, 31, 62, 71, 78, 85, 91, 95];
 const ramp = (hue, sat, lightness) => Object.fromEntries(STEPS.map((step, i) => [step, hslToHex(hue, sat, lightness[i])]));
 
-const GREEN = { 50: "#ecfdf5", 100: "#d1fae5", 200: "#a7f3d0", 300: "#6ee7b7", 400: "#34d399", 500: "#10b981", 600: "#059669", 700: "#047857", 800: "#065f46", 900: "#064e3b" };
+// Mix `a` towards `b` (t = 0..1): used to take the glare out of the bright dark-look accent colours.
+const mix = (a, b, t) => `#${hexToRgb(a).map((v, i) => Math.round(v + (hexToRgb(b)[i] - v) * t).toString(16).padStart(2, "0")).join("")}`;
 
 // hue/sat tint the greys; `dark` describes the dark look: the surfaces' hue and the lifted accent text.
 export const SCHEMES = [
-  { id: "green", name: "Green Pastures", blurb: "Fresh lucerne green - the original look.", swatch: GREEN },
+  {
+    id: "green", name: "Green Pastures", blurb: "Calm lucerne green - the original look, made gentler.",
+    accent: { 50: "#eef7f2", 100: "#d8eee2", 200: "#b3dcc6", 300: "#82c4a3", 400: "#4fa883", 500: "#2f8c68", 600: "#1f7556", 700: "#195e46", 800: "#164a38", 900: "#123d2f" },
+    rgb: "47 140 104", hue: 150, sat: 6, darkHue: 160, accentText: "#7fcaa6", accentTextHi: "#a8dcc2",
+  },
   {
     id: "wheat", name: "Harvest Wheat", blurb: "Ripe wheat and straw on warm cream, brown at night.",
     accent: { 50: "#fcf7e6", 100: "#f8eec6", 200: "#f0dc92", 300: "#e5c45c", 400: "#d6a932", 500: "#bf8d1c", 600: "#8f5f0d", 700: "#744c0c", 800: "#5c3d0e", 900: "#41300f" },
@@ -70,8 +77,7 @@ export const isScheme = (id) => Boolean(byId(id));
 
 /** The CSS variables a scheme sets for the light or dark look ({} for the original look). */
 export function schemeVariables(id, mode) {
-  const scheme = byId(id);
-  if (!scheme || scheme.id === DEFAULT_SCHEME) return {};
+  const scheme = byId(id) || byId(DEFAULT_SCHEME);
   const vars = { "--acc-rgb": scheme.rgb };
   for (const step of STEPS) vars[`--color-emerald-${step}`] = scheme.accent[step];
   if (mode === "dark") {
@@ -81,17 +87,19 @@ export function schemeVariables(id, mode) {
     delete vars["--color-emerald-50"];
     delete vars["--color-emerald-100"];
     Object.assign(vars, {
-      "--acc-text": scheme.accentText,
-      "--acc-text-hi": scheme.accentTextHi,
-      "--dk-bg": hslToHex(scheme.darkHue, 30, 8),
-      "--dk-sidebar": hslToHex(scheme.darkHue, 24, 10),
-      "--dk-card": hslToHex(scheme.darkHue, 24, 14.5),
-      "--dk-line": hslToHex(scheme.darkHue, 18, 21),
-      "--dk-text": hslToHex(scheme.darkHue, 14, 90),
+      "--acc-text": mix(scheme.accentText, hslToHex(scheme.darkHue, 14, 80), 0.14),
+      "--acc-text-hi": mix(scheme.accentTextHi, hslToHex(scheme.darkHue, 14, 80), 0.14),
+      "--dk-bg": hslToHex(scheme.darkHue, 28, 9.5),
+      "--dk-sidebar": hslToHex(scheme.darkHue, 24, 11.5),
+      "--dk-card": hslToHex(scheme.darkHue, 24, 15.5),
+      "--dk-line": hslToHex(scheme.darkHue, 18, 22),
+      "--dk-text": hslToHex(scheme.darkHue, 14, 85),
     });
   } else {
     const neutral = ramp(scheme.hue, scheme.sat, LIGHT_NEUTRAL);
     for (const step of STEPS) vars[`--color-slate-${step}`] = neutral[step];
+    // Cards, panels and pop-ups are Tailwind's "white": a soft off-white keeps them from glaring (text-white follows).
+    vars["--color-white"] = hslToHex(scheme.hue, Math.min(scheme.sat + 4, 16), 99);
   }
   return vars;
 }
@@ -99,13 +107,8 @@ export function schemeVariables(id, mode) {
 /** The handful of colours a scheme's preview tile is drawn with, for the light or dark look. */
 export function previewColors(id, mode) {
   const scheme = byId(id) || SCHEMES[0];
-  if (scheme.id === DEFAULT_SCHEME) {
-    return mode === "dark"
-      ? { page: "#0e1320", sidebar: "#111827", card: "#171e2e", line: "#262f45", text: "#c5cbda", muted: "#7d879f", accent: "#059669", accentText: "#34d399" }
-      : { page: "#f8fafc", sidebar: "#064e3b", card: "#ffffff", line: "#e2e8f0", text: "#1e293b", muted: "#64748b", accent: "#059669", accentText: "#047857" };
-  }
   const v = schemeVariables(scheme.id, mode);
   return mode === "dark"
     ? { page: v["--dk-bg"], sidebar: v["--dk-sidebar"], card: v["--dk-card"], line: v["--dk-line"], text: v["--dk-text"], muted: v["--color-slate-500"], accent: v["--color-emerald-600"], accentText: v["--acc-text"] }
-    : { page: v["--color-slate-50"], sidebar: v["--color-emerald-900"], card: "#ffffff", line: v["--color-slate-200"], text: v["--color-slate-800"], muted: v["--color-slate-500"], accent: v["--color-emerald-600"], accentText: v["--color-emerald-700"] };
+    : { page: v["--color-slate-50"], sidebar: v["--color-emerald-900"], card: v["--color-white"], line: v["--color-slate-200"], text: v["--color-slate-800"], muted: v["--color-slate-500"], accent: v["--color-emerald-600"], accentText: v["--color-emerald-700"] };
 }

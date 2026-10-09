@@ -52,8 +52,9 @@ test("switching the look and the scheme leaves no old colours behind", () => {
   assert.ok(root.classes.has("theme-dark") && root.vars.has("--dk-bg") && root.vars.has("--acc-text"));
   setTheme("light", root);
   assert.ok(!root.vars.has("--dk-bg") && !root.vars.has("--acc-text"));
-  setScheme("green", root); // the original sets nothing at all
-  assert.equal(root.vars.size, 0);
+  setScheme("green", root); // green is a full scheme too; nothing of the dam scheme or the dark look is left over
+  assert.ok(root.vars.has("--color-emerald-600") && !root.vars.has("--dk-bg"));
+  assert.notEqual(root.vars.get("--color-emerald-600"), "#10b981");
   assert.equal(root.dataset.scheme, "green");
 });
 
