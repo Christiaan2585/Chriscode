@@ -10,6 +10,7 @@ import { isNative } from "../../utils/pairing";
 import MyDetails from "../MyDetails";
 import BusinessSettings from "../BusinessSettings";
 import PhoneSettings from "../PhoneSettings";
+import { OPEN_WHATS_NEW } from "../WhatsNew";
 import PhonePairingSettings from "../PhonePairingSettings";
 import ActivityLog from "./ActivityLog";
 import AccountCard from "./AccountCard";
@@ -40,6 +41,8 @@ const GeneralPanel = () => {
             <p><span className="font-medium">Name:</span> {version.app_name}</p>
             <p><span className="font-medium">Version:</span> {version.version}</p>
             {version.last_updated && <p><span className="font-medium">Last updated:</span> {version.last_updated}</p>}
+            <button type="button" onClick={() => window.dispatchEvent(new Event(OPEN_WHATS_NEW))}
+              className="mt-1 font-medium text-emerald-700 hover:underline">See what's new in this version</button>
           </div>
         ) : (
           <p className="text-sm text-red-500">Couldn't reach the backend to check the version.</p>

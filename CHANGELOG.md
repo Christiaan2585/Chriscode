@@ -5,6 +5,7 @@ All notable changes to Sandveld Vee Dienste. Newest first.
 ## 1.0.10 - 2026-10-08
 
 ### New
+- **"What's new" window**: after an update the app shows, once, a short list of what changed. Settings -> General -> About can show it again.
 - **Easier on the eyes (all five schemes)**: cards are a soft off-white instead of glaring pure white, the page behind them is gently tinted, and in dark mode the text and accent colours are softer and the surfaces a touch lighter - still easy to read, but calmer, especially in the evening. Green Pastures has been refined into a calmer green too.
 - **Colour schemes and a fresher look**: Settings -> General -> Appearance now has light/dark and five colour schemes taken from the farm - Green Pastures (the original), Harvest Wheat, Barn Red, Dam & Sky and Karoo Earth - each with a preview, each in light and dark. The app also looks a little more finished: a furrow-textured sidebar, an accent line under the top bar, softer cards, lit buttons and a faint wash of the scheme's colour behind the pages. Kept on each computer or phone separately.
 - **Ram ID tags**: each client's page has a Rams card - type an ear-tag number and press Add, then use the pencil for the ram's name, breed, birth date and notes. A tag can only be used once on a farm. The top search finds a ram by its tag and opens its farm, and the phone keeps the rams in its offline copy.

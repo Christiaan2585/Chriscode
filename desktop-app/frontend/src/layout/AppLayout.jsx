@@ -12,6 +12,7 @@ import OutboxBadge from "../components/OutboxBadge";
 import OfflineSupport from "../components/OfflineSupport";
 import SyncStatus from "../components/SyncStatus";
 import AutoLock from "../components/AutoLock";
+import WhatsNew from "../components/WhatsNew";
 
 const NAV = [
   { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
@@ -44,6 +45,7 @@ const AppLayout = () => {
   return (
     <div className="app-bg flex h-screen bg-slate-50 text-slate-900 font-sans">
       <AutoLock />
+      <WhatsNew />
       <OfflineSupport />
       {navOpen && (
         <button type="button" aria-label="Close the menu" onClick={() => setNavOpen(false)}
