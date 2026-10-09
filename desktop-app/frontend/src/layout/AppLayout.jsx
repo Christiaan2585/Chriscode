@@ -53,11 +53,20 @@ const AppLayout = () => {
       )}
       {/* Sidebar */}
       <aside className={`app-sidebar fixed inset-y-0 left-0 z-40 w-64 bg-emerald-900 text-white flex flex-col transition-transform md:static md:translate-x-0 ${navOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="px-5 py-6 text-xl leading-tight font-bold tracking-tight flex items-center gap-3">
-          <img src={logo} alt="" className="w-11 h-11 rounded-full shrink-0" />
-          <span className="min-w-0">Sandveld<br />Vee Dienste</span>
-          <button type="button" aria-label="Close the menu" onClick={() => setNavOpen(false)}
-            className="ml-auto rounded-lg p-1 text-emerald-200 hover:bg-emerald-800 md:hidden"><X size={20} /></button>
+        <div className="px-5 pt-6 pb-4">
+          <div className="text-xl leading-tight font-bold tracking-tight flex items-center gap-3">
+            <img src={logo} alt="" className="w-11 h-11 rounded-full shrink-0" />
+            <span className="min-w-0">Sandveld<br />Vee Dienste</span>
+            <button type="button" aria-label="Close the menu" onClick={() => setNavOpen(false)}
+              className="ml-auto rounded-lg p-1 text-emerald-200 hover:bg-emerald-800 md:hidden"><X size={20} /></button>
+          </div>
+          {user && (
+            <p className="mt-3 text-sm leading-snug text-emerald-200" title="The sales rep printed on your quotes and invoices">
+              <span className="block text-[11px] font-medium uppercase tracking-wider text-emerald-300/70">Sales rep</span>
+              <span className="block truncate font-semibold text-white">{user.name}</span>
+              {user.phone && <span className="block truncate">{user.phone}</span>}
+            </p>
+          )}
         </div>
         <OutboxBadge />
         <p className="nav-label px-7 mt-2 text-xs font-medium uppercase tracking-wider text-emerald-300/70">Menu</p>
