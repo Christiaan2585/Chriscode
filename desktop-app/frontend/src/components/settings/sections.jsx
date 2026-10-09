@@ -12,6 +12,7 @@ import BusinessSettings from "../BusinessSettings";
 import PhoneSettings from "../PhoneSettings";
 import PhonePairingSettings from "../PhonePairingSettings";
 import ActivityLog from "./ActivityLog";
+import AccountCard from "./AccountCard";
 import AppearanceSettings from "./AppearanceSettings";
 import AutoLockSetting from "./AutoLockSetting";
 import BackupSettings from "./BackupSettings";
@@ -52,7 +53,12 @@ const GeneralPanel = () => {
 
 const MyDetailsPanel = () => {
   const { user, refreshMe } = useAuth();
-  return <MyDetails user={user} onSaved={refreshMe} />;
+  return (
+    <>
+      <AccountCard />
+      <MyDetails user={user} onSaved={refreshMe} />
+    </>
+  );
 };
 
 const SecurityPanel = () => (

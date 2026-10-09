@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Outlet, NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Users, ClipboardList, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, Lock, LogOut, CloudSun, Truck, Menu, X } from "lucide-react";
+import { LayoutDashboard, Users, ClipboardList, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, CloudSun, Truck, Menu, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import SetupReminder from "../components/SetupReminder";
 import logo from "../assets/logo.png";
@@ -8,7 +8,6 @@ import GrazingHeaderStrip from "../components/GrazingHeaderStrip";
 import GlobalSearch from "../components/GlobalSearch";
 import ThemeToggle from "../components/ThemeToggle";
 import PoweredBy from "../components/PoweredBy";
-import Avatar from "../components/Avatar";
 import OutboxBadge from "../components/OutboxBadge";
 import OfflineSupport from "../components/OfflineSupport";
 import SyncStatus from "../components/SyncStatus";
@@ -31,8 +30,7 @@ const navClass = ({ isActive }) =>
   `flex items-center gap-3 p-3 rounded-lg transition-colors ${isActive ? "nav-active bg-emerald-800" : "hover:bg-emerald-800"}`;
 
 const AppLayout = () => {
-  const { user, lock, forgetDevice } = useAuth();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { user } = useAuth();
   // Phones and narrow windows: the sidebar slides in over the page from the
   // menu button and closes again on every page change.
   const [navOpen, setNavOpen] = useState(false);
@@ -79,40 +77,6 @@ const AppLayout = () => {
         </nav>
         <PoweredBy onDark className="px-4 pb-3" />
         <div className="p-4 border-t border-emerald-800 space-y-1">
-          {/* The signed-in user, with Lock / Sign out. */}
-          <div className="relative">
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-emerald-800"
-              aria-label={`Account menu for ${user?.name || "you"}`}
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((o) => !o)}
-            >
-              <Avatar user={user} size="md" />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-white">{user?.name}</span>
-                <span className="block truncate text-xs text-emerald-200/80">{user?.is_admin ? "Admin" : "Staff"}</span>
-              </span>
-            </button>
-            {menuOpen && (
-              <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-10">
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50"
-                  onClick={() => { setMenuOpen(false); lock(); }}
-                >
-                  <Lock size={14} /> Lock (keep me remembered)
-                </button>
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50"
-                  onClick={() => { setMenuOpen(false); forgetDevice(); }}
-                >
-                  <LogOut size={14} /> Sign out completely
-                </button>
-              </div>
-            )}
-          </div>
           <NavLink to="/settings" className={navClass}>
             <Settings size={20} /> Settings
           </NavLink>
