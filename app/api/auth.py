@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel, EmailStr, Field
 from sqlmodel import Session, select
 
-from app.core import audit, password_policy, totp
+from app.core import audit, field_crypto, password_policy, totp
 from app.core.db import get_session
 from app.core.google_oauth import exchange_code_for_profile, get_google_client_id, is_google_login_enabled
 from app.core.security import (
@@ -313,9 +313,19 @@ def _new_recovery_codes(user: User, session: Session) -> List[str]:
     return codes
 
 
+def _totp_secret(user: User) -> Optional[str]:
+    """The authenticator secret, decrypted (it is stored encrypted - field_crypto). None when this PC can't read it
+    (data restored onto another computer): then only a recovery code can get the person in."""
+    try:
+        return field_crypto.decrypt(user.totp_secret)
+    except field_crypto.Unreadable:
+        return None
+
+
 def _accept_second_step(user: User, code: Optional[str], session: Session) -> bool:
     """True when `code` is a fresh authenticator code or an unused recovery code (which it then spends)."""
-    step = totp.verify(user.totp_secret, code, after_step=user.totp_last_step)
+    secret = _totp_secret(user)
+    step = totp.verify(secret, code, after_step=user.totp_last_step) if secret else None
     if step is not None:
         user.totp_last_step = step
         return True
@@ -670,17 +680,19 @@ def two_step_setup(user: User = Depends(get_current_user), session: Session = De
     once a code from the app is confirmed (/2fa/enable)."""
     if user.totp_enabled:
         raise HTTPException(status_code=400, detail="Two-step sign-in is already on")
-    user.totp_secret = totp.new_secret()
+    secret = totp.new_secret()
+    user.totp_secret = field_crypto.encrypt(secret)  # never stored readable
     session.add(user)
     session.commit()
-    return {"secret": user.totp_secret, "uri": totp.otpauth_uri(user.totp_secret, user.email)}
+    return {"secret": secret, "uri": totp.otpauth_uri(secret, user.email)}
 
 
 @router.post("/2fa/enable")
 def two_step_enable(payload: TwoStepCode, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     if user.totp_enabled or not user.totp_secret:
         raise HTTPException(status_code=400, detail="Start the setup first")
-    step = totp.verify(user.totp_secret, payload.code)
+    secret = _totp_secret(user)
+    step = totp.verify(secret, payload.code) if secret else None
     if step is None:
         raise HTTPException(status_code=400, detail="That code isn't right - check the app and try again")
     user.totp_enabled = True

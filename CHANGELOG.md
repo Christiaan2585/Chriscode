@@ -5,6 +5,7 @@ All notable changes to Sandveld Vee Dienste. Newest first.
 ## 1.0.10 - 2026-10-08
 
 ### New
+- **Stronger encryption**: the phone's offline copy of the office data is now encrypted (AES-256, key held by the phone's secure hardware store), and the two-step sign-in secrets in the PC's database are encrypted with a key Windows protects. After this update each phone downloads its copy once more.
 - **Proper Android icon and start-up screen**: the Sandveld badge instead of the default blue cross.
 - **Android updates itself** like the PC version: the phone checks the same GitHub release, downloads the new app, checks it is genuinely ours (same publisher key, newer version, matching checksum) and hands it to Android's installer, which asks you to confirm. Settings > General > Software Update on the phone. The very first install of this version still has to be done by hand.
 - **"What's new" window**: after an update the app shows, once, a short list of what changed. Settings -> General -> About can show it again.

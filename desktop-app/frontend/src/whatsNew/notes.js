@@ -24,6 +24,7 @@ export const NOTES = [
           "Wrong-password guessing is limited properly, and a temporary password can only be used to choose a new one.",
           "The \"remember this device\" sign-in is locked with Windows' own encryption.",
           "A phone not used for 90 days has to be paired again.",
+          "The phone's offline copy of your data is now encrypted, and so are the two-step sign-in keys on the PC.",
         ],
       },
       {

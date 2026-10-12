@@ -1,7 +1,9 @@
 // Where the phone keeps the saved copy of the office data: an IndexedDB database inside the app's
-// own private storage (nothing else on the phone can read it, and Android backups are off). The
-// offline PIN check lives separately in the Keystore-sealed store (PairingStore plugin).
+// own private storage (Android backups are off). Every saved answer is ENCRYPTED (AES-256-GCM, see
+// sealed.js) with a key kept in the Keystore-sealed store, so a copy of the app's files holds only
+// ciphertext. The offline PIN check lives separately in that same sealed store (PairingStore plugin).
 import { PairingStorePlugin as plugin } from "../utils/pairing";
+import { createSealer } from "./sealed";
 
 const DB_NAME = "sandveld-offline";
 const RESPONSES = "responses";
@@ -11,10 +13,13 @@ let opened = null;
 const open = () => {
   if (!opened) {
     opened = new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, 1);
-      request.onupgradeneeded = () => {
-        request.result.createObjectStore(RESPONSES);
-        request.result.createObjectStore(META);
+      // Version 2 = encrypted answers. Going from 1 drops the old, unencrypted answers (they are downloaded again).
+      const request = indexedDB.open(DB_NAME, 2);
+      request.onupgradeneeded = (event) => {
+        const db = request.result;
+        if (event.oldVersion >= 1 && db.objectStoreNames.contains(RESPONSES)) db.deleteObjectStore(RESPONSES);
+        db.createObjectStore(RESPONSES);
+        if (!db.objectStoreNames.contains(META)) db.createObjectStore(META);
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -35,10 +40,22 @@ const run = async (storeName, mode, action) => {
   });
 };
 
-// The saved answers (cachingAdapter's `store`).
+// Small secrets sealed with the phone's Keystore key.
+export const secure = {
+  get: async (key) => (await plugin.secureGet({ key }))?.value ?? null,
+  set: (key, value) => plugin.secureSet({ key, value }),
+  remove: (key) => plugin.secureRemove({ key }),
+};
+
+const sealer = createSealer(secure);
+
+// The saved answers (cachingAdapter's `store`): sealed on the way in, opened on the way out.
 export const savedCopy = {
-  get: (key) => run(RESPONSES, "readonly", (s) => s.get(key)),
-  put: (key, entry) => run(RESPONSES, "readwrite", (s) => s.put(entry, key)),
+  get: async (key) => sealer.open(await run(RESPONSES, "readonly", (s) => s.get(key))),
+  put: async (key, entry) => {
+    const sealed = await sealer.seal(entry); // encrypt first: an IndexedDB transaction can't wait for WebCrypto
+    return run(RESPONSES, "readwrite", (s) => s.put(sealed, key));
+  },
   clear: () => run(RESPONSES, "readwrite", (s) => s.clear()),
   count: () => run(RESPONSES, "readonly", (s) => s.count()),
 };
@@ -49,13 +66,6 @@ export const meta = {
   clear: () => run(META, "readwrite", (s) => s.clear()),
 };
 
-// Small secrets sealed with the phone's Keystore key.
-export const secure = {
-  get: async (key) => (await plugin.secureGet({ key }))?.value ?? null,
-  set: (key, value) => plugin.secureSet({ key, value }),
-  remove: (key) => plugin.secureRemove({ key }),
-};
-
 // The saved answers and sync notes only (a different person signed in on this phone).
 export async function wipeSavedCopy() {
   try {
@@ -63,6 +73,11 @@ export async function wipeSavedCopy() {
     await meta.clear();
   } catch {
     // nothing saved yet
+  }
+  try {
+    await sealer.forgetKey(); // a fresh key for the next person: nothing left behind can be read with it
+  } catch {
+    // not on a phone
   }
 }
 

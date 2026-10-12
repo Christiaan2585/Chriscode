@@ -6,7 +6,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlmodel import Session
-from app.core import audit, herding
+from app.core import audit, field_crypto, herding
 from app.core.db import create_db_and_tables, database_file_path, engine
 from app.core.backup import backup_on_version_change, start_scheduler
 from app.core.local_secret import LocalSecretGuard, configured_secret
@@ -131,6 +131,11 @@ def on_startup():
             herding.ensure_standard_programs(session)  # clients from before the master program existed
     except Exception:
         logger.exception("Couldn't give the clients the standard herding program")
+    try:
+        with Session(engine) as session:
+            field_crypto.encrypt_plain_totp_secrets(session)  # two-step secrets from before encryption
+    except Exception:
+        logger.exception("Couldn't encrypt the stored two-step secrets")
     try:
         with Session(engine) as session:
             audit.prune(session)  # the activity log keeps a year, at most 100,000 lines

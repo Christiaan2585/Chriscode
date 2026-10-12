@@ -31,6 +31,8 @@ config/catalogue/
 # Google OAuth client secret - see SETUP_GOOGLE_LOGIN.md. config/google_oauth.example.json
 # stays tracked (it's just a blank template); only the real, filled-in file is excluded.
 config/google_oauth.json
+# Key for the encrypted database fields (app/core/field_crypto.py) - DPAPI-protected, never commit
+config/field.key
 
 # Streamlit's own convention for local secrets - not present today, but this
 # is the exact filename Streamlit looks for if any get added later.
