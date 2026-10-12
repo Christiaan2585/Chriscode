@@ -69,6 +69,19 @@ class ReadTableTests(unittest.TestCase):
             read_table("c.xlsx", b"not a workbook")
         self.assertEqual(ctx.exception.status_code, 400)
 
+    def test_a_sheet_that_unpacks_into_too_many_rows_or_columns_is_stopped(self):
+        from unittest import mock
+        from app.core import uploads
+        with mock.patch.object(uploads, "MAX_TABLE_ROWS", 3):
+            with self.assertRaises(HTTPException) as ctx:
+                uploads.read_table("c.csv", b"Name\n" + b"x\n" * 10)
+            self.assertEqual(ctx.exception.status_code, 413)
+            with self.assertRaises(HTTPException):
+                uploads.read_table("c.xlsx", self.xlsx([["Name"]] + [["x"]] * 10))
+        with mock.patch.object(uploads, "MAX_TABLE_COLUMNS", 2):
+            columns, _ = uploads.read_table("c.csv", b"A,B,C,D\n1,2,3,4\n")
+            self.assertEqual(columns, ["A", "B"])
+
 
 if __name__ == "__main__":
     unittest.main()

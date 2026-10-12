@@ -5,6 +5,9 @@ from fastapi import HTTPException, UploadFile
 from openpyxl import load_workbook
 
 IMPORT_LIMIT_BYTES = 10 * 1024 * 1024  # a price list or client list is a few hundred KB; this leaves room
+# An .xlsx is a zip: 10 MB can unpack into millions of cells. Imports never need more than this.
+MAX_TABLE_ROWS = 20_000
+MAX_TABLE_COLUMNS = 100
 
 
 async def read_capped(file: UploadFile, limit: int = IMPORT_LIMIT_BYTES) -> bytes:
@@ -35,12 +38,17 @@ def read_table(filename: str, data: bytes) -> tuple:
                 text = data.decode("utf-8-sig")
             except UnicodeDecodeError:
                 text = data.decode("cp1252")  # Excel's "CSV" on Windows
-            grid = list(csv.reader(io.StringIO(text)))
+            rows = csv.reader(io.StringIO(text))
         elif name.endswith(".xlsx"):
             ws = load_workbook(io.BytesIO(data), read_only=True, data_only=True).worksheets[0]
-            grid = [list(row) for row in ws.iter_rows(values_only=True)]
+            rows = ws.iter_rows(values_only=True, max_col=MAX_TABLE_COLUMNS)
         else:
             raise HTTPException(status_code=400, detail="Old .xls files can't be read - open it in Excel and save it as .xlsx (or .csv)")
+        grid = []
+        for row in rows:  # read lazily, so an oversized sheet stops here instead of filling the memory
+            if len(grid) > MAX_TABLE_ROWS:
+                raise HTTPException(status_code=413, detail=f"That sheet has more than {MAX_TABLE_ROWS:,} rows - split it into smaller files")
+            grid.append(list(row)[:MAX_TABLE_COLUMNS])
     except HTTPException:
         raise
     except Exception:
