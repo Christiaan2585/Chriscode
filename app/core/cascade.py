@@ -20,7 +20,7 @@ from app.models.invoice import Invoice, InvoiceItem
 from app.models.medical import MedicalRecord
 from app.models.note import ClientNote
 from app.models.order import Order
-from app.models.product import Product, ProductImage
+from app.models.product import Product, ProductImage, StockMovement
 from app.models.product_dosing import ProductDosing
 from app.models.purchase_order import PurchaseOrderItem
 from app.core import herding
@@ -103,7 +103,7 @@ def delete_product(session: Session, product: Product) -> None:
             "old invoices and quotes still need its name."
         )
     # dosing rules; uses in the master herding program; links to the supplier's catalogue book
-    for model in (ProductDosing, ProgramStepProduct, CatalogueLink):
+    for model in (ProductDosing, ProgramStepProduct, CatalogueLink, StockMovement):
         for row in _rows(session, model, model.product_id, product.id):
             session.delete(row)
     # Purchase order lines carry their own description, so they only lose the link.

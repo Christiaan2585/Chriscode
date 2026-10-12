@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 
 from app.api.business import get_business, next_document_number, price_line, product_label, sales_rep_for, totals_for
+from app.core import stock
 from app.core.dates import coerce_datetime
 from app.core.db import get_session
 from app.core.pdf import generate_purchase_order_pdf
@@ -21,6 +22,7 @@ def _recalculate_total(session: Session, po: PurchaseOrder) -> None:
     items = session.exec(select(PurchaseOrderItem).where(PurchaseOrderItem.purchase_order_id == po.id)).all()
     po.total_amount = totals_for(items)["grand_total"]
     session.add(po)
+    stock.sync_purchase_order(session, po)
 
 
 def _get_or_404(session: Session, model, row_id: int, label: str):
@@ -113,6 +115,7 @@ def delete_purchase_order(po_id: int, session: Session = Depends(get_session)):
     po = _get_or_404(session, PurchaseOrder, po_id, "Purchase order")
     for item in session.exec(select(PurchaseOrderItem).where(PurchaseOrderItem.purchase_order_id == po_id)).all():
         session.delete(item)
+    stock.sync_purchase_order(session, po, deleted=True)
     session.delete(po)
     session.commit()
     return {"ok": True}

@@ -21,6 +21,22 @@ class Product(SQLModel, table=True):
     # yes - the schema sync adds the columns without back-filling.
     in_stock: Optional[bool] = True
     is_active: Optional[bool] = True  # False = hidden from the catalog and pickers, kept for old paperwork
+    # Stock on the shelf (app/core/stock.py). None = not counted yet, so not tracked: only the in_stock switch.
+    stock_quantity: Optional[float] = None
+    reorder_level: Optional[float] = None  # at or below this the dashboard says "order more"
+
+
+class StockMovement(SQLModel, table=True):
+    """Every change to a product's stock: a count, a received purchase order, an invoice line. `source` names the
+    document ("invoice:12", "po:3") so editing it books only the difference."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    product_id: int = Field(foreign_key="product.id", index=True)
+    change: float
+    reason: str  # count | received | sold | opening
+    source: Optional[str] = Field(default=None, index=True)
+    reference: Optional[str] = None  # the document number, shown in the history
+    created_by: Optional[int] = Field(default=None, foreign_key="user.id")
+    at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class ProductImage(SQLModel, table=True):

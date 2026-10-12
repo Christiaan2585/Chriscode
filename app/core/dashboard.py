@@ -151,8 +151,12 @@ def build_dashboard(session: Session, today: date | None = None) -> dict:
                      "quantity": round(q, 2), "revenue": _money(r)}
                     for pid, (q, r) in sorted(sold.items(), key=lambda kv: -kv[1][1])[:TOP_N]]
 
-    low = [p for p in products.values() if p.in_stock is False and p.is_active is not False]
-    low_stock = {"count": len(low), "items": [{"id": p.id, "name": p.name} for p in sorted(low, key=lambda p: p.name)[:LOW_STOCK_SHOWN]]}
+    def is_low(p):
+        counted_low = p.stock_quantity is not None and p.reorder_level is not None and p.stock_quantity <= p.reorder_level
+        return p.is_active is not False and (p.in_stock is False or counted_low)
+    low = [p for p in products.values() if is_low(p)]
+    low_stock = {"count": len(low), "items": [{"id": p.id, "name": p.name, "stock_quantity": p.stock_quantity, "reorder_level": p.reorder_level}
+                                              for p in sorted(low, key=lambda p: p.name)[:LOW_STOCK_SHOWN]]}
 
     return {"money": money, "quotes_waiting": quotes_waiting, "attention": attention,
             "older_overdue": {"steps": older_steps, "clients": len(older_clients)}, "program_money": program_money,

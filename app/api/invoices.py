@@ -7,7 +7,7 @@ from app.core.db import get_session
 from app.core.dates import coerce_datetime
 from app.models.invoice import Invoice, InvoiceItem
 from app.models.payment import CreditNote, Payment
-from app.core import settlement
+from app.core import settlement, stock
 from app.models.product import Product
 from app.core.pdf import generate_invoice_pdf
 from app.api.business import default_due_date, document_lines, get_business, next_document_number, price_line, sales_rep_for, totals_for
@@ -22,6 +22,7 @@ def _recalculate_total(session: Session, invoice: Invoice) -> None:
     items = session.exec(select(InvoiceItem).where(InvoiceItem.invoice_id == invoice.id)).all()
     invoice.total_amount = totals_for(items)["grand_total"]
     session.add(invoice)
+    stock.sync_invoice(session, invoice)
 
 @router.post("/", response_model=Invoice)
 def create_invoice(invoice: Invoice, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
@@ -77,6 +78,7 @@ def delete_invoice(invoice_id: int, session: Session = Depends(get_session)):
     for model in (InvoiceItem, Payment, CreditNote):
         for row in session.exec(select(model).where(model.invoice_id == invoice_id)).all():
             session.delete(row)
+    stock.sync_invoice(session, invoice, deleted=True)
     session.delete(invoice)
     session.commit()
     return {"ok": True}

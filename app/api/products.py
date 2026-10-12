@@ -5,9 +5,10 @@ import re
 import io
 from openpyxl import load_workbook
 from app.core.db import get_session
-from app.core.security import require_admin
+from app.core.security import get_current_user, require_admin
 from app.core.uploads import read_capped
-from app.core import cascade
+from app.core import cascade, stock
+from app.models.user import User
 import base64
 from datetime import datetime
 from fastapi.responses import Response
@@ -16,7 +17,7 @@ from app.api.business import get_business
 from app.core.pdf import generate_catalogue_pdf
 from app.core.images import NotAnImage, process_image
 from app.models.client import Client
-from app.models.product import Product, ProductImage
+from app.models.product import Product, ProductImage, StockMovement
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/products", tags=["Products"])
 @router.post("/", response_model=Product)
 def create_product(product: Product, session: Session = Depends(get_session)):
     product.id = None  # the database picks the number
+    product.stock_quantity = None  # stock only changes through a count (POST /products/{id}/stock-count)
     session.add(product)
     session.commit()
     session.refresh(product)
@@ -127,6 +129,29 @@ class ProductPatch(BaseModel):
     dosage: Optional[float] = Field(default=None, ge=0)
     in_stock: Optional[bool] = None
     is_active: Optional[bool] = None
+    reorder_level: Optional[float] = Field(default=None, ge=0)
+
+
+class StockCount(BaseModel):
+    quantity: float = Field(ge=0, le=10_000_000)
+
+
+@router.post("/{product_id}/stock-count", response_model=Product)
+def count_stock(product_id: int, body: StockCount, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    product = session.get(Product, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    stock.count(session, product, body.quantity, user.id if user else None)
+    session.commit()
+    session.refresh(product)
+    return product
+
+
+@router.get("/{product_id}/stock")
+def stock_history(product_id: int, session: Session = Depends(get_session)):
+    rows = session.exec(select(StockMovement).where(StockMovement.product_id == product_id)
+                        .order_by(StockMovement.at.desc(), StockMovement.id.desc()).limit(200)).all()
+    return [{"at": m.at, "change": m.change, "reason": m.reason, "reference": m.reference} for m in rows]
 
 
 @router.patch("/{product_id}", response_model=Product)
@@ -152,7 +177,7 @@ def update_product(product_id: int, product_data: Product, session: Session = De
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    for key, value in product_data.dict(exclude_unset=True, exclude={"id"}).items():
+    for key, value in product_data.dict(exclude_unset=True, exclude={"id", "stock_quantity"}).items():
         setattr(db_product, key, value)
 
     session.add(db_product)

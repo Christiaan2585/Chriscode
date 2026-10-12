@@ -6,7 +6,7 @@ from sqlmodel import Session, func, select
 from typing import List, Literal, Optional
 import re
 from app.api.business import get_business, totals_for
-from app.api.invoices import create_invoice
+from app.api.invoices import _recalculate_total as recalculate_invoice, create_invoice
 from app.core import herding, program_quote
 from app.core.db import get_session
 from app.core.uploads import read_capped, read_table
@@ -660,7 +660,7 @@ def invoice_program_step(program_id: int, step_id: int, session: Session = Depen
                                 unit_price=item.unit_price, discount_percent=item.discount_percent,
                                 vat_percent=item.vat_percent, subtotal=item.subtotal))
     session.flush()
-    invoice.total_amount = totals_for(session.exec(select(InvoiceItem).where(InvoiceItem.invoice_id == invoice.id)).all())["grand_total"]
+    recalculate_invoice(session, invoice)  # total and stock
     step.invoice_id = invoice.id
     session.add_all([invoice, step])
     session.commit()
