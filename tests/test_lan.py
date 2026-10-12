@@ -21,6 +21,18 @@ from app.models.device import PairedDevice
 from app.models.user import User
 
 
+class AddressOrderTests(unittest.TestCase):
+    def test_a_tailscale_address_is_offered_first_so_the_phone_keeps_working_away_from_the_office(self):
+        self.assertEqual(lan.prefer_private_network(["192.168.10.190", "100.101.102.103", "10.0.0.5"]),
+                         ["100.101.102.103", "192.168.10.190", "10.0.0.5"])
+
+    def test_without_tailscale_the_order_is_unchanged(self):
+        self.assertEqual(lan.prefer_private_network(["192.168.10.190", "10.0.0.5"]), ["192.168.10.190", "10.0.0.5"])
+
+    def test_only_the_tailscale_range_counts_not_any_100_address(self):
+        self.assertEqual(lan.prefer_private_network(["192.168.1.2", "100.200.1.1"]), ["192.168.1.2", "100.200.1.1"])
+
+
 class CertificateTests(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()

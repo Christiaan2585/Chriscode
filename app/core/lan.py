@@ -122,7 +122,21 @@ def local_addresses() -> list:
             found.append(info[4][0])
     except OSError:
         pass
-    return [a for a in dict.fromkeys(found) if not a.startswith(("127.", "169.254.", "0."))]
+    return prefer_private_network([a for a in dict.fromkeys(found) if not a.startswith(("127.", "169.254.", "0."))])
+
+
+def prefer_private_network(addresses: list) -> list:
+    """Tailscale's address (100.64.0.0/10) first: a phone pairs with the first address that answers and keeps it, and
+    only that one keeps working away from the office Wi-Fi (and across mesh points that don't pass traffic)."""
+    import ipaddress
+    tailnet = ipaddress.ip_network("100.64.0.0/10")
+
+    def on_tailnet(address):
+        try:
+            return ipaddress.ip_address(address) in tailnet
+        except ValueError:
+            return False
+    return sorted(addresses, key=lambda a: not on_tailnet(a))  # stable: the rest keep their order
 
 
 def hash_token(token: str) -> str:
