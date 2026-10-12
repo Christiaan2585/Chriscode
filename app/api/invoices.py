@@ -6,6 +6,8 @@ from datetime import datetime
 from app.core.db import get_session
 from app.core.dates import coerce_datetime
 from app.models.invoice import Invoice, InvoiceItem
+from app.models.payment import CreditNote, Payment
+from app.core import settlement
 from app.models.product import Product
 from app.core.pdf import generate_invoice_pdf
 from app.api.business import default_due_date, document_lines, get_business, next_document_number, price_line, sales_rep_for, totals_for
@@ -71,9 +73,10 @@ def delete_invoice(invoice_id: int, session: Session = Depends(get_session)):
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     # Remove line items first so we don't leave orphaned rows behind.
-    statement = select(InvoiceItem).where(InvoiceItem.invoice_id == invoice_id)
-    for item in session.exec(statement).all():
-        session.delete(item)
+    # Its lines, payments and credit notes go with it (nothing else points at them).
+    for model in (InvoiceItem, Payment, CreditNote):
+        for row in session.exec(select(model).where(model.invoice_id == invoice_id)).all():
+            session.delete(row)
     session.delete(invoice)
     session.commit()
     return {"ok": True}
@@ -122,7 +125,8 @@ def download_invoice_pdf(invoice_id: int, session: Session = Depends(get_session
         raise HTTPException(status_code=404, detail="Invoice not found")
     items = session.exec(select(InvoiceItem).where(InvoiceItem.invoice_id == invoice_id)).all()
     pdf = generate_invoice_pdf(get_business(session), invoice, session.get(Client, invoice.client_id),
-                               document_lines(session, items), sales_rep_for(session, invoice))
+                               document_lines(session, items), sales_rep_for(session, invoice),
+                               balance=settlement.invoice_balance(session, invoice)["balance"])
     return StreamingResponse(pdf, media_type="application/pdf", headers={
         "Content-Disposition": f"attachment; filename={invoice.number or invoice_id}.pdf"
     })

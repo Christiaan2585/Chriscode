@@ -255,7 +255,7 @@ def _footer(bank, totals, due_label, due_amount, width):
     return footer
 
 
-def _build(title, meta, business, rep, to_party, lines, notes, due_label, paid=False, show_bank=True):
+def _build(title, meta, business, rep, to_party, lines, notes, due_label, paid=False, show_bank=True, due_amount=None):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm,
                             topMargin=15 * mm, bottomMargin=18 * mm, title=title)
@@ -276,8 +276,8 @@ def _build(title, meta, business, rep, to_party, lines, notes, due_label, paid=F
 
     totals = document_totals([line_amounts(l["quantity"], l["unit_price"], l.get("discount_percent"),
                                            l.get("vat_percent")) for l in lines])
-    footer = _footer(_bank_block(business, width * 0.5) if show_bank else None, totals, due_label,
-                     0.0 if paid else totals["grand_total"], width)
+    due = 0.0 if paid else (totals["grand_total"] if due_amount is None else due_amount)
+    footer = _footer(_bank_block(business, width * 0.5) if show_bank else None, totals, due_label, due, width)
 
     story = [heading, Spacer(1, 10 * mm), parties, Spacer(1, 8 * mm), _lines_table(lines, width)]
     if notes:
@@ -298,14 +298,27 @@ def _dicts(items):
              "discount_percent": i.discount_percent, "vat_percent": i.vat_percent} for i in items]
 
 
-def generate_invoice_pdf(business, invoice, client, lines, rep=(None, None)):
+def generate_invoice_pdf(business, invoice, client, lines, rep=(None, None), balance=None):
+    """`balance`: what is still owed after payments and credit notes (app/core/settlement.py); printed as Balance due."""
     title = "TAX INVOICE" if business.vat_registered else "INVOICE"
     if invoice.status == "cancelled":
         title += " (CANCELLED)"
     meta = [("Number", invoice.number or f"#{invoice.id}"), ("Reference", invoice.reference),
             ("Date", _date(invoice.date)), ("Due date", _date(invoice.due_date)), ("Sales rep", rep[0])]
     return _build(title, meta, business, rep, _client_party(client), lines, invoice.notes, "Balance due",
-                  paid=invoice.status in ("paid", "cancelled"))
+                  paid=invoice.status == "cancelled", due_amount=max(balance, 0.0) if balance is not None else None)
+
+
+def generate_credit_note_pdf(business, note, invoice, client, rep=(None, None)):
+    """A credit note in the invoices' layout: one line crediting the invoice, its VAT part shown like an invoice's."""
+    title = "TAX CREDIT NOTE" if business.vat_registered else "CREDIT NOTE"
+    invoice_label = (invoice.number or f"#{invoice.id}") if invoice else "-"
+    meta = [("Number", note.number), ("Invoice", invoice_label), ("Date", _date(note.date)), ("Sales rep", rep[0])]
+    exclusive = round(note.amount - note.vat_amount, 2)
+    vat_percent = round(note.vat_amount / exclusive * 100, 6) if exclusive else 0.0
+    lines = [{"description": f"Credit against invoice {invoice_label}: {note.reason}", "quantity": 1,
+              "unit_price": exclusive, "discount_percent": None, "vat_percent": vat_percent}]
+    return _build(title, meta, business, rep, _client_party(client), lines, None, "Total credit", show_bank=False)
 
 
 def generate_quote_pdf(business, quote, client, lines, rep=(None, None)):

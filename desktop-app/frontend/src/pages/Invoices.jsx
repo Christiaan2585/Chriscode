@@ -3,12 +3,13 @@ import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
 import { useSelection } from "../utils/useSelection";
 import { useOpenNew } from "../utils/useOpenNew";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, FileText, Trash2, Download, X, Edit, Eye } from "lucide-react";
+import { Plus, Search, FileText, Trash2, Download, X, Edit, Eye, Wallet } from "lucide-react";
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
 import Modal from "../components/Modal";
 import SearchableSelect from "../components/SearchableSelect";
 import DocumentPreview from "../components/DocumentPreview";
+import InvoicePayments from "../components/InvoicePayments";
 import { ClientHover, DocumentHover } from "../components/PreviewCards";
 import { downloadDocumentPdf } from "../utils/documents";
 import { newestFirst } from "../utils/format";
@@ -31,6 +32,8 @@ const Invoices = () => {
   const [newItem, setNewItem] = useState(emptyLine);
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState(null);
+  const [paying, setPaying] = useState(null); // the invoice whose payments window is open
+  const { data: balances } = useQuery({ queryKey: ["invoice-balances"], queryFn: async () => (await apiClient.get("/payments/balances")).data });
 
   const { data: invoices, isLoading } = useQuery({
     queryKey: ["invoices"],
@@ -264,6 +267,7 @@ const Invoices = () => {
               <th className="px-6 py-3 font-medium">Date</th>
               <th className="px-6 py-3 font-medium">Client</th>
               <th className="px-6 py-3 font-medium">Total Amount</th>
+              <th className="px-6 py-3 font-medium">Owed</th>
               <th className="px-6 py-3 font-medium">Status</th>
               <th className="px-6 py-3 font-medium text-right">Actions</th>
             </tr>
@@ -280,6 +284,9 @@ const Invoices = () => {
                   <ClientHover client={clients?.find((c) => c.id === inv.client_id)}>{clientName(inv.client_id)}</ClientHover>
                 </td>
                 <td data-label="Total" className="px-6 py-4 font-medium text-slate-800">R {inv.total_amount.toLocaleString()}</td>
+                <td data-label="Owed" className="px-6 py-4 text-slate-700">
+                  {inv.status === "cancelled" ? "-" : balances?.[inv.id] ? (balances[inv.id].balance > 0 ? `R ${balances[inv.id].balance.toLocaleString()}` : "Nothing") : "..."}
+                </td>
                 <td data-label="Status" className="px-6 py-4">
                   <span
                     className={`px-2 py-1 rounded-full text-xs font-bold ${
@@ -300,6 +307,13 @@ const Invoices = () => {
                     title="Preview"
                   >
                     <Eye size={18} />
+                  </button>
+                  <button
+                    onClick={() => setPaying(inv)}
+                    className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
+                    title="Payments and credit notes"
+                  >
+                    <Wallet size={18} />
                   </button>
                   <button
                     onClick={() => downloadDocumentPdf("invoice", inv.id, inv.number)}
@@ -331,7 +345,7 @@ const Invoices = () => {
             ))}
             {filteredInvoices.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-slate-400">
+                <td colSpan={8} className="px-6 py-8 text-center text-slate-400">
                   {invoices?.length ? "No invoices match your search." : "No invoices yet. Create your first one above."}
                 </td>
               </tr>
@@ -521,6 +535,8 @@ const Invoices = () => {
         </div>
       </Modal>
 
+      {paying && <InvoicePayments invoice={invoices?.find((i) => i.id === paying.id) || paying} onClose={() => setPaying(null)} onPreview={setPreview} />}
+      {/* after the payments window, so a credit note opened from it shows on top */}
       <DocumentPreview doc={preview} onClose={() => setPreview(null)} />
     </div>
   );

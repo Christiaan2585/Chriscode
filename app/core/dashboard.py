@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 
 from sqlmodel import Session, select
 
-from app.core import herding
+from app.core import herding, settlement
 from app.models.business import BusinessSettings
 from app.models.client import Client
 from app.models.client_document import ClientDocument
@@ -53,15 +53,17 @@ def build_dashboard(session: Session, today: date | None = None) -> dict:
     attention = []
 
     # --- Money owed ---
-    invoices = [i for i in session.exec(select(Invoice).where(Invoice.status == "unpaid")).all()]
+    unpaid = [i for i in session.exec(select(Invoice).where(Invoice.status == "unpaid")).all()]
+    owed = settlement.outstanding(session, unpaid)  # what is still owed after payments and credit notes
+    invoices = [i for i in unpaid if owed[i.id] > 0]
     due_of = lambda inv: _day(inv.due_date) if inv.due_date else _day(inv.date) + timedelta(days=business.payment_terms_days or 0)
     past_due = [(inv, (today - due_of(inv)).days) for inv in invoices if due_of(inv) < today]
-    money = {"unpaid_total": _money(sum(i.total_amount for i in invoices)), "unpaid_count": len(invoices),
-             "past_due_total": _money(sum(i.total_amount for i, _ in past_due)), "past_due_count": len(past_due),
+    money = {"unpaid_total": _money(sum(owed[i.id] for i in invoices)), "unpaid_count": len(invoices),
+             "past_due_total": _money(sum(owed[i.id] for i, _ in past_due)), "past_due_count": len(past_due),
              "oldest_past_due_days": max((d for _, d in past_due), default=0)}
     for inv, days in sorted(past_due, key=lambda p: -p[1]):
         client = clients.get(inv.client_id)
-        attention.append(_item("invoice_overdue", "overdue", f"Invoice {inv.number or '#' + str(inv.id)} - R{inv.total_amount:,.2f}",
+        attention.append(_item("invoice_overdue", "overdue", f"Invoice {inv.number or '#' + str(inv.id)} - R{owed[inv.id]:,.2f} owed",
                                f"{_label(client)} - {days} {'day' if days == 1 else 'days'} overdue", inv.client_id,
                                f"/clients/{inv.client_id}", due_of(inv), id=inv.id))
 

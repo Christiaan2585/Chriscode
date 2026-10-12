@@ -50,7 +50,7 @@ const SendButtons = ({ blob, filename, send }) => {
   );
 };
 
-const LABEL = { invoice: "Invoice", quote: "Quote", "purchase-order": "Purchase order", catalogue: "Product", program: "Herding program", "program-costs": "Herding program", "tax-certificate": "Tax certificate", "catalogue-library": "Catalogue" };
+const LABEL = { invoice: "Invoice", quote: "Quote", "purchase-order": "Purchase order", catalogue: "Product", program: "Herding program", "program-costs": "Herding program", "tax-certificate": "Tax certificate", "catalogue-library": "Catalogue", "credit-note": "Credit note", statement: "Statement" };
 
 // Shows the real PDF (the same file Download saves) in Electron's built-in
 // PDF viewer. The packaged CSP allows this via frame-src blob: - see

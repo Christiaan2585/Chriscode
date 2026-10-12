@@ -23,6 +23,7 @@ _ENTITIES = {
     "notes": "note", "animals": "animal", "rams": "ram", "herds": "herd", "schedules": "schedule", "medical": "medical record",
     "weights": "weight record", "dosing": "dosing rule", "business": "company details", "catalogue": "catalogue",
     "devices": "phone", "backups": "backup", "exports": "export", "auth": "user",
+    "payments": "payment", "credit-notes": "credit note",
 }
 
 # (method, path pattern) -> (action, entity). Checked in order; the first match wins.

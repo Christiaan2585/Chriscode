@@ -1,7 +1,7 @@
 import apiClient from "../api/client";
 import { isNativeApp, shareBlob } from "./nativeFiles";
 
-const API_PATH = { invoice: "invoices", quote: "quotes", "purchase-order": "purchase-orders" };
+const API_PATH = { invoice: "invoices", quote: "quotes", "purchase-order": "purchase-orders", "credit-note": "credit-notes" };
 
 // `url` overrides the usual /{kind}s/{id}/pdf address (e.g. the product catalogue).
 export async function fetchDocumentPdf(kind, id, url) {
