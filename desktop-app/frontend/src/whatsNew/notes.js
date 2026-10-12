@@ -14,6 +14,7 @@ export const NOTES = [
           "Ram ear-tag numbers on each client's page, and the top search finds a ram by its tag.",
           "A new header animation: sheep, cow, collie and a Land Cruiser bakkie.",
           "Android: the phone keeps a copy of the office data, works without the office Wi-Fi, and catches up when it is back.",
+          "Android: the phone app can now update itself - it checks the same releases as the PC and asks before installing (Settings > General > Software Update).",
         ],
       },
       {

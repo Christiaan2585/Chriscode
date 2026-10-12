@@ -5,6 +5,7 @@ All notable changes to Sandveld Vee Dienste. Newest first.
 ## 1.0.10 - 2026-10-08
 
 ### New
+- **Android updates itself** like the PC version: the phone checks the same GitHub release, downloads the new app, checks it is genuinely ours (same publisher key, newer version, matching checksum) and hands it to Android's installer, which asks you to confirm. Settings > General > Software Update on the phone. The very first install of this version still has to be done by hand.
 - **"What's new" window**: after an update the app shows, once, a short list of what changed. Settings -> General -> About can show it again.
 - **Easier on the eyes (all five schemes)**: cards are a soft off-white instead of glaring pure white, the page behind them is gently tinted, and in dark mode the text and accent colours are softer and the surfaces a touch lighter - still easy to read, but calmer, especially in the evening. Green Pastures has been refined into a calmer green too.
 - **Colour schemes and a fresher look**: Settings -> General -> Appearance now has light/dark and five colour schemes taken from the farm - Green Pastures (the original), Harvest Wheat, Barn Red, Dam & Sky and Karoo Earth - each with a preview, each in light and dark. The app also looks a little more finished: a furrow-textured sidebar, an accent line under the top bar, softer cards, lit buttons and a faint wash of the scheme's colour behind the pages. Kept on each computer or phone separately.

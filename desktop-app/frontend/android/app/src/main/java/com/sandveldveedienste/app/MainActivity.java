@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(PairingStorePlugin.class);
+        registerPlugin(AppUpdatePlugin.class);
         super.onCreate(savedInstanceState);
         // Client details are on screen: keep them out of screenshots and the recent-apps thumbnail.
         // (Debug builds only skip it, so screenshots can be taken while testing; the release APK always has it.)

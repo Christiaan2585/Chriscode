@@ -10,6 +10,13 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+// The app's version is the project's one version.json (the same the PC installer and the "What's new" window use), so
+// the phone can't be released with a stale number. versionCode must only ever grow for Android to accept an update:
+// 1.0.10 -> 1001000 (major*1,000,000 + minor*10,000 + patch*100 + a fourth part, if any).
+def projectVersion = new groovy.json.JsonSlurper().parse(file("../../../../version.json")).version
+def versionParts = projectVersion.tokenize('.').collect { it.toInteger() }
+def computedVersionCode = versionParts[0] * 1000000 + versionParts[1] * 10000 + versionParts[2] * 100 + (versionParts.size() > 3 ? versionParts[3] : 0)
+
 android {
     namespace = "com.sandveldveedienste.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -17,8 +24,8 @@ android {
         applicationId "com.sandveldveedienste.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 6
-        versionName "1.0.10"
+        versionCode computedVersionCode
+        versionName projectVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -37,6 +44,11 @@ android {
         }
     }
     buildTypes {
+        debug {
+            // A debug build installs NEXT TO the real app (its own storage and pairing) instead of replacing it, so
+            // testing never touches the installed release. (Its update key differs too, so it could not update it anyway.)
+            applicationIdSuffix ".debug"
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

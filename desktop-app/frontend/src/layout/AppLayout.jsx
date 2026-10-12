@@ -13,6 +13,8 @@ import OfflineSupport from "../components/OfflineSupport";
 import SyncStatus from "../components/SyncStatus";
 import AutoLock from "../components/AutoLock";
 import WhatsNew from "../components/WhatsNew";
+import { AndroidUpdatePrompt } from "../components/AndroidUpdate";
+import { isNative } from "../utils/pairing";
 
 const NAV = [
   { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
@@ -46,6 +48,7 @@ const AppLayout = () => {
     <div className="app-bg flex h-screen bg-slate-50 text-slate-900 font-sans">
       <AutoLock />
       <WhatsNew />
+      {isNative() && <AndroidUpdatePrompt />}
       <OfflineSupport />
       {navOpen && (
         <button type="button" aria-label="Close the menu" onClick={() => setNavOpen(false)}

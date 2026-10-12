@@ -49,6 +49,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Self-update: lets the app hand a downloaded update (from GitHub Releases) to Android's installer, which still asks the person. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Camera: only to scan the office PC's pairing QR code (QrScanner.jsx). Not required, so
          the app still installs on a phone without one (the manual pairing form covers that). -->
     <uses-permission android:name="android.permission.CAMERA" />

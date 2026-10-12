@@ -11,6 +11,7 @@ import MyDetails from "../MyDetails";
 import BusinessSettings from "../BusinessSettings";
 import PhoneSettings from "../PhoneSettings";
 import { OPEN_WHATS_NEW } from "../WhatsNew";
+import { AndroidUpdateSettings } from "../AndroidUpdate";
 import PhonePairingSettings from "../PhonePairingSettings";
 import ActivityLog from "./ActivityLog";
 import AccountCard from "./AccountCard";
@@ -48,7 +49,7 @@ const GeneralPanel = () => {
           <p className="text-sm text-red-500">Couldn't reach the backend to check the version.</p>
         )}
       </SettingsCard>
-      <SoftwareUpdateSettings currentVersion={version?.version} />
+      {isNative() ? <AndroidUpdateSettings /> : <SoftwareUpdateSettings currentVersion={version?.version} />}
       <AppearanceSettings />
     </>
   );
