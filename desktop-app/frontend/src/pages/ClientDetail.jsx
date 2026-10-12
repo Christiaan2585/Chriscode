@@ -16,7 +16,7 @@ import TaxCertificate from "../components/TaxCertificate";
 import RamsPanel from "../components/RamsPanel";
 import { loadedLanguages, useSupplierBook } from "../components/SupplierCatalogue";
 import { DocumentHover } from "../components/PreviewCards";
-import { downloadDocumentPdf, orderFormFor } from "../utils/documents";
+import { downloadDocumentPdf, orderFormFor, statementFor } from "../utils/documents";
 import { farmLabel, money, statusStyle } from "../utils/format";
 
 
@@ -251,6 +251,13 @@ const ClientDetail = () => {
               <BookOpen size={18} /> {lang === "af" ? "Bestelvorm (Afrikaans)" : lang === "en" ? "Order form (English)" : "Order form"}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setPreview(statementFor(client))}
+            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:border-emerald-300 hover:text-emerald-600 transition-colors shadow-sm text-sm font-medium"
+          >
+            <FileText size={18} /> Statement
+          </button>
           <button
             onClick={openEditClient}
             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm text-sm font-medium"

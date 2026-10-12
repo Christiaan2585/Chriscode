@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Outlet, NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Users, ClipboardList, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, CloudSun, Truck, Menu, X } from "lucide-react";
+import { LayoutDashboard, Users, ClipboardList, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, CloudSun, Truck, BarChart3, Menu, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import SetupReminder from "../components/SetupReminder";
 import logo from "../assets/logo.png";
@@ -27,6 +27,7 @@ const NAV = [
   { to: "/calculator", label: "Product Calc", Icon: Calculator },
   { to: "/invoices", label: "Invoices", Icon: FileText },
   { to: "/purchase-orders", label: "Purchase Orders", Icon: Truck },
+  { to: "/reports", label: "Reports", Icon: BarChart3 },
 ];
 
 const navClass = ({ isActive }) =>

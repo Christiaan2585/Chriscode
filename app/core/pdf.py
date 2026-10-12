@@ -321,6 +321,56 @@ def generate_credit_note_pdf(business, note, invoice, client, rep=(None, None)):
     return _build(title, meta, business, rep, _client_party(client), lines, None, "Total credit", show_bank=False)
 
 
+
+def generate_statement_pdf(business, client, statement, aging=None):
+    """A client's statement of account (app/core/reports.py): every invoice, payment and credit note in the period
+    with a running balance, how old what is owed is, the bank details, and the amount due."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm,
+                            topMargin=15 * mm, bottomMargin=18 * mm, title="Statement")
+    width = doc.width - 12
+    period = f"{_date(statement['start'])} - {_date(statement['end'])}"
+    meta = [("Date", _date(datetime.utcnow())), ("Period", period), ("Account", client.farm_name or client.name)]
+    heading = Table([[[_p("STATEMENT", "title"), Spacer(1, 4), _key_values(meta, width * 0.42)], _logo_block((None, None))]],
+                    colWidths=[width * 0.55, width * 0.45])
+    heading.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                                 ("LEFTPADDING", (0, 0), (0, 0), 0)]))
+    half = width * 0.48
+    parties = Table([[
+        _party("FROM", business.trading_name, _business_details(business), business.postal_address, business.physical_address, half),
+        _party(*_client_party(client), half),
+    ]], colWidths=[width * 0.52, width * 0.48])
+    parties.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (0, 0), 0)]))
+
+    widths = [0.12, 0.13, 0.39, 0.12, 0.12, 0.12]
+    rows = [[_p("Date", "head"), _p("Reference", "head"), _p("Description", "head")] +
+            [_p(h, "head_right") for h in ("Debit", "Credit", "Balance")]]
+    rows.append([_p(_date(statement["start"]), "cell"), "", _p("<b>Opening balance</b>", "cell"), "", "",
+                 _p(f"<b>{money(statement['opening_balance'])}</b>", "cell_right")])
+    for r in statement["rows"]:
+        rows.append([_p(_date(r["date"]), "cell"), _p(_text(r["reference"]), "cell"), _p(_text(r["description"]), "cell"),
+                     _p(money(r["debit"]) if r["debit"] else "", "cell_right"), _p(money(r["credit"]) if r["credit"] else "", "cell_right"),
+                     _p(money(r["balance"]), "cell_right")])
+    table = Table(rows, colWidths=[width * w for w in widths], repeatRows=1)
+    table.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.5, RULE), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                               ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
+
+    story = [heading, Spacer(1, 10 * mm), parties, Spacer(1, 8 * mm), table]
+    if aging:
+        labels = [("Not yet due", "current"), ("1-30 days", "days_30"), ("31-60 days", "days_60"), ("61-90 days", "days_90"), ("Over 90 days", "older")]
+        age = Table([[_p(label, "head_right") for label, _ in labels], [_p(money(aging[key]), "cell_right") for _, key in labels]],
+                    colWidths=[width / len(labels)] * len(labels))
+        age.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.5, RULE), ("LINEBELOW", (0, 0), (-1, 0), 0.5, RULE)]))
+        story += [Spacer(1, 6 * mm), KeepTogether([_p("WHAT IS OWED, BY AGE", "small_bold"), Spacer(1, 2), age])]
+    due = Table([[_p("AMOUNT DUE", "due_label")], [_p(money(max(statement["closing_balance"], 0.0)), "due")]], colWidths=[width * 0.4])
+    footer = Table([[_bank_block(business, width * 0.5), due]], colWidths=[width * 0.55, width * 0.45])
+    footer.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LINEABOVE", (0, 0), (-1, 0), 0.75, RULE),
+                                ("TOPPADDING", (0, 0), (-1, -1), 8), ("LEFTPADDING", (0, 0), (0, 0), 0)]))
+    story.append(_AtPageFoot(footer))
+    doc.build(story, canvasmaker=_NumberedCanvas)
+    buffer.seek(0)
+    return buffer
+
 def generate_quote_pdf(business, quote, client, lines, rep=(None, None)):
     meta = [("Number", quote.number or f"#{quote.id}"), ("Reference", quote.reference),
             ("Date", _date(quote.date)), ("Valid until", _date(quote.expiry_date)), ("Sales rep", rep[0])]

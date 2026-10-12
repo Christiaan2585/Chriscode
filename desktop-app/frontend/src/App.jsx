@@ -26,6 +26,7 @@ import Programs from "./pages/Programs";
 import Weather from "./pages/Weather";
 import PurchaseOrders from "./pages/PurchaseOrders";
 import ProgramSheet from "./pages/ProgramSheet";
+import Reports from "./pages/Reports";
 
 // On a phone a read that finds the office PC out of reach is answered from the saved copy, so there is no point
 // asking again and again; the PC coming back refreshes everything (offline/sync.js).
@@ -71,6 +72,7 @@ const App = ({ initiallyPaired = false }) => {
                   <Route path="orders" element={<Orders />} />
                   <Route path="invoices" element={<Invoices />} />
                   <Route path="purchase-orders" element={<PurchaseOrders />} />
+                  <Route path="reports" element={<Reports />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="settings/:section" element={<Settings />} />
                 </Route>

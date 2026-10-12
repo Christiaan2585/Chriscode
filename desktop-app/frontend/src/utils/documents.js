@@ -53,6 +53,25 @@ export const orderFormFor = (client, lang = null) => {
   };
 };
 
+// A client's statement of account for start..end (YYYY-MM-DD; blank = the last 90 days), ready to send.
+export const statementFor = (client, start = "", end = "") => {
+  const name = client.name.replace(/[\\/:*?"<>|]+/g, "");
+  const query = new URLSearchParams(Object.entries({ start, end }).filter(([, v]) => v)).toString();
+  return {
+    kind: "statement",
+    id: client.id,
+    title: `for ${client.farm_name || client.name}`,
+    url: `/reports/clients/${client.id}/statement.pdf${query ? `?${query}` : ""}`,
+    filename: `Statement - ${name}${end ? ` ${end}` : ""}.pdf`,
+    send: {
+      phone: client.phone,
+      email: client.email,
+      subject: "Your statement of account",
+      message: `Good day ${client.name}, please find your statement of account attached. Thank you!`,
+    },
+  };
+};
+
 export async function downloadDocumentPdf(kind, id, number) {
   saveBlob(await fetchDocumentPdf(kind, id), pdfFilename(kind, id, number));
 }
