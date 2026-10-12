@@ -4,14 +4,12 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlmodel import Session, func, select
 from typing import List, Literal, Optional
-import io
 import re
-import pandas as pd
 from app.api.business import get_business, totals_for
 from app.api.invoices import create_invoice
 from app.core import herding, program_quote
 from app.core.db import get_session
-from app.core.uploads import read_capped
+from app.core.uploads import read_capped, read_table
 from app.core.dates import coerce_datetime
 from app.core.pdf import generate_program_cost_pdf, generate_program_pdf
 from app.core.security import get_current_user, require_admin
@@ -221,9 +219,15 @@ def _parse_date(value) -> Optional[datetime]:
     if not text:
         return None
     try:
-        return pd.to_datetime(text).to_pydatetime()
-    except Exception:
-        return None
+        return datetime.fromisoformat(text)  # 2026-01-05, or a date cell from Excel (2026-01-05 00:00:00)
+    except ValueError:
+        pass
+    for pattern in ("%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y"):  # day first, as typed in South Africa
+        try:
+            return datetime.strptime(text, pattern)
+        except ValueError:
+            pass
+    return None
 
 
 @router.post("/import")
@@ -249,26 +253,20 @@ async def import_programs(file: UploadFile = File(...), session: Session = Depen
 
     Every row is handled independently so one bad row can't abort the whole
     import."""
-    if not file.filename.endswith((".xlsx", ".xls", ".csv")):
-        raise HTTPException(status_code=400, detail="File must be an Excel (.xlsx/.xls) or .csv file")
+    if not file.filename.lower().endswith((".xlsx", ".xls", ".csv")):
+        raise HTTPException(status_code=400, detail="File must be an Excel (.xlsx) or .csv file")
 
     contents = await read_capped(file)
-    try:
-        if file.filename.endswith(".csv"):
-            df = pd.read_csv(io.BytesIO(contents), dtype=str, keep_default_na=False)
-        else:
-            df = pd.read_excel(io.BytesIO(contents), dtype=str)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Could not read the file: {exc}")
+    columns, table = read_table(file.filename, contents)
 
-    column_map = _build_column_map(df.columns)
+    column_map = _build_column_map(columns)
     missing = [f for f in ("client", "program", "animal_type", "count") if f not in column_map]
     if missing:
         raise HTTPException(
             status_code=400,
             detail=(
                 f"Could not find a column for: {', '.join(missing)}. "
-                f"Columns found: {list(df.columns)}."
+                f"Columns found: {columns}."
             ),
         )
 
@@ -282,7 +280,7 @@ async def import_programs(file: UploadFile = File(...), session: Session = Depen
     # the file's count; repeats within the file add up.
     groups_touched: dict = {}
 
-    for excel_row_num, row_dict in enumerate(df.to_dict(orient="records"), start=2):
+    for excel_row_num, row_dict in enumerate(table, start=2):
         try:
             client_ref = _clean(row_dict.get(column_map.get("client")))
             program_name = _clean(row_dict.get(column_map.get("program")))

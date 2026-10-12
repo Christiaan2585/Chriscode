@@ -3,7 +3,6 @@ sqlmodel
 uvicorn
 pydantic
 requests
-pandas
 openpyxl
 reportlab
 pypdf

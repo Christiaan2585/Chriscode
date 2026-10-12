@@ -110,8 +110,9 @@ python -m PyInstaller --noconfirm --clean --onedir --name sandveld-backend ^
     --collect-all pypdf ^
     --collect-all cryptography ^
     --collect-all multipart ^
-    --collect-all pandas ^
     --hidden-import sqlalchemy.dialects.sqlite ^
+    --exclude-module pandas ^
+    --exclude-module numpy ^
     --exclude-module streamlit ^
     --exclude-module altair ^
     --exclude-module pyarrow ^

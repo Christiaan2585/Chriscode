@@ -8,13 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from datetime import datetime
 from sqlmodel import Session, func, select
 from typing import List, Optional
-import io
 import os
 import re
-import pandas as pd
 from fastapi.responses import Response
 from app.core.db import get_session
-from app.core.uploads import read_capped
+from app.core.uploads import read_capped, read_table
 from app.core import cascade, herding
 from pydantic import BaseModel
 from app.core.security import require_admin
@@ -241,28 +239,19 @@ async def import_clients(file: UploadFile = File(...), session: Session = Depend
     a new client is created. Every row is handled independently so one bad row
     can't abort the whole import.
     """
-    if not file.filename.endswith((".xlsx", ".xls", ".csv")):
-        raise HTTPException(status_code=400, detail="File must be an Excel (.xlsx/.xls) or .csv file")
+    if not file.filename.lower().endswith((".xlsx", ".xls", ".csv")):
+        raise HTTPException(status_code=400, detail="File must be an Excel (.xlsx) or .csv file")
 
     contents = await read_capped(file)
-    try:
-        # dtype=str keeps every column as text. Without it, pandas guesses
-        # column types and a phone/cell number column like "0821234567" gets
-        # read as a number, silently dropping the leading 0.
-        if file.filename.endswith(".csv"):
-            df = pd.read_csv(io.BytesIO(contents), dtype=str, keep_default_na=False)
-        else:
-            df = pd.read_excel(io.BytesIO(contents), dtype=str)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Could not read the file: {exc}")
+    columns, table = read_table(file.filename, contents)
 
-    column_map = _build_column_map(df.columns)
+    column_map = _build_column_map(columns)
     if "name" not in column_map:
         raise HTTPException(
             status_code=400,
             detail=(
                 "Could not find a name column in this file. "
-                f"Columns found: {list(df.columns)}. "
+                f"Columns found: {columns}. "
                 "Expected one of: " + ", ".join(_COLUMN_ALIASES["name"])
             ),
         )
@@ -270,12 +259,7 @@ async def import_clients(file: UploadFile = File(...), session: Session = Depend
     created, updated, skipped = 0, 0, 0
     errors = []
 
-    # to_dict(orient="records") keeps the original column-name strings as keys.
-    # itertuples()._asdict() was tried first but silently breaks on headers with
-    # spaces/hyphens (e.g. "Client Name", "E-mail") because it sanitizes them
-    # into namedtuple-safe identifiers, so the alias lookup below would find
-    # nothing and every row would look blank.
-    for excel_row_num, row_dict in enumerate(df.to_dict(orient="records"), start=2):  # +2: header row + 1-index
+    for excel_row_num, row_dict in enumerate(table, start=2):  # +2: header row + 1-index
         try:
             name = _clean(row_dict.get(column_map.get("name")))
             if not name:
