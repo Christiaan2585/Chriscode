@@ -119,6 +119,7 @@ html.theme-dark {
 .theme-dark .text-red-600, .theme-dark .text-red-700,
 .theme-dark .hover\:text-red-600:hover { color: #f87171; }
 .theme-dark .text-amber-600, .theme-dark .text-amber-700 { color: #fbbf24; }
+.theme-dark .text-amber-800, .theme-dark .text-amber-900 { color: #fcd34d; } /* warning boxes (e.g. the phone's "Pair with the office PC?") were dark brown on dark */
 .theme-dark .text-blue-600, .theme-dark .text-blue-700,
 .theme-dark .hover\:text-blue-600:hover { color: #60a5fa; }
 .theme-dark .text-purple-600, .theme-dark .hover\:text-purple-600:hover { color: #c084fc; }

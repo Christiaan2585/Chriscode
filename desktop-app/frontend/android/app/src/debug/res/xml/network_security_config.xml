@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only (this file is in the `debug` source set, never in a release): lets the update test download a
+     test APK from a local server (adb reverse -> localhost) over plain http. Release builds keep Android's default,
+     which refuses all cleartext traffic. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>
