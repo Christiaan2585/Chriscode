@@ -125,7 +125,7 @@ export const LowStock = ({ data }) => (
       <>
         <ul className="space-y-1 text-sm text-slate-700">{data.items.map((p) => <li key={p.id}>{p.name}{p.stock_quantity != null && <span className="text-slate-500"> - {p.stock_quantity} left</span>}</li>)}</ul>
         {data.count > data.items.length && <p className="mt-1 text-xs text-slate-500">and {data.count - data.items.length} more</p>}
-        <Link to="/products" className="mt-3 inline-block text-sm font-medium text-emerald-700 hover:underline">Open products</Link>
+        <Link to="/purchase-orders?tab=stock" className="mt-3 inline-block text-sm font-medium text-emerald-700 hover:underline">Open stock</Link>
       </>
     )}
   </Panel>

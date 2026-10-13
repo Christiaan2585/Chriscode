@@ -2,11 +2,13 @@ import React, { useState } from "react";
 import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
 import { useSelection } from "../utils/useSelection";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Trash2, Edit, Eye, Download, X, Truck, Building2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Plus, Search, Trash2, Edit, Eye, Download, X, Truck, Building2, Boxes } from "lucide-react";
 import apiClient from "../api/client";
 import Modal from "../components/Modal";
 import SearchableSelect from "../components/SearchableSelect";
 import DocumentPreview from "../components/DocumentPreview";
+import StockPanel from "../components/StockPanel";
 import { downloadDocumentPdf, lineTotal } from "../utils/documents";
 import { money, newestFirst, shortDate, statusStyle } from "../utils/format";
 import { pickerProducts } from "../utils/products";
@@ -90,6 +92,10 @@ const SuppliersModal = ({ isOpen, onClose, suppliers }) => {
 
 const PurchaseOrders = () => {
   const queryClient = useQueryClient();
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "stock" ? "stock" : "orders"; // the dashboard's low-stock card links to ?tab=stock
+  const { data: stockRows = [] } = useQuery({ queryKey: ["stock-overview"], queryFn: async () => (await apiClient.get("/stock/")).data });
+  const stockAlerts = stockRows.filter((r) => r.status === "low" || r.status === "out").length;
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState(null);
   const [suppliersOpen, setSuppliersOpen] = useState(false);
@@ -200,6 +206,17 @@ const PurchaseOrders = () => {
         </div>
       </div>
 
+      <div role="tablist" aria-label="Purchase orders and stock" className="flex gap-1 border-b border-slate-200">
+        {[["orders", "Orders", Truck], ["stock", "Stock", Boxes]].map(([id, label, Icon]) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setParams(id === "orders" ? {} : { tab: id })}
+            className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-colors ${tab === id ? "border-emerald-600 text-emerald-700" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+            <Icon size={16} /> {label}
+            {id === "stock" && stockAlerts > 0 && <span className="rounded-full bg-red-100 px-1.5 text-xs font-semibold text-red-700" title="Low or out of stock">{stockAlerts}</span>}
+          </button>
+        ))}
+      </div>
+
+      {tab === "stock" ? <StockPanel /> : (
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 bg-slate-50 p-4">
           <div className="relative">
@@ -253,6 +270,7 @@ const PurchaseOrders = () => {
         </table>
         </div>
       </div>
+      )}
 
       <Modal isOpen={editing !== null} onClose={close} size="lg"
         title={editing === "new" ? "New Purchase Order" : `Edit ${editing?.number || "Purchase Order"}`}>

@@ -32,9 +32,11 @@ class StockMovement(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     product_id: int = Field(foreign_key="product.id", index=True)
     change: float
-    reason: str  # count | received | sold | opening
+    reason: str  # count | adjusted | received | sold | opening
     source: Optional[str] = Field(default=None, index=True)
     reference: Optional[str] = None  # the document number, shown in the history
+    note: Optional[str] = None  # why, for a manual count or adjustment
+    balance: Optional[float] = None  # what was on the shelf right after this movement (None: product not counted yet)
     created_by: Optional[int] = Field(default=None, foreign_key="user.id")
     at: datetime = Field(default_factory=datetime.utcnow)
 

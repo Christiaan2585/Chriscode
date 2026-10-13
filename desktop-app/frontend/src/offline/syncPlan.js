@@ -8,7 +8,7 @@ export const BASE_ENDPOINTS = [
   "/clients/", "/products/", "/products/thumbnails", "/invoices/", "/quotes/", "/orders/", "/purchase-orders/", "/suppliers/",
   "/programs/", "/programs/template", "/appointments/", "/animals/", "/rams/", "/herds/", "/business/", "/dosing/",
   "/analytics/dashboard", "/analytics/revenue", "/analytics/revenue-by-month",
-  "/reports/aged-debtors", "/clients/headcounts",
+  "/reports/aged-debtors", "/clients/headcounts", "/stock/",
 ];
 
 const CLIENT_PAGES = (id) => [

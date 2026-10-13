@@ -23,7 +23,7 @@ _ENTITIES = {
     "notes": "note", "animals": "animal", "rams": "ram", "herds": "herd", "schedules": "schedule", "medical": "medical record",
     "weights": "weight record", "dosing": "dosing rule", "business": "company details", "catalogue": "catalogue",
     "devices": "phone", "backups": "backup", "exports": "export", "auth": "user",
-    "payments": "payment", "credit-notes": "credit note",
+    "payments": "payment", "credit-notes": "credit note", "stock": "stock",
 }
 
 # (method, path pattern) -> (action, entity). Checked in order; the first match wins.
@@ -33,6 +33,7 @@ _SPECIAL = [
     ("PUT", r"^/backups/settings$", "Changed backup settings", "backup"),
     ("GET", r"^/exports/", "Exported all data to Excel", "export"),
     ("POST", r"^/catalogue/library/[0-9a-f]{32}/email$", "Emailed a brochure to clients", "catalogue"),
+    ("POST", r"^/stock/(\d+)/adjust$", "Adjusted stock", "stock"),
     ("POST", r"^/mail/send$", "Emailed a document", "email"),
     ("PUT", r"^/mail/settings$", "Changed the email settings", "email"),
     ("POST", r"^/trash/(\d+)/restore$", "Restored from the recycle bin", "recycle bin"),

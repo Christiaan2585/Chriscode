@@ -11,6 +11,7 @@ export const NOTES = [
         items: [
           "Brochures: add a PDF brochure (Products > Brochures & catalogues) and send it to as many clients as you tick - by email in one click (each client gets their own name in the greeting), or by WhatsApp one client at a time. The list shows who already got it.",
           "Add the brochure's products to your products list: open its pages, draw a box round a product and the picture snaps to the product's own outline. Type the name and price and it is added with that picture.",
+          "Stock menu on the Purchase Orders page: what is on the shelf (count it once, then it keeps itself up to date), what is low or out, adjustments for breakage or samples, and a timeline of every change - sold on an invoice, received on a purchase order, counted or adjusted - with what was left after each. Invoices take stock off automatically and a purchase order adds it when marked Received.",
           "Clients: filter by town or area and by the number of animals, and sort by name, most or fewest animals, or town. Each client now has a Town / area field (it can also be imported from a spreadsheet).",
         ],
       },

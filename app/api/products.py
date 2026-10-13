@@ -134,6 +134,7 @@ class ProductPatch(BaseModel):
 
 class StockCount(BaseModel):
     quantity: float = Field(ge=0, le=10_000_000)
+    note: Optional[str] = Field(default=None, max_length=200)
 
 
 @router.post("/{product_id}/stock-count", response_model=Product)
@@ -141,7 +142,7 @@ def count_stock(product_id: int, body: StockCount, session: Session = Depends(ge
     product = session.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    stock.count(session, product, body.quantity, user.id if user else None)
+    stock.count(session, product, body.quantity, user.id if user else None, (body.note or "").strip() or None)
     session.commit()
     session.refresh(product)
     return product

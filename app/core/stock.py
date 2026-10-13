@@ -17,25 +17,31 @@ from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem
 
 
 def _move(session: Session, product: Product, change: float, reason: str, source: Optional[str] = None,
-          reference: Optional[str] = None, user_id: Optional[int] = None) -> None:
+          reference: Optional[str] = None, user_id: Optional[int] = None, note: Optional[str] = None) -> None:
     if not change:
         return
-    session.add(StockMovement(product_id=product.id, change=change, reason=reason, source=source,
-                              reference=reference, created_by=user_id))
     if product.stock_quantity is not None:
         product.stock_quantity = round(product.stock_quantity + change, 3)
         product.in_stock = product.stock_quantity > 0
         session.add(product)
+    # Each movement keeps the balance it left behind, so the timeline never has to be re-added up.
+    session.add(StockMovement(product_id=product.id, change=change, reason=reason, source=source, reference=reference,
+                              created_by=user_id, note=note, balance=product.stock_quantity))
 
 
-def count(session: Session, product: Product, quantity: float, user_id: Optional[int] = None) -> None:
+def count(session: Session, product: Product, quantity: float, user_id: Optional[int] = None, note: Optional[str] = None) -> None:
     """What is on the shelf now. The first count switches tracking on."""
     before = product.stock_quantity or 0.0
     if product.stock_quantity is None:
         product.stock_quantity = 0.0
-    _move(session, product, round(quantity - before, 3), "count", user_id=user_id)
+    _move(session, product, round(quantity - before, 3), "count", user_id=user_id, note=note)
     product.in_stock = quantity > 0
     session.add(product)
+
+
+def adjust(session: Session, product: Product, change: float, note: str, user_id: Optional[int] = None) -> None:
+    """A correction that is not a count or a document: breakage, expiry, a sample given away, a found box."""
+    _move(session, product, round(change, 3), "adjusted", user_id=user_id, note=note)
 
 
 def _booked(session: Session, source: str) -> dict:
