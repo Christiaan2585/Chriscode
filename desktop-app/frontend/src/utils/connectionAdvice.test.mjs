@@ -55,3 +55,15 @@ test("something answering that is not the PC is flagged", () => {
 test("nothing known at all", () => {
   assert.equal(connectionAdvice({ results: [], phoneAddresses: ["192.168.1.55"] }).level, "bad");
 });
+
+test("Tailscale is on for the phone but no address of the PC is known on it: finish the PC side", () => {
+  const a = connectionAdvice({ results: [bad("192.168.1.20")], phoneAddresses: ["192.168.1.55"], tailnetPhoneAddresses: ["100.70.1.1"] });
+  assert.equal(a.level, "bad");
+  assert.match(a.tips.join(" "), /Tailscale on the PC|PC.*Tailscale/);
+});
+
+test("the PC's Tailscale address is known but Tailscale is off on the phone", () => {
+  const a = connectionAdvice({ results: [bad("192.168.1.20"), bad("100.88.1.2")], phoneAddresses: [], tailnetPhoneAddresses: [] });
+  assert.match(a.headline + a.tips.join(" "), /Tailscale/);
+  assert.match(a.tips.join(" "), /turn.*on|open Tailscale/i);
+});

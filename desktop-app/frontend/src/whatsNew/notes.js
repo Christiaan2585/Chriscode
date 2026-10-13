@@ -3,6 +3,20 @@
 // people will notice. (Never put the business's program steps, products or doses here: the repository is public.)
 export const NOTES = [
   {
+    version: "1.0.14",
+    title: "Phones that keep finding the office PC",
+    sections: [
+      {
+        heading: "New",
+        items: [
+          "While it is connected, the phone now asks the office PC for its current addresses and keeps them, so a new address from the router - or Tailscale installed on the PC later - reaches the phone by itself, with no pairing again.",
+          "Settings > Phones on the PC now says whether Tailscale is installed and connected, and links to the download. With Tailscale on the PC and the phone, the phone connects from anywhere, even when the office Wi-Fi will not let it reach the PC.",
+          "The phone's Check connection also tells you when Tailscale is off on the phone or still missing on the PC.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.13",
     title: "Brochures, and finding clients by town and herd size",
     sections: [

@@ -5,7 +5,7 @@ import { QrCode, Smartphone, Trash2 } from "lucide-react";
 import apiClient from "../api/client";
 import Modal from "./Modal";
 import ReadyForPhones from "./ReadyForPhones";
-import { isTailnetAddress } from "../utils/addresses";
+import { tailscaleAdvice } from "../utils/addresses";
 
 const when = (iso) => (iso ? new Date(`${iso}Z`).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "never");
 
@@ -120,11 +120,15 @@ const PhoneSettings = () => {
         </p>
       )}
       {on && !status?.running && status?.error && <p role="alert" className="text-sm text-red-600">{status.error}</p>}
-      {on && status?.running && (
-        status.addresses.some(isTailnetAddress)
-          ? <p className="text-sm text-emerald-700">Tailscale is on: phones can also connect from anywhere, not just the office Wi-Fi.</p>
-          : <p className="text-xs text-slate-500">Tip: if a phone sometimes cannot reach this PC (for example on a different Wi-Fi point), install Tailscale on this PC and the phone - it makes the connection work from anywhere.</p>
-      )}
+      {on && status?.running && (() => {
+        const advice = tailscaleAdvice(status.tailscale);
+        return (
+          <div className={`rounded-lg border px-3 py-2 text-sm ${advice.level === "good" ? "border-emerald-300 text-emerald-800" : "border-amber-300 text-slate-700"}`}>
+            <p>{advice.text}</p>
+            {advice.link && <a href={advice.link} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block font-medium text-emerald-700 hover:underline">Get Tailscale for Windows</a>}
+          </div>
+        );
+      })()}
       <ReadyForPhones />
 
       <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">

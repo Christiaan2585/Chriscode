@@ -7,6 +7,7 @@ import { decodePairingLink, savePairing, trustHost } from "../utils/pairing";
 import { setDeviceConnection } from "../api/client";
 import { nativeAdapter } from "../api/nativeHttp";
 import { wipeOfflineData } from "../offline/store";
+import { isOfficeAddress } from "../utils/addresses";
 
 // A readable name for Settings -> Phones' paired-phone list on the PC.
 const deviceName = () => {
@@ -24,19 +25,7 @@ const deviceName = () => {
 // Whole-string matches only ("evil.com/x.local" must not pass), and the
 // address is re-read by the URL parser so nothing in it (an "@", a port
 // like "1@evil.com") can point the request anywhere else.
-const PRIVATE_IP = /^(10\.\d{1,3}|192\.168|172\.(1[6-9]|2\d|3[01])|169\.254|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7]))\.\d{1,3}\.\d{1,3}$/;
-const LOCAL_NAME = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.local$/i;
-export const isOfficeAddress = (host, port = 8443) => {
-  const h = String(host || "").trim();
-  if (!PRIVATE_IP.test(h) && !LOCAL_NAME.test(h)) return false;
-  if (!Number.isInteger(Number(port)) || Number(port) < 1 || Number(port) > 65535) return false;
-  try {
-    const url = new URL(`https://${h}:${Number(port)}/`);
-    return url.hostname === h.toLowerCase() && url.port === String(Number(port)) && !url.username;
-  } catch {
-    return false;
-  }
-};
+export { isOfficeAddress };
 
 // Tries each address the PC offered (it may have more than one network
 // interface) until one actually answers.

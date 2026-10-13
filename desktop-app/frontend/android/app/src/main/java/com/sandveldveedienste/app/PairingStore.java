@@ -98,6 +98,17 @@ final class PairingStore {
         return out;
     }
 
+    /** Addresses the PC reported over the connection that is already trusted: the acceptable new ones are kept
+     * (first, they are the newest news), everything already known stays, the one in use stays first. */
+    static void addHosts(Context ctx, List<String> offered) {
+        String current = getHost(ctx);
+        if (current == null || offered == null) return;
+        List<String> merged = new ArrayList<>();
+        for (String h : offered) if (Discovery.isAcceptableHost(h)) merged.add(h.trim());
+        merged.addAll(getHosts(ctx));
+        prefs(ctx).edit().putString("hosts", joinHosts(current, merged)).apply();
+    }
+
     static boolean knowsHost(Context ctx, String host) {
         for (String h : getHosts(ctx)) if (h.equalsIgnoreCase(host)) return true;
         return false;

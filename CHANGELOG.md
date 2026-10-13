@@ -2,6 +2,12 @@
 
 All notable changes to Sandveld Vee Dienste. Newest first.
 
+## 1.0.14 - 2026-10-15
+
+### New
+- **The phone learns the PC's addresses by itself**: while it is connected, the phone asks `GET /devices/addresses` (phone listener only, behind the paired-device token) and keeps the new addresses (office network, Tailscale 100.64.0.0/10 or `.local` only - checked in the app and again in the phone's own code), at most every 6 hours and whenever the PC comes back. A new router address, or Tailscale installed on the PC later, therefore reaches paired phones without pairing again.
+- **Tailscale status on the PC** (Settings -> Phones): not installed (with the download link), installed but not connected, or connected; the phone's Check connection recognises Tailscale on/off on the phone (its 100.x address) and says which side still needs it.
+
 ## 1.0.13 - 2026-10-14
 
 ### New

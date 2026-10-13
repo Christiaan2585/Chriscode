@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import secrets
+import shutil
 import socket
 import threading
 import time
@@ -137,6 +138,25 @@ def prefer_private_network(addresses: list) -> list:
         except ValueError:
             return False
     return sorted(addresses, key=lambda a: not on_tailnet(a))  # stable: the rest keep their order
+
+
+def tailscale_installed() -> bool:
+    """Is Tailscale on this PC? (its program, or `tailscale` on the path) - it makes phones reach the PC from anywhere."""
+    program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+    return os.path.exists(os.path.join(program_files, "Tailscale", "tailscale.exe")) or shutil.which("tailscale") is not None
+
+
+def tailscale_status(addresses: list) -> dict:
+    """{installed, address}: address is this PC's Tailscale address (None until it is signed in and connected)."""
+    return {"installed": tailscale_installed(), "address": next((a for a in prefer_private_network(addresses) if _on_tailnet(a)), None)}
+
+
+def _on_tailnet(address: str) -> bool:
+    import ipaddress
+    try:
+        return ipaddress.ip_address(address) in ipaddress.ip_network("100.64.0.0/10")
+    except ValueError:
+        return False
 
 
 def hash_token(token: str) -> str:

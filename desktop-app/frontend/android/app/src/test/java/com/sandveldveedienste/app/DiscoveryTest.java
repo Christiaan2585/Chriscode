@@ -108,6 +108,30 @@ public class DiscoveryTest {
     }
 
     @Test
+    public void onlyOfficeTailscaleOrLocalNameAddressesAreKeptFromWhatThePcReports() {
+        assertTrue(Discovery.isAcceptableHost("192.168.1.20"));
+        assertTrue(Discovery.isAcceptableHost(" 100.90.1.2 "));
+        assertTrue(Discovery.isAcceptableHost("office-pc.local"));
+        assertFalse(Discovery.isAcceptableHost("8.8.8.8"));
+        assertFalse(Discovery.isAcceptableHost("evil.example.com"));
+        assertFalse(Discovery.isAcceptableHost("192.168.1.20@evil.com"));
+        assertFalse(Discovery.isAcceptableHost("192.168.1.20:8443"));
+        assertFalse(Discovery.isAcceptableHost("100.128.0.1"));
+        assertFalse(Discovery.isAcceptableHost("-bad.local"));
+        assertFalse(Discovery.isAcceptableHost(null));
+    }
+
+    @Test
+    public void tailscaleAddressesAreRecognisedButNeverScanned() {
+        assertTrue(Discovery.isTailnet("100.64.0.1"));
+        assertTrue(Discovery.isTailnet("100.127.255.254"));
+        assertFalse(Discovery.isTailnet("100.63.0.1"));
+        assertFalse(Discovery.isTailnet("100.128.0.1"));
+        assertFalse(Discovery.isTailnet("192.168.1.1"));
+        assertTrue(Discovery.subnetCandidates(Arrays.asList("100.88.1.2"), new HashSet<String>()).isEmpty());
+    }
+
+    @Test
     public void aSubnetScanStaysInsideTheSameBlockOf254() {
         List<String> found = Discovery.subnetCandidates(Arrays.asList("192.168.1.55"), new HashSet<>(Arrays.asList("192.168.1.20", "192.168.1.55")));
         assertEquals(252, found.size());

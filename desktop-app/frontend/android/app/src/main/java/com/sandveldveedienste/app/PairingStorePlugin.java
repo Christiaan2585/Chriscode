@@ -132,6 +132,22 @@ public class PairingStorePlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /** The PC's current addresses, as it reported them over the trusted connection. Only acceptable ones are kept. */
+    @PluginMethod
+    public void addHosts(PluginCall call) {
+        java.util.List<String> offered = new java.util.ArrayList<>();
+        try {
+            org.json.JSONArray list = call.getArray("hosts");
+            if (list != null) for (int i = 0; i < list.length() && i < 32; i++) offered.add(list.getString(i));
+        } catch (org.json.JSONException ignored) {
+            // nothing usable
+        }
+        PairingStore.addHosts(getContext(), offered);
+        JSObject ret = new JSObject();
+        ret.put("hosts", new org.json.JSONArray(PairingStore.getHosts(getContext())));
+        call.resolve(ret);
+    }
+
     /** "Check connection": can this phone reach the PC on each address it knows, how fast, and is it really the PC? */
     @PluginMethod
     public void diagnose(final PluginCall call) {
@@ -166,6 +182,7 @@ public class PairingStorePlugin extends Plugin {
                 ret.put("results", results);
                 ret.put("current", PairingStore.getHost(getContext()));
                 ret.put("phoneAddresses", new org.json.JSONArray(Discovery.phoneAddresses()));
+                ret.put("tailnetPhoneAddresses", new org.json.JSONArray(Discovery.tailnetPhoneAddresses()));
                 call.resolve(ret);
             } catch (Exception e) {
                 call.reject("Could not check the connection");

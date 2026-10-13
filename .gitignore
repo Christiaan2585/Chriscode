@@ -52,3 +52,6 @@ Thumbs.db
 /build/
 desktop-app/backend/
 
+
+# graphify knowledge graph (rebuilt with `graphify update .`)
+graphify-out/

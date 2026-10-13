@@ -3,7 +3,7 @@ import { addressKind } from "./addresses.js";
 // Turns the phone's connection check (PairingStore.diagnose) into plain words: what is wrong and what to try.
 const sameNetwork = (a, b) => a.split(".").slice(0, 3).join(".") === b.split(".").slice(0, 3).join(".");
 
-export function connectionAdvice({ results = [], phoneAddresses = [] }) {
+export function connectionAdvice({ results = [], phoneAddresses = [], tailnetPhoneAddresses = [] }) {
   const working = results.find((r) => r.ok);
   if (working) {
     const kind = addressKind(working.host);
@@ -18,17 +18,27 @@ export function connectionAdvice({ results = [], phoneAddresses = [] }) {
 
   const known = results.map((r) => r.host);
   const impostor = results.some((r) => /not the office PC/.test(r.problem || ""));
-  if (!phoneAddresses.length) {
+  const knowsTailnet = known.some((h) => addressKind(h) === "tailscale");
+  const phoneOnTailnet = tailnetPhoneAddresses.length > 0;
+  if (knowsTailnet && !phoneOnTailnet) {
+    return { level: "bad", headline: "Tailscale is not turned on for this phone.", tips: ["Open Tailscale on this phone and turn it on, then check again - the PC is reachable through it from anywhere."] };
+  }
+  // Tailscale is on for the phone but the phone has never been told the PC's Tailscale address.
+  const finishPc = phoneOnTailnet && !knowsTailnet
+    ? ["Tailscale is on for this phone, but it does not know the PC's Tailscale address yet: install Tailscale on the PC and sign in (same account), then open this app once on the office Wi-Fi - it learns the address by itself."]
+    : [];
+  if (!phoneAddresses.length && !phoneOnTailnet) {
     return { level: "bad", headline: "This phone is not on Wi-Fi.", tips: ["Connect to the office Wi-Fi, then check again. Mobile data cannot reach the office PC unless Tailscale is installed on both."] };
   }
   const local = known.filter((h) => addressKind(h) === "wifi");
   if (local.length && !local.some((h) => phoneAddresses.some((p) => sameNetwork(p, h))) && !known.some((h) => addressKind(h) === "tailscale")) {
     return {
       level: "bad", headline: "This phone is on a different network from the office PC.",
-      tips: ["Join the same Wi-Fi as the PC, or install Tailscale on both so they find each other anywhere."],
+      tips: [...finishPc, "Join the same Wi-Fi as the PC, or install Tailscale on both so they find each other anywhere."],
     };
   }
   const tips = [
+    ...finishPc,
     "Check that the Sandveld app is running on the office PC (it must be open, or set to stay in the tray) and that the PC is not asleep.",
     "If it is running: this Wi-Fi may stop devices from talking to each other (\"AP isolation\" or a different Wi-Fi point of the mesh). Try the PC on a cable, or install Tailscale on both.",
   ];

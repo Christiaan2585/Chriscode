@@ -33,6 +33,27 @@ class AddressOrderTests(unittest.TestCase):
         self.assertEqual(lan.prefer_private_network(["192.168.1.2", "100.200.1.1"]), ["192.168.1.2", "100.200.1.1"])
 
 
+class TailscaleTests(unittest.TestCase):
+    def test_installed_when_its_program_is_there_or_on_the_path(self):
+        with mock.patch.object(lan.os.path, "exists", return_value=True), mock.patch.object(lan.shutil, "which", return_value=None):
+            self.assertTrue(lan.tailscale_installed())
+        with mock.patch.object(lan.os.path, "exists", return_value=False), mock.patch.object(lan.shutil, "which", return_value="C:/x/tailscale.exe"):
+            self.assertTrue(lan.tailscale_installed())
+        with mock.patch.object(lan.os.path, "exists", return_value=False), mock.patch.object(lan.shutil, "which", return_value=None):
+            self.assertFalse(lan.tailscale_installed())
+
+    def test_the_status_names_the_tailscale_address_if_there_is_one(self):
+        with mock.patch.object(lan, "tailscale_installed", return_value=True):
+            self.assertEqual(lan.tailscale_status(["100.90.1.2", "192.168.1.5"]), {"installed": True, "address": "100.90.1.2"})
+            self.assertEqual(lan.tailscale_status(["192.168.1.5"]), {"installed": True, "address": None})
+        with mock.patch.object(lan, "tailscale_installed", return_value=False):
+            self.assertEqual(lan.tailscale_status(["192.168.1.5"]), {"installed": False, "address": None})
+
+    def test_the_phones_settings_page_gets_it_with_the_rest_of_the_status(self):
+        with mock.patch.object(devices.lan, "local_addresses", return_value=["100.90.1.2"]),              mock.patch.object(devices.lan, "tailscale_installed", return_value=True):
+            self.assertEqual(devices.lan_status()["tailscale"], {"installed": True, "address": "100.90.1.2"})
+
+
 class CertificateTests(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
@@ -221,6 +242,37 @@ class DeviceGuardTests(unittest.TestCase):
 
     def test_the_pc_itself_needs_no_device_token(self):
         self.assertEqual(self.local.get("/version").status_code, 200)
+
+
+class AddressSyncTests(unittest.TestCase):
+    """A connected phone is told the PC's current addresses, so it keeps working when the router gives the PC a new
+    one or Tailscale is installed later - without pairing again."""
+
+    def setUp(self):
+        self.app, self.engine = _app_and_session()
+        self.codes = lan.PairingCodes()
+        patcher = mock.patch.object(devices, "PAIRING_CODES", self.codes)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.local = Client(self.app)
+        self.phone = Client(lan.DeviceGuard(self.app, session_factory=lambda: Session(self.engine)))
+
+    def token(self):
+        return self.phone.post("/devices/pair", json={"code": self.codes.create()["code"], "name": "Test phone"}).json()["device_token"]
+
+    def test_a_paired_phone_gets_the_addresses_and_the_port(self):
+        token = self.token()
+        with mock.patch.object(lan, "local_addresses", return_value=["100.90.1.2", "192.168.10.190"]):
+            r = self.phone.get("/devices/addresses", headers={"X-Device-Token": token})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["addresses"], ["100.90.1.2", "192.168.10.190"])
+        self.assertIsInstance(r.json()["port"], int)
+
+    def test_an_unpaired_phone_is_told_nothing(self):
+        self.assertEqual(self.phone.get("/devices/addresses").status_code, 401)
+
+    def test_it_is_only_for_phones_not_the_desktop_window(self):
+        self.assertEqual(self.local.get("/devices/addresses").status_code, 403)
 
 
 class PhoneAppOriginTests(DeviceGuardTests):

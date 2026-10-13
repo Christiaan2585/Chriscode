@@ -48,6 +48,43 @@ final class Discovery {
         }
     }
 
+    static boolean isTailnet(String ip) {
+        String[] p = ip.split("\\.");
+        if (p.length != 4) return false;
+        try {
+            return Integer.parseInt(p[0]) == 100 && Integer.parseInt(p[1]) >= 64 && Integer.parseInt(p[1]) <= 127;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /** May this phone keep an address the PC reported? Only the office network, Tailscale, or a plain ".local" name:
+     * whatever the PC says, the phone never starts talking to anything else. */
+    static boolean isAcceptableHost(String host) {
+        if (host == null) return false;
+        String h = host.trim();
+        if (isPrivate(h) || isTailnet(h)) return h.matches("\\d{1,3}(\\.\\d{1,3}){3}");
+        return h.length() <= 253 && h.matches("(?i)[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\\.local");
+    }
+
+    /** This phone's Tailscale address(es), if Tailscale is switched on for it. */
+    static List<String> tailnetPhoneAddresses() {
+        List<String> found = new ArrayList<>();
+        try {
+            Enumeration<NetworkInterface> all = NetworkInterface.getNetworkInterfaces();
+            while (all != null && all.hasMoreElements()) {
+                NetworkInterface nif = all.nextElement();
+                if (!nif.isUp()) continue;
+                for (InetAddress address : Collections.list(nif.getInetAddresses())) {
+                    if (address instanceof Inet4Address && isTailnet(address.getHostAddress())) found.add(address.getHostAddress());
+                }
+            }
+        } catch (Exception ignored) {
+            // no network information
+        }
+        return found;
+    }
+
     /** This phone's own private IPv4 addresses (its Wi-Fi address, normally one). */
     static List<String> phoneAddresses() {
         List<String> found = new ArrayList<>();

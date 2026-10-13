@@ -30,6 +30,12 @@ def require_local(request: Request) -> None:
         raise HTTPException(status_code=403, detail="This can only be done on the office PC")
 
 
+def require_phone(request: Request) -> None:
+    """The reverse of require_local: only over the phone connection (where DeviceGuard has already checked the token)."""
+    if not getattr(request.state, "via_lan", False):
+        raise HTTPException(status_code=403, detail="This is for paired phones")
+
+
 _PC_ADMIN = [Depends(require_local), Depends(require_admin)]
 
 
@@ -76,8 +82,16 @@ def lan_status() -> dict:
     directory = lan.default_dir()
     settings = lan.load_settings(directory)
     fingerprint = lan.ensure_certificate(directory)[2] if SERVER.running else None
+    addresses = lan.local_addresses()
     return {"enabled": settings["enabled"], "running": SERVER.running, "error": SERVER.error if settings["enabled"] else None,
-            "port": settings["port"], "addresses": lan.local_addresses(), "fingerprint": fingerprint}
+            "port": settings["port"], "addresses": addresses, "fingerprint": fingerprint, "tailscale": lan.tailscale_status(addresses)}
+
+
+@router.get("/addresses", dependencies=[Depends(require_phone)])
+def current_addresses():
+    """The PC's addresses right now. A phone that is already connected asks, and keeps whatever is new, so it still
+    finds the PC when the router changes its address or Tailscale is installed later (no pairing again)."""
+    return {"addresses": lan.local_addresses(), "port": lan.load_settings(lan.default_dir())["port"]}
 
 
 @router.get("/lan", dependencies=_PC_ADMIN)
