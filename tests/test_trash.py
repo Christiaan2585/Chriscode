@@ -137,6 +137,18 @@ class KeepingTests(TrashCase):
         self.assertNotIn("payload", row)
         self.assertGreaterEqual(row["rows"], 3)
 
+    def test_opening_the_bin_also_clears_what_has_expired(self):
+        prod = Product(name="X", price=1.0)
+        self.s.add(prod)
+        self.s.commit()
+        products.delete_product(prod.id, session=self.s)
+        old = self.bin()[0]
+        old.deleted_at = datetime.utcnow() - timedelta(days=45)
+        self.s.add(old)
+        self.s.commit()
+        self.assertEqual(trash_api.list_trash(session=self.s), [])
+        self.assertEqual(self.bin(), [])
+
     def test_deleting_forever_removes_the_entry(self):
         inv = self.make_invoice()
         invoices.delete_invoice(inv.id, session=self.s)

@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Calculator, Calendar, CloudSun, Database, FileText, History, Info, Landmark, Package, Scale, Settings as GearIcon,
+  Calculator, Calendar, CloudSun, Database, FileText, History, Info, Landmark, Mail, Package, Scale, Settings as GearIcon,
   ShieldCheck, ShoppingCart, Smartphone, Trash2, Truck, UserRound, Users, ClipboardList,
 } from "lucide-react";
 import apiClient from "../../api/client";
@@ -19,6 +19,7 @@ import AppearanceSettings from "./AppearanceSettings";
 import AutoLockSetting from "./AutoLockSetting";
 import RemindersSetting from "./RemindersSetting";
 import RecycleBin from "./RecycleBin";
+import EmailSettings from "./EmailSettings";
 import BackupSettings from "./BackupSettings";
 import {
   CalculatorPanel, CalendarPanel, ClientsPanel, InvoicesPanel, OrdersPanel, ProductsPanel, PurchaseOrdersPanel,
@@ -132,6 +133,7 @@ export const GROUPS = [
     items: [
       { id: "phones", label: "Phones", subtitle: "Pair staff phones", Icon: Smartphone, color: "bg-green-500", Panel: PhonesPanel, show: ({ user }) => isNative() || Boolean(user?.is_admin) },
       { id: "activity", label: "Activity log", subtitle: "Who changed what", Icon: History, color: "bg-slate-600", Panel: ActivityLog, show: ({ user }) => Boolean(user?.is_admin) },
+      { id: "email", label: "Email", subtitle: "Send documents from the app", Icon: Mail, color: "bg-sky-500", Panel: EmailSettings, show: ({ user }) => Boolean(user?.is_admin) },
       { id: "recycle-bin", label: "Recycle bin", subtitle: "Restore deleted records", Icon: Trash2, color: "bg-slate-500", Panel: RecycleBin, show: ({ user }) => Boolean(user?.is_admin) },
       { id: "backups", label: "Data & Backups", subtitle: "Backups, restore, export", Icon: Database, color: "bg-amber-500", Panel: BackupsPanel },
       { id: "legal", label: "Legal", subtitle: "Licence and privacy notice", Icon: Scale, color: "bg-slate-400", Panel: LegalSettings },

@@ -21,6 +21,7 @@ def _item_or_404(session: Session, item_id: int) -> TrashItem:
 
 @router.get("/")
 def list_trash(session: Session = Depends(get_session)):
+    trash.purge_old(session)  # a PC left on for weeks never restarts, so expiry is also checked here
     items = session.exec(select(TrashItem).order_by(TrashItem.deleted_at.desc(), TrashItem.id.desc())).all()
     return [{"id": i.id, "kind": i.kind, "label": i.label, "rows": i.row_count, "deleted_at": i.deleted_at,
              "days_left": max(0, trash.RETAIN_DAYS - (datetime.utcnow() - i.deleted_at).days)} for i in items]

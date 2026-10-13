@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Download, Mail, MessageCircle, Printer } from "lucide-react";
+import { Download, Mail, MessageCircle, Printer, Send } from "lucide-react";
+import apiClient from "../api/client";
+import EmailDocumentDialog from "./EmailDocumentDialog";
 import Modal from "./Modal";
 import { fetchDocumentPdf, pdfFilename, saveBlob } from "../utils/documents";
 import { sendDocument, sendLink } from "../utils/sending";
@@ -14,6 +16,9 @@ const sendButton =
 const SendButtons = ({ blob, filename, send }) => {
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [composing, setComposing] = useState(false);
+  // Shown only once an admin has set up the business's mail server (Settings -> Email).
+  const { data: mail } = useQuery({ queryKey: ["mail-status"], queryFn: async () => (await apiClient.get("/mail/status")).data });
   const go = async (via) => {
     setBusy(true);
     setStatus(null);
@@ -37,6 +42,12 @@ const SendButtons = ({ blob, filename, send }) => {
         title={noPhone ? "This client has no phone number" : "Send on WhatsApp"}>
         <MessageCircle size={16} /> WhatsApp
       </button>
+      {mail?.configured && (
+        <button type="button" className={sendButton} disabled={!blob || busy} onClick={() => setComposing(true)} title="Email it from the app, with the PDF attached">
+          <Send size={16} /> Send from app
+        </button>
+      )}
+      {composing && <EmailDocumentDialog blob={blob} filename={filename} send={send} onClose={() => setComposing(false)} />}
       <button type="button" className={sendButton} disabled={!blob || busy || noEmail} onClick={() => go("email")}
         title={noEmail ? "This client has no email address" : "Send by email"}>
         <Mail size={16} /> Email

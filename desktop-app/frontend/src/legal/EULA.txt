@@ -48,6 +48,8 @@ The Software works mainly offline on your computer and contains no analytics, ad
 (b) Software updates (GitHub, github.com): the Software checks GitHub for new versions and downloads them from there. No business data is sent.
 (c) Google sign-in (only if switched on): if you choose "Sign in with Google", Google handles the sign-in and the Software receives your name and email address from Google.
 (d) WhatsApp and phone links: when you click a client's WhatsApp or phone link, the number (and any pre-filled message) is passed to WhatsApp or your phone app. Nothing is sent unless you click.
+(e) Email (your own mail server, only if you set it up): if an administrator enters mail-server details under Settings -> Email, the Software sends the emails you ask it to send (with the document you attach) to that server over an encrypted connection. The password is stored encrypted on this computer. Nothing is sent unless you click Send.
+(f) Recycle bin: records an administrator deletes are kept on this computer for 30 days so they can be put back; "Delete for good" removes them at once. Older backups can still contain deleted records until they are replaced.
 
 Like any internet request, these services can see this computer's IP address. Their own terms and privacy policies apply to what they receive.
 
