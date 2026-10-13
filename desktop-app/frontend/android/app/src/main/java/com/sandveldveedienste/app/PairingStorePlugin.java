@@ -124,12 +124,34 @@ public class PairingStorePlugin extends Plugin {
         if (paired) {
             ret.put("host", PairingStore.getHost(getContext()));
             ret.put("hosts", new org.json.JSONArray(PairingStore.getHosts(getContext())));
+            ret.put("hasRelay", PairingStore.hasRelay(getContext()));
             ret.put("port", PairingStore.getPort(getContext()));
             ret.put("fingerprint", PairingStore.getFingerprint(getContext()));
             ret.put("token", PairingStore.getToken(getContext()));
             ret.put("deviceName", PairingStore.getDeviceName(getContext()));
         }
         call.resolve(ret);
+    }
+
+    /** Relay details from the PC ("Connect from anywhere"). Checked again here, whatever the JavaScript side did. */
+    @PluginMethod
+    public void setRelay(PluginCall call) {
+        String host = call.getString("host");
+        Integer port = call.getInt("port");
+        String office = call.getString("office");
+        String key = call.getString("key");
+        if (!PairingStore.isPaired(getContext()) || port == null || !RelayTunnel.isAcceptableRelay(host == null ? null : host.trim().toLowerCase(), port, office, key)) {
+            call.reject("Those relay details are not acceptable");
+            return;
+        }
+        PairingStore.setRelay(getContext(), host.trim().toLowerCase(), port, office, key);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void clearRelay(PluginCall call) {
+        PairingStore.clearRelay(getContext());
+        call.resolve();
     }
 
     /** The PC's current addresses, as it reported them over the trusted connection. Only acceptable ones are kept. */
@@ -175,6 +197,18 @@ public class PairingStorePlugin extends Plugin {
                     } else {
                         row.put("ok", false);
                     }
+                    row.put("ms", System.currentTimeMillis() - started);
+                    results.put(row);
+                }
+                if (PairingStore.hasRelay(getContext())) { // the internet relay, as one more way in
+                    org.json.JSONObject row = new org.json.JSONObject();
+                    long started = System.currentTimeMillis();
+                    String problem = RelayTunnel.check(PairingStore.getRelayHost(getContext()), PairingStore.getRelayPort(getContext()),
+                            PairingStore.getRelayOffice(getContext()), PairingStore.getRelayKey(getContext()), fingerprint);
+                    row.put("host", PairingStore.getRelayHost(getContext()));
+                    row.put("via", "relay");
+                    row.put("ok", problem == null);
+                    if (problem != null) row.put("problem", problem);
                     row.put("ms", System.currentTimeMillis() - started);
                     results.put(row);
                 }

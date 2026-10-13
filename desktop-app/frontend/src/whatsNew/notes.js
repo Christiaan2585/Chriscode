@@ -3,6 +3,20 @@
 // people will notice. (Never put the business's program steps, products or doses here: the repository is public.)
 export const NOTES = [
   {
+    version: "1.0.15",
+    title: "Connect from anywhere",
+    sections: [
+      {
+        heading: "New",
+        items: [
+          "Connect from anywhere: switch it on under Settings > Phones on the office PC and phones reach the PC from any Wi-Fi or mobile data, even when the office Wi-Fi will not let them connect directly. Nothing to install and no router settings. Everything stays encrypted between the phone and the PC.",
+          "Phones that are already paired pick this up by themselves the next time they connect at the office. Check connection on the phone now shows the Wi-Fi and the relay side by side and says what is wrong in plain words.",
+          "\"Make a new key for phones\" stops a removed or lost phone from using the relay.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.14",
     title: "Phones that keep finding the office PC",
     sections: [

@@ -34,6 +34,8 @@ _SPECIAL = [
     ("GET", r"^/exports/", "Exported all data to Excel", "export"),
     ("POST", r"^/catalogue/library/[0-9a-f]{32}/email$", "Emailed a brochure to clients", "catalogue"),
     ("POST", r"^/stock/(\d+)/adjust$", "Adjusted stock", "stock"),
+    ("PUT", r"^/devices/relay$", "Changed the connection relay", "phone"),
+    ("POST", r"^/devices/relay/new-key$", "Made a new relay key for phones", "phone"),
     ("POST", r"^/mail/send$", "Emailed a document", "email"),
     ("PUT", r"^/mail/settings$", "Changed the email settings", "email"),
     ("POST", r"^/trash/(\d+)/restore$", "Restored from the recycle bin", "recycle bin"),

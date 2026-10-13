@@ -49,3 +49,22 @@ test("the PC's Tailscale status becomes one plain sentence and a next step", () 
   assert.match(missing.link, /^https:\/\/tailscale\.com\//);
   assert.equal(tailscaleAdvice(undefined).level, "todo");
 });
+
+import { acceptableRelay } from "./addresses.js";
+
+const GOOD_RELAY = { host: "relay.example.com", port: 8447, office: "a".repeat(32), key: "b".repeat(64) };
+
+test("relay details from the PC are only kept when every part is well formed", () => {
+  assert.deepEqual(acceptableRelay(GOOD_RELAY), GOOD_RELAY);
+  assert.deepEqual(acceptableRelay({ ...GOOD_RELAY, host: " Relay.Example.com " }), GOOD_RELAY);
+  assert.equal(acceptableRelay({ ...GOOD_RELAY, host: "bad host" }), null);
+  assert.equal(acceptableRelay({ ...GOOD_RELAY, host: "http://relay.example.com" }), null);
+  assert.equal(acceptableRelay({ ...GOOD_RELAY, host: "relay.example.com:1" }), null);
+  assert.equal(acceptableRelay({ ...GOOD_RELAY, host: "a@b.com" }), null);
+  assert.equal(acceptableRelay({ ...GOOD_RELAY, port: 0 }), null);
+  assert.equal(acceptableRelay({ ...GOOD_RELAY, port: 70000 }), null);
+  assert.equal(acceptableRelay({ ...GOOD_RELAY, office: "short" }), null);
+  assert.equal(acceptableRelay({ ...GOOD_RELAY, key: "Z".repeat(64) }), null);
+  assert.equal(acceptableRelay(null), null);
+  assert.equal(acceptableRelay("relay"), null);
+});

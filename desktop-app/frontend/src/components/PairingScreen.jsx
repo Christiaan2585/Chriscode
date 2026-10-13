@@ -60,7 +60,7 @@ const PairingScreen = ({ onPaired }) => {
   const [offer, setOffer] = useState(null); // pairing details from a link, waiting for the user's OK
   const [scanning, setScanning] = useState(false);
 
-  const pair = async ({ hosts, port, fp, code }) => {
+  const pair = async ({ hosts, port, fp, code, relay }) => {
     setOffer(null);
     port = Number(port);
     const office = (hosts || []).map((h) => String(h).trim()).filter((h) => isOfficeAddress(h, port));
@@ -75,7 +75,7 @@ const PairingScreen = ({ onPaired }) => {
     try {
       const { host, token } = await pairAgainst(hosts, port, fp, code);
       await wipeOfflineData(); // a copy of some other office's data must never mix with this one
-      await savePairing(host, port, fp, token, deviceName(), hosts);
+      await savePairing(host, port, fp, token, deviceName(), hosts, relay);
       setDeviceConnection({ host, port, token });
       onPaired();
     } catch (e) {
@@ -89,7 +89,7 @@ const PairingScreen = ({ onPaired }) => {
       const data = decodePairingLink(url);
       // Never pair straight from a link - anyone can send one. Show where it
       // points and let the user say yes.
-      if (data) setOffer({ hosts: data.hosts, port: data.port, fp: data.fp, code: data.code });
+      if (data) setOffer({ hosts: data.hosts, port: data.port, fp: data.fp, code: data.code, relay: data.relay });
     });
     return () => {
       subscription.then((handle) => handle.remove());
@@ -103,7 +103,7 @@ const PairingScreen = ({ onPaired }) => {
     setScanning(false);
     setStatus("idle");
     setError(null);
-    if (data) setOffer({ hosts: data.hosts, port: data.port, fp: data.fp, code: data.code });
+    if (data) setOffer({ hosts: data.hosts, port: data.port, fp: data.fp, code: data.code, relay: data.relay });
   };
 
   const submitManual = (e) => {

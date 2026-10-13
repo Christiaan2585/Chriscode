@@ -67,7 +67,7 @@ const PhoneConnection = () => {
           {advice.tips.length > 0 && <ul className="list-disc space-y-1 pl-5 text-xs">{advice.tips.map((t) => <li key={t}>{t}</li>)}</ul>}
           <ul className="space-y-0.5 text-xs">
             {report.results.map((r) => (
-              <li key={r.host}>{r.ok ? "✔" : "✘"} {r.host} {KIND[addressKind(r.host)] && `(${KIND[addressKind(r.host)]})`} - {r.ok ? `${r.ms} ms` : r.problem}</li>
+              <li key={`${r.via || "lan"}-${r.host}`}>{r.ok ? "✔" : "✘"} {r.via === "relay" ? "Internet relay" : r.host} {r.via !== "relay" && KIND[addressKind(r.host)] && `(${KIND[addressKind(r.host)]})`} - {r.ok ? `${r.ms} ms` : r.problem}</li>
             ))}
           </ul>
           <p className="text-xs text-slate-500">This phone: {report.phoneAddresses.length ? report.phoneAddresses.join(", ") : "not on Wi-Fi"}</p>

@@ -5,6 +5,7 @@ import { QrCode, Smartphone, Trash2 } from "lucide-react";
 import apiClient from "../api/client";
 import Modal from "./Modal";
 import ReadyForPhones from "./ReadyForPhones";
+import RelaySettings from "./RelaySettings";
 import { tailscaleAdvice } from "../utils/addresses";
 
 const when = (iso) => (iso ? new Date(`${iso}Z`).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "never");
@@ -120,7 +121,8 @@ const PhoneSettings = () => {
         </p>
       )}
       {on && !status?.running && status?.error && <p role="alert" className="text-sm text-red-600">{status.error}</p>}
-      {on && status?.running && (() => {
+      {on && status?.running && (status.tailscale?.installed || status.tailscale?.address) && (() => {
+        // Only for people who already use Tailscale: nobody is asked to install it (the relay below needs nothing).
         const advice = tailscaleAdvice(status.tailscale);
         return (
           <div className={`rounded-lg border px-3 py-2 text-sm ${advice.level === "good" ? "border-emerald-300 text-emerald-800" : "border-amber-300 text-slate-700"}`}>
@@ -129,6 +131,7 @@ const PhoneSettings = () => {
           </div>
         );
       })()}
+      <RelaySettings status={status} phonesOn={on && Boolean(status?.running)} />
       <ReadyForPhones />
 
       <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">

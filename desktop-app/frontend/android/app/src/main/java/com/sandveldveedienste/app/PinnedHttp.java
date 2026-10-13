@@ -80,10 +80,14 @@ final class PinnedHttp {
      * quiet when idle and only answers a moment after the first attempt. Only the connecting is repeated
      * (nothing has been sent), so a retry can never do something twice. */
     private static HttpsURLConnection connect(URL url, String fingerprint, int timeoutMs, String method, JSONObject headers, int bodyLength, int connectMs, int attempts) throws Exception {
+        return connect(url, fingerprint, timeoutMs, method, headers, bodyLength, connectMs, attempts, null);
+    }
+
+    private static HttpsURLConnection connect(URL url, String fingerprint, int timeoutMs, String method, JSONObject headers, int bodyLength, int connectMs, int attempts, javax.net.ssl.SSLSocketFactory factory) throws Exception {
         IOException last = null;
         for (int attempt = 0; attempt < attempts; attempt++) {
             HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
-            conn.setSSLSocketFactory(pinnedContext(fingerprint).getSocketFactory());
+            conn.setSSLSocketFactory(factory != null ? factory : pinnedContext(fingerprint).getSocketFactory());
             conn.setHostnameVerifier((hostname, session) -> true); // the pinned certificate IS the identity check
             conn.setConnectTimeout(Math.min(timeoutMs, connectMs));
             conn.setReadTimeout(timeoutMs);
@@ -111,6 +115,20 @@ final class PinnedHttp {
         throw last;
     }
 
+    /** One connection to the PC by way of the relay: HTTPS to the relay's address with the relay handshake underneath. */
+    private static HttpsURLConnection connectViaRelay(Context ctx, String path, String fingerprint, int timeoutMs, String method, JSONObject headers, int bodyLength) throws IOException {
+        try {
+            String host = PairingStore.getRelayHost(ctx);
+            int port = PairingStore.getRelayPort(ctx);
+            javax.net.ssl.SSLSocketFactory factory = new RelayTunnel.RelaySocketFactory(pinnedFactory(fingerprint), PairingStore.getRelayOffice(ctx), PairingStore.getRelayKey(ctx));
+            return connect(new URL("https://" + host + ":" + port + path), fingerprint, timeoutMs, method, headers, bodyLength, 6000, 1, factory);
+        } catch (IOException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IOException("Could not connect through the relay", e);
+        }
+    }
+
     static Reply execute(Context ctx, String address, String method, JSONObject headers, byte[] body, int timeoutMs, boolean fast) throws Exception {
         int port = PairingStore.getPort(ctx);
         String fingerprint = PairingStore.getFingerprint(ctx);
@@ -133,12 +151,34 @@ final class PinnedHttp {
         HttpsURLConnection conn = null;
         String used = null;
         IOException last = null;
+        // The internet relay ("Connect from anywhere"): the way in when the office Wi-Fi cannot be used. Tried first for a
+        // while after it was last needed (the phone is probably still away), otherwise only after the PC's own addresses.
+        boolean relayConfigured = PairingStore.hasRelay(ctx);
+        boolean relayFirst = relayConfigured && PairingStore.relayRecentlyUsed(ctx);
+        boolean viaRelay = false;
+        if (relayFirst) {
+            try {
+                conn = connectViaRelay(ctx, path, fingerprint, timeoutMs, method, headers, bodyLength);
+                viaRelay = true;
+            } catch (IOException e) {
+                last = e;
+            }
+        }
         for (int i = 0; i < hosts.size() && conn == null; i++) {
-            int connectMs = fast || i > 0 ? 3500 : several ? 4500 : 6000;
-            int attempts = fast || several || i > 0 ? 1 : 3;
+            // With the relay as a fallback, an address that does not answer is not worth waiting long for.
+            int connectMs = fast || i > 0 || relayConfigured ? 3500 : several ? 4500 : 6000;
+            int attempts = fast || several || i > 0 || relayConfigured ? 1 : 3;
             try {
                 conn = connect(new URL("https://" + hosts.get(i) + ":" + port + path), fingerprint, timeoutMs, method, headers, bodyLength, connectMs, attempts);
                 used = hosts.get(i);
+            } catch (IOException e) {
+                last = e;
+            }
+        }
+        if (conn == null && relayConfigured && !relayFirst) {
+            try {
+                conn = connectViaRelay(ctx, path, fingerprint, timeoutMs, method, headers, bodyLength);
+                viaRelay = true;
             } catch (IOException e) {
                 last = e;
             }
@@ -163,7 +203,8 @@ final class PinnedHttp {
             }
         }
         if (conn == null) throw last != null ? last : new IOException("Could not reach the office PC");
-        if (used != null && !used.equalsIgnoreCase(hosts.get(0))) PairingStore.promote(ctx, used);
+        if (relayConfigured) PairingStore.markRelayUsed(ctx, viaRelay);
+        if (!viaRelay && used != null && !used.equalsIgnoreCase(hosts.get(0))) PairingStore.promote(ctx, used);
         if (body != null && body.length > 0) {
             try (OutputStream out = conn.getOutputStream()) {
                 out.write(body);

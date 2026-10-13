@@ -2,6 +2,11 @@
 
 All notable changes to Sandveld Vee Dienste. Newest first.
 
+## 1.0.15 - 2026-10-16
+
+### New
+- **Connect from anywhere (connection relay)**: a built-in connection service for customers who cannot install Tailscale or fix their Wi-Fi. `relay/server.py` (standard library only, `relay/README.md`, Dockerfile) is a small public server; the office PC keeps ONE outbound connection to it (`app/core/relay_agent.py`) and a phone that cannot reach the PC directly connects out to the relay, which joins it to the PC. What flows is the same TLS the phone would speak to the PC, and the phone still checks the PC's certificate fingerprint, so the relay cannot read or change anything. A phone needs the office id and a 256-bit key (only its hash is registered); the PC's own secret owns the office; unknown office and wrong key get the same answer; failed handshakes are rate-limited; hops to the relay are TLS with the certificate checked (plain only on private addresses, for testing). PC: Settings -> Phones -> "Connect from anywhere" (switch + relay address, status, "Make a new key for phones"); a vendor can ship a default address in `desktop-app/frontend/src/config/relay.js`. Phone: tries the office addresses first, then the relay (and the relay first for ten minutes once it was needed); the QR code and `GET /devices/addresses` carry the relay details, so already-paired phones pick them up; Check connection shows it. Relay details are checked again in the phone's own code.
+
 ## 1.0.14 - 2026-10-15
 
 ### New

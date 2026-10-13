@@ -1,5 +1,5 @@
 import apiClient from "../api/client";
-import { PairingStorePlugin, isNative } from "./pairing";
+import { PairingStorePlugin, isNative, keepRelay } from "./pairing";
 import { acceptableAddresses } from "./addresses";
 
 // Phone only. While the office PC answers, ask it for its addresses right now and keep any new ones: so a new address
@@ -18,6 +18,7 @@ export async function refreshKnownAddresses({ force = false } = {}) {
     const { data } = await apiClient.get("/devices/addresses", { silent: true, queueable: true, timeout: 8000, fast: true });
     const hosts = acceptableAddresses(data?.addresses, data?.port);
     if (hosts.length) await PairingStorePlugin.addHosts({ hosts });
+    if ("relay" in (data || {})) await keepRelay(data.relay); // new, changed or switched off on the PC
     markChecked();
     return hosts;
   } catch {

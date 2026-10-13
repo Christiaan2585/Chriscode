@@ -45,6 +45,7 @@ final class PairingStore {
             .putString("token_enc", sealed)
             .remove("token")
             .putString("deviceName", deviceName)
+            .remove("relay_host").remove("relay_port").remove("relay_office").remove("relay_key_enc").remove("relay_used_at")
             .apply();
     }
 
@@ -107,6 +108,46 @@ final class PairingStore {
         for (String h : offered) if (Discovery.isAcceptableHost(h)) merged.add(h.trim());
         merged.addAll(getHosts(ctx));
         prefs(ctx).edit().putString("hosts", joinHosts(current, merged)).apply();
+    }
+
+    // --- the internet relay ("Connect from anywhere" on the PC): host, port, office id, and the key phones use ---
+
+    static void setRelay(Context ctx, String host, int port, String office, String key) {
+        String sealed;
+        try {
+            sealed = SecretBox.seal(key); // the key lets a phone in through the relay, so it is sealed like the device token
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("This phone couldn't store the relay key securely", e);
+        }
+        prefs(ctx).edit().putString("relay_host", host).putInt("relay_port", port).putString("relay_office", office).putString("relay_key_enc", sealed).apply();
+    }
+
+    static void clearRelay(Context ctx) {
+        prefs(ctx).edit().remove("relay_host").remove("relay_port").remove("relay_office").remove("relay_key_enc").remove("relay_used_at").apply();
+    }
+
+    static boolean hasRelay(Context ctx) {
+        return getRelayHost(ctx) != null && getRelayOffice(ctx) != null && prefs(ctx).getString("relay_key_enc", null) != null;
+    }
+
+    static String getRelayHost(Context ctx) { return prefs(ctx).getString("relay_host", null); }
+    static int getRelayPort(Context ctx) { return prefs(ctx).getInt("relay_port", 0); }
+    static String getRelayOffice(Context ctx) { return prefs(ctx).getString("relay_office", null); }
+
+    static String getRelayKey(Context ctx) {
+        String sealed = prefs(ctx).getString("relay_key_enc", null);
+        return sealed == null ? null : SecretBox.open(sealed);
+    }
+
+    /** The last time a call went through the relay (0 = the last one went straight to the PC). While the phone is away
+     * from the office the relay is tried first, so every call does not first wait for the office Wi-Fi to time out. */
+    static void markRelayUsed(Context ctx, boolean used) {
+        prefs(ctx).edit().putLong("relay_used_at", used ? System.currentTimeMillis() : 0L).apply();
+    }
+
+    static boolean relayRecentlyUsed(Context ctx) {
+        long at = prefs(ctx).getLong("relay_used_at", 0L);
+        return at > 0 && System.currentTimeMillis() - at < 10 * 60 * 1000L;
     }
 
     static boolean knowsHost(Context ctx, String host) {

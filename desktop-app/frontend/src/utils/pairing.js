@@ -5,6 +5,7 @@
 // synchronously during the TLS handshake, before any JS runs. This module
 // is just the JS-side way to read and write that same store.
 import { Capacitor, registerPlugin } from "@capacitor/core";
+import { acceptableRelay } from "./addresses.js";
 
 export const PairingStorePlugin = registerPlugin("PairingStore");
 
@@ -32,8 +33,17 @@ export async function trustHost(host, port, fingerprint) {
 }
 
 // `hosts` = every address the PC offered: the phone remembers all of them and uses whichever answers.
-export async function savePairing(host, port, fingerprint, token, deviceName, hosts = [host]) {
+export async function savePairing(host, port, fingerprint, token, deviceName, hosts = [host], relay = null) {
   await PairingStorePlugin.save({ host, port, fingerprint, token, deviceName, hosts });
+  await keepRelay(relay);
+}
+
+// The internet relay the PC offers ("Connect from anywhere"). null/undefined = the PC does not offer one (any old one is
+// dropped); anything that is not well formed is ignored, here and again in the phone's own code.
+export async function keepRelay(offer) {
+  const relay = acceptableRelay(offer);
+  if (relay) await PairingStorePlugin.setRelay(relay);
+  else if (offer === null) await PairingStorePlugin.clearRelay();
 }
 
 export async function clearPairing() {

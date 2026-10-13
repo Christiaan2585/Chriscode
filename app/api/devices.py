@@ -9,12 +9,13 @@ import base64
 import json
 import secrets
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
-from app.core import audit, lan
+from app.core import audit, lan, relay_agent
 from app.core.db import get_session
 from app.core.security import require_admin
 from app.models.device import PairedDevice
@@ -23,6 +24,7 @@ router = APIRouter(prefix="/devices", tags=["Phones"])
 
 PAIRING_CODES = lan.PairingCodes()
 SERVER = lan.LanServer()
+RELAY = relay_agent.RelayAgent()
 
 
 def require_local(request: Request) -> None:
@@ -84,14 +86,80 @@ def lan_status() -> dict:
     fingerprint = lan.ensure_certificate(directory)[2] if SERVER.running else None
     addresses = lan.local_addresses()
     return {"enabled": settings["enabled"], "running": SERVER.running, "error": SERVER.error if settings["enabled"] else None,
-            "port": settings["port"], "addresses": addresses, "fingerprint": fingerprint, "tailscale": lan.tailscale_status(addresses)}
+            "port": settings["port"], "addresses": addresses, "fingerprint": fingerprint, "tailscale": lan.tailscale_status(addresses),
+            "relay": relay_status()}
+
+
+# --- The connection relay: how phones reach this PC from anywhere (app/core/relay_agent.py, relay/server.py) ---
+
+def relay_status() -> dict:
+    return {**relay_agent.load_relay_settings(lan.default_dir()), **RELAY.status()}
+
+
+def relay_payload() -> Optional[dict]:
+    """What a phone needs to reach this PC through the relay - given only to phones being paired or already paired."""
+    directory = lan.default_dir()
+    settings = relay_agent.load_relay_settings(directory)
+    if not settings["enabled"]:
+        return None
+    identity = relay_agent.load_identity(directory)
+    return {"host": settings["host"], "port": settings["port"], "office": identity.office, "key": identity.phone_key}
+
+
+def apply_relay() -> None:
+    """Start, restart or stop the agent to match the settings; it only runs while the phone listener does."""
+    directory = lan.default_dir()
+    settings = relay_agent.load_relay_settings(directory)
+    if settings["enabled"] and SERVER.running:
+        RELAY.start(settings["host"], settings["port"], lan.load_settings(directory)["port"], relay_agent.load_identity(directory))
+    else:
+        RELAY.stop()
+
+
+class RelayUpdate(BaseModel):
+    enabled: bool
+    address: Optional[str] = Field(default=None, max_length=300)  # "relay.example.com" or "relay.example.com:8447"
+
+
+@router.get("/relay", dependencies=_PC_ADMIN)
+def read_relay():
+    return relay_status()
+
+
+@router.put("/relay", dependencies=_PC_ADMIN)
+def update_relay(data: RelayUpdate):
+    directory = lan.default_dir()
+    current = relay_agent.load_relay_settings(directory)
+    host, port = current["host"], current["port"]
+    if data.address is not None:
+        if data.address.strip():
+            try:
+                host, port = relay_agent.parse_relay(data.address)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc))
+        else:
+            host, port = None, relay_agent.DEFAULT_RELAY_PORT
+    if data.enabled and not host:
+        raise HTTPException(status_code=422, detail="Enter the relay's address first")
+    relay_agent.save_relay_settings(directory, data.enabled, host, port)
+    apply_relay()
+    return relay_status()
+
+
+@router.post("/relay/new-key", dependencies=_PC_ADMIN)
+def new_relay_key():
+    """A new key for phones to use the relay: a phone that was removed (or lost) with the old one can no longer
+    reach this PC through it. Phones still paired learn the new key the next time they reach the PC."""
+    relay_agent.rotate_phone_key(lan.default_dir())
+    apply_relay()
+    return relay_status()
 
 
 @router.get("/addresses", dependencies=[Depends(require_phone)])
 def current_addresses():
     """The PC's addresses right now. A phone that is already connected asks, and keeps whatever is new, so it still
     finds the PC when the router changes its address or Tailscale is installed later (no pairing again)."""
-    return {"addresses": lan.local_addresses(), "port": lan.load_settings(lan.default_dir())["port"]}
+    return {"addresses": lan.local_addresses(), "port": lan.load_settings(lan.default_dir())["port"], "relay": relay_payload()}
 
 
 @router.get("/lan", dependencies=_PC_ADMIN)
@@ -108,6 +176,7 @@ def update_lan(data: LanUpdate, request: Request):
         SERVER.start(request.app, directory, settings["port"])
     else:
         SERVER.stop()
+    apply_relay()
     return lan_status()
 
 
@@ -119,8 +188,12 @@ def new_pairing_code():
     if not status["running"]:
         raise HTTPException(status_code=409, detail="Switch on \"Allow phones\" first")
     code = PAIRING_CODES.create()
-    payload = json.dumps({"app": "sandveld", "v": 1, "hosts": status["addresses"], "port": status["port"],
-                          "fp": status["fingerprint"], "code": code["code"]}, separators=(",", ":"))
+    offer = {"app": "sandveld", "v": 1, "hosts": status["addresses"], "port": status["port"],
+             "fp": status["fingerprint"], "code": code["code"]}
+    relay = relay_payload()
+    if relay:
+        offer["relay"] = relay
+    payload = json.dumps(offer, separators=(",", ":"))
     # sandveld://pair?d=<data> rather than bare JSON, so any camera app's
     # QR reader offers "open in Sandveld" instead of just showing text -
     # the Android app never needs its own in-app scanner.
@@ -135,3 +208,4 @@ def start_if_enabled(app) -> None:
     settings = lan.load_settings(directory)
     if settings["enabled"]:
         SERVER.start(app, directory, settings["port"])
+        apply_relay()

@@ -62,3 +62,18 @@ export function tailscaleAdvice(status) {
     link: TAILSCALE_DOWNLOAD,
   };
 }
+
+const RELAY_HOST = /^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+
+// The relay details the PC hands over (in the pairing QR code or over the connection the phone already has). Only a
+// well-formed host, port, 32-hex office id and 64-hex key are kept; the phone's own code checks them again.
+export function acceptableRelay(offer) {
+  if (!offer || typeof offer !== "object") return null;
+  const host = typeof offer.host === "string" ? offer.host.trim().toLowerCase() : "";
+  const port = Number(offer.port);
+  if (!host || host.length > 253 || !RELAY_HOST.test(host)) return null;
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
+  if (!/^[0-9a-f]{32}$/.test(String(offer.office))) return null;
+  if (!/^[0-9a-f]{64}$/.test(String(offer.key))) return null;
+  return { host, port, office: offer.office, key: offer.key };
+}
