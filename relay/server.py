@@ -18,7 +18,9 @@ import argparse
 import asyncio
 import hashlib
 import hmac
+import json
 import logging
+import os
 import re
 import secrets
 import ssl
@@ -41,6 +43,7 @@ class _Office:
     def __init__(self, secret_hash: str, key_hash: str):
         self.secret_hash = secret_hash
         self.key_hash = key_hash
+        self.last_seen = time.monotonic()
         self.control = None  # the PC's control StreamWriter while it is connected
         self.last_pong = time.monotonic()
         self.pending = {}  # session -> _Waiting
@@ -54,7 +57,8 @@ class _Waiting:
 
 class RelayServer:
     def __init__(self, pending_timeout=10.0, handshake_timeout=8.0, rate_limit=20, rate_window=60.0, max_pending=8,
-                 max_active=5000, max_offices=10000, idle_timeout=900.0, ping_interval=25.0, max_per_ip=60):
+                 max_active=5000, max_offices=10000, idle_timeout=900.0, ping_interval=25.0, max_per_ip=60,
+                 office_ttl=86400.0, max_new_offices_per_ip=10, new_office_window=3600.0, state_file=None):
         self.pending_timeout = pending_timeout
         self.handshake_timeout = handshake_timeout
         self.rate_limit = rate_limit  # failed handshakes per address per window before it is turned away
@@ -65,12 +69,61 @@ class RelayServer:
         self.idle_timeout = idle_timeout
         self.ping_interval = ping_interval
         self.max_per_ip = max_per_ip
+        self.office_ttl = office_ttl  # an office whose PC has been gone this long is forgotten (it can register again)
+        self.max_new_offices_per_ip = max_new_offices_per_ip  # new offices one address may create per window
+        self.new_office_window = new_office_window
+        self.state_file = state_file
+        self._new_offices = defaultdict(deque)
         self.offices = {}
+        self._load_state()
         self.active = 0
         self._failures = defaultdict(deque)
         self._open_by_ip = defaultdict(int)
         self._writers = set()
         self._tasks = set()
+
+    # --- who owns which office (only the SHA-256 of each PC's secret is kept, and it survives a restart) ---
+
+    def _load_state(self) -> None:
+        if not self.state_file:
+            return
+        try:
+            with open(self.state_file, encoding="utf-8") as f:
+                stored = json.load(f)
+            for office_id, secret_hash in stored.items():
+                if _OFFICE.fullmatch(office_id) and isinstance(secret_hash, str) and _SECRET.fullmatch(secret_hash):
+                    self.offices[office_id] = _Office(secret_hash, "")  # no phone is let in until the PC reconnects
+        except (OSError, ValueError, AttributeError):
+            log.warning("could not read %s - starting without remembered offices", self.state_file)
+
+    def _save_state(self) -> None:
+        if not self.state_file:
+            return
+        try:
+            with open(self.state_file + ".tmp", "w", encoding="utf-8") as f:
+                json.dump({oid: o.secret_hash for oid, o in self.offices.items()}, f)
+            os.replace(self.state_file + ".tmp", self.state_file)
+        except OSError:
+            log.warning("could not save %s", self.state_file)
+
+    def _purge(self) -> None:
+        """Forget offices nobody has used for a long time, so they cannot pile up (a connected PC is never forgotten)."""
+        cutoff = time.monotonic() - self.office_ttl
+        gone = [oid for oid, o in self.offices.items() if o.control is None and not o.pending and o.last_seen < cutoff]
+        for oid in gone:
+            del self.offices[oid]
+        if gone:
+            self._save_state()
+
+    def _may_create_office(self, ip: str) -> bool:
+        recent = self._new_offices[ip]
+        cutoff = time.monotonic() - self.new_office_window
+        while recent and recent[0] < cutoff:
+            recent.popleft()
+        if len(recent) >= self.max_new_offices_per_ip:
+            return False
+        recent.append(time.monotonic())
+        return True
 
     # --- helpers ---
 
@@ -159,12 +212,14 @@ class RelayServer:
         if not (_OFFICE.fullmatch(office_id) and _SECRET.fullmatch(pc_secret) and _SECRET.fullmatch(key_hash)):
             self._failed(ip)
             return False
+        self._purge()
         office = self.offices.get(office_id)
         if office is None:
-            if len(self.offices) >= self.max_offices:
+            if len(self.offices) >= self.max_offices or not self._may_create_office(ip):
                 await self._say(writer, "BUSY")
                 return False
             office = self.offices[office_id] = _Office(_sha(pc_secret), key_hash)
+            self._save_state()
         elif not hmac.compare_digest(office.secret_hash, _sha(pc_secret)):
             self._failed(ip)
             await self._say(writer, "DENIED")
@@ -181,12 +236,13 @@ class RelayServer:
                 if not said:
                     break
                 if said.strip() == b"PONG":
-                    office.last_pong = time.monotonic()
+                    office.last_pong = office.last_seen = time.monotonic()
         except (ConnectionError, asyncio.CancelledError):
             pass
         finally:
             pinger.cancel()
             if office.control is writer:
+                office.last_seen = time.monotonic()
                 office.control = None
                 for waiting in office.pending.values():
                     if not waiting.data.done():
@@ -286,8 +342,8 @@ class RelayServer:
             self._close(b_writer)
 
 
-async def serve(host: str, port: int, cert: str = None, key: str = None) -> None:
-    relay = RelayServer()
+async def serve(host: str, port: int, cert: str = None, key: str = None, state: str = None) -> None:
+    relay = RelayServer(state_file=state)
     context = None
     if cert and key:
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -305,9 +361,10 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8447)
     parser.add_argument("--cert", help="TLS certificate chain (PEM); with --key the relay speaks TLS itself")
     parser.add_argument("--key", help="TLS private key (PEM)")
+    parser.add_argument("--state", help="file that remembers which PC owns which office across restarts (recommended)")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
-    asyncio.run(serve(args.host, args.port, args.cert, args.key))
+    asyncio.run(serve(args.host, args.port, args.cert, args.key, args.state))
 
 
 if __name__ == "__main__":

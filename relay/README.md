@@ -30,8 +30,8 @@ Protocol (one text line, then raw bytes) is documented at the top of `relay/serv
 Needs only Python 3.10+ (standard library, nothing to install):
 
 ```bash
-python -m relay.server --port 8447 --cert /etc/letsencrypt/live/relay.example.com/fullchain.pem \
-                                   --key  /etc/letsencrypt/live/relay.example.com/privkey.pem
+python -m relay.server --port 8447 --state /var/lib/sandveld-relay/state.json \
+   --cert /etc/letsencrypt/live/relay.example.com/fullchain.pem --key /etc/letsencrypt/live/relay.example.com/privkey.pem
 ```
 
 * Without `--cert/--key` it speaks plain TCP: **use that only on a private network or behind something that adds TLS.**
@@ -74,7 +74,10 @@ WantedBy=multi-user.target
 
 ## Good to know
 
-* State is in memory. If the relay restarts, PCs reconnect by themselves within a few seconds (they back off up to 30 s);
+* `--state` keeps (only) a hash of each PC's secret on disk, so after a restart nobody who learnt an office id can take
+  the office over; without it a restart forgets who owns what. Offices unused for 24 hours are forgotten, and one
+  address can create only 10 new offices an hour.
+* If the relay restarts, PCs reconnect by themselves within a few seconds (they back off up to 30 s);
   phones in the middle of a request see an error and the next call works.
 * Who the relay sees: network addresses and connection times of PCs and phones, never what they say.
 * A phone that was removed or lost still holds the relay key. Removing it on the PC already stops it using the PC

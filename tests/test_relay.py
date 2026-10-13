@@ -3,6 +3,8 @@ joined to a fresh connection the PC opens back, and the bytes are passed through
 phone and the PC, so the relay can't read them). Tests run the real server on a local port with a fake PC and phone."""
 import asyncio
 import hashlib
+import os
+import tempfile
 import unittest
 
 from relay.server import RelayServer
@@ -198,6 +200,81 @@ class LimitTests(unittest.IsolatedAsyncioTestCase):
         await server.wait_closed()
         await relay.close()
         self.assertEqual(third, "BUSY")
+
+
+def _office(n):
+    return f"{n:032x}"
+
+
+async def _register(port, office, secret=PC_SECRET):
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    writer.write(f"PC {office} {secret} {KEY_HASH}\n".encode())
+    await writer.drain()
+    answer = (await asyncio.wait_for(reader.readline(), 3)).decode().strip()
+    return answer, writer
+
+
+class AbuseTests(unittest.IsolatedAsyncioTestCase):
+    async def serve(self, **options):
+        self.relay = RelayServer(rate_limit=1000, **options)
+        self.server = await asyncio.start_server(self.relay.handle, "127.0.0.1", 0)
+        self.port = self.server.sockets[0].getsockname()[1]
+        self.writers = []
+
+    async def asyncTearDown(self):
+        for w in self.writers:
+            w.close()
+        self.server.close()
+        await self.server.wait_closed()
+        await self.relay.close()
+
+    async def test_one_address_cannot_register_a_flood_of_offices(self):
+        await self.serve(max_new_offices_per_ip=3)
+        answers = []
+        for n in range(6):
+            answer, writer = await _register(self.port, _office(n + 1))
+            self.writers.append(writer)
+            answers.append(answer)
+        self.assertEqual(answers[:3], ["OK"] * 3)
+        self.assertEqual(set(answers[3:]), {"BUSY"})
+        self.assertEqual(len(self.relay.offices), 3)
+
+    async def test_an_office_that_has_gone_quiet_is_forgotten_but_a_connected_one_never_is(self):
+        await self.serve(office_ttl=0.05)
+        _, quiet = await _register(self.port, _office(1))
+        _, kept = await _register(self.port, _office(2))
+        self.writers.append(kept)
+        quiet.close()
+        await asyncio.sleep(0.3)
+        answer, writer = await _register(self.port, _office(3))  # any registration tidies up
+        self.writers.append(writer)
+        self.assertNotIn(_office(1), self.relay.offices)
+        self.assertIn(_office(2), self.relay.offices)
+
+    async def test_who_owns_an_office_survives_a_restart_of_the_relay(self):
+        state = os.path.join(tempfile.mkdtemp(), "relay-state.json")
+        await self.serve(state_file=state)
+        answer, writer = await _register(self.port, _office(7))
+        self.assertEqual(answer, "OK")
+        writer.close()
+        self.server.close()
+        await self.server.wait_closed()
+        await self.relay.close()
+        # the relay starts again: a stranger who learnt the office id still cannot take it over
+        await self.serve(state_file=state)
+        thief, w1 = await _register(self.port, _office(7), secret="9" * 64)
+        owner, w2 = await _register(self.port, _office(7))
+        self.writers += [w1, w2]
+        self.assertEqual((thief, owner), ("DENIED", "OK"))
+
+    async def test_a_damaged_state_file_means_a_fresh_start_not_a_crash(self):
+        state = os.path.join(tempfile.mkdtemp(), "relay-state.json")
+        with open(state, "w") as f:
+            f.write("{not json")
+        await self.serve(state_file=state)
+        answer, writer = await _register(self.port, _office(1))
+        self.writers.append(writer)
+        self.assertEqual(answer, "OK")
 
 
 if __name__ == "__main__":
