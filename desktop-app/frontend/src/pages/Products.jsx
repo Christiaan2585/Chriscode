@@ -42,6 +42,13 @@ const ViewButton = ({ active, onClick, Icon, children }) => (
 // Spreadsheet-style table: every cell is editable in place.
 const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, selection }) => {
   const patch = useProductPatch();
+  const queryClient = useQueryClient();
+  // A count is its own action (it is written to the stock history), not a field edit.
+  const count = useMutation({
+    mutationFn: ({ id, quantity }) => apiClient.post(`/products/${id}/stock-count`, { quantity }).then((r) => r.data),
+    onSettled: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); queryClient.invalidateQueries({ queryKey: ["dashboard"] }); },
+  });
+  const saveCount = (id) => (value) => count.mutateAsync({ id, quantity: value ?? 0 });
   const save = (id, field) => (value) => patch.mutateAsync({ id, changes: { [field]: value } });
   // Cost keeps the standard markup in step, same as the full product form.
   const saveCost = (id) => (value) => patch.mutateAsync({ id, changes: { cost: value, ...recomputeFromCost(value) } });
@@ -54,7 +61,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
           <tr>
             <SelectAllTh selection={selection} />
             {["Product", "Code", "Category", "Pack Size", "Packaging"].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}
-            {["Cost", "Excl VAT", "Incl VAT"].map((h) => <th key={h} className="px-4 py-3 font-medium text-right">{h}</th>)}
+            {["Stock", "Reorder at", "Cost", "Excl VAT", "Incl VAT"].map((h) => <th key={h} className="px-4 py-3 font-medium text-right">{h}</th>)}
             <th className="px-4 py-3 font-medium text-right">Actions</th>
           </tr>
         </thead>
@@ -78,6 +85,10 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
               <td data-label="Category" className={`${cell} text-slate-500`}><InlineEdit value={p.category} onSave={save(p.id, "category")} label="Category" placeholder="—" listId="product-categories" /></td>
               <td data-label="Pack size" className={`${cell} text-slate-500`}><InlineEdit value={p.pack_size} onSave={save(p.id, "pack_size")} label="Pack size" type="number" placeholder="—" /></td>
               <td data-label="Packaging" className={`${cell} text-slate-500`}><InlineEdit value={p.packaging} onSave={save(p.id, "packaging")} label="Packaging" placeholder="—" /></td>
+              <td data-label="Stock" className={`${cell} text-right ${p.stock_quantity != null && p.reorder_level != null && p.stock_quantity <= p.reorder_level ? "font-semibold text-red-700" : "text-slate-600"}`}>
+                <InlineEdit value={p.stock_quantity} onSave={saveCount(p.id)} label="Stock on the shelf (a count)" type="number" placeholder="Count" />
+              </td>
+              <td data-label="Reorder at" className={`${cell} text-right text-slate-500`}><InlineEdit value={p.reorder_level} onSave={save(p.id, "reorder_level")} label="Reorder level" type="number" placeholder="—" /></td>
               <td data-label="Cost" className={`${cell} text-right text-slate-600`}><InlineEdit value={p.cost} onSave={saveCost(p.id)} label="Cost" type="number" format={money} placeholder="—" /></td>
               <td data-label="Price excl VAT" className={`${cell} text-right text-slate-600`}><InlineEdit value={p.price_excl_vat} onSave={save(p.id, "price_excl_vat")} label="Selling price excl VAT" type="number" format={money} placeholder="—" /></td>
               <td data-label="Price incl VAT" data-key className={`${cell} text-right font-semibold text-slate-800`}><InlineEdit value={p.price} onSave={save(p.id, "price")} label="Selling price incl VAT" type="number" required format={money} /></td>
@@ -94,7 +105,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
             </tr>
           ))}
           {products.length === 0 && (
-            <tr><td colSpan={10} className="px-6 py-12 text-center text-slate-400">No products match.</td></tr>
+            <tr><td colSpan={12} className="px-6 py-12 text-center text-slate-400">No products match.</td></tr>
           )}
         </tbody>
       </table>

@@ -120,10 +120,10 @@ export const WeatherGlance = () => {
 };
 
 export const LowStock = ({ data }) => (
-  <Panel icon={<PackageX size={18} className="text-red-500" />} title="Out of stock">
+  <Panel icon={<PackageX size={18} className="text-red-500" />} title="Low or out of stock">
     {!data || data.count === 0 ? <p className="text-sm text-slate-400">Everything is in stock.</p> : (
       <>
-        <ul className="space-y-1 text-sm text-slate-700">{data.items.map((p) => <li key={p.id}>{p.name}</li>)}</ul>
+        <ul className="space-y-1 text-sm text-slate-700">{data.items.map((p) => <li key={p.id}>{p.name}{p.stock_quantity != null && <span className="text-slate-500"> - {p.stock_quantity} left</span>}</li>)}</ul>
         {data.count > data.items.length && <p className="mt-1 text-xs text-slate-500">and {data.count - data.items.length} more</p>}
         <Link to="/products" className="mt-3 inline-block text-sm font-medium text-emerald-700 hover:underline">Open products</Link>
       </>
