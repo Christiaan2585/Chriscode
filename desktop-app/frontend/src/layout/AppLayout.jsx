@@ -12,6 +12,7 @@ import OutboxBadge from "../components/OutboxBadge";
 import OfflineSupport from "../components/OfflineSupport";
 import SyncStatus from "../components/SyncStatus";
 import AutoLock from "../components/AutoLock";
+import Reminders from "../components/Reminders";
 import WhatsNew from "../components/WhatsNew";
 import { AndroidUpdatePrompt } from "../components/AndroidUpdate";
 import { isNative } from "../utils/pairing";
@@ -48,6 +49,7 @@ const AppLayout = () => {
   return (
     <div className="app-bg flex h-screen bg-slate-50 text-slate-900 font-sans">
       <AutoLock />
+      <Reminders />
       <WhatsNew />
       {isNative() && <AndroidUpdatePrompt />}
       <OfflineSupport />

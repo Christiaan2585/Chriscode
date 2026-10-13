@@ -17,6 +17,7 @@ import ActivityLog from "./ActivityLog";
 import AccountCard from "./AccountCard";
 import AppearanceSettings from "./AppearanceSettings";
 import AutoLockSetting from "./AutoLockSetting";
+import RemindersSetting from "./RemindersSetting";
 import BackupSettings from "./BackupSettings";
 import {
   CalculatorPanel, CalendarPanel, ClientsPanel, InvoicesPanel, OrdersPanel, ProductsPanel, PurchaseOrdersPanel,
@@ -68,6 +69,7 @@ const MyDetailsPanel = () => {
 const SecurityPanel = () => (
   <>
     <AutoLockSetting />
+    <RemindersSetting />
     <SecuritySettings />
   </>
 );

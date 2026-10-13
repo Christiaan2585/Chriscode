@@ -10,7 +10,7 @@ const input = "w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline
 
 // Everything that changes when money is recorded: the invoice lists, balances, client pages and the dashboard.
 export const refreshMoney = (queryClient) =>
-  ["invoices", "invoice-balances", "invoice-settlement", "client-summary", "dashboard", "aged-debtors"].forEach((key) =>
+  ["invoices", "invoice-balances", "invoice-settlement", "client-summary", "analytics", "aged-debtors"].forEach((key) =>
     queryClient.invalidateQueries({ queryKey: [key] }));
 
 // An invoice's payments and credit notes, its balance, and the forms to add either (app/api/payments.py).

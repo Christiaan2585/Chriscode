@@ -647,7 +647,7 @@ function registerPermissionHandler() {
       }).then((result) => callback(result.response === 0));
       return;
     }
-    callback(false);
+    callback(permission === 'notifications'); // the daily reminder (components/Reminders.jsx)
   });
 }
 
@@ -720,6 +720,7 @@ if (!app.requestSingleInstanceLock()) {
     }
   });
   app.whenReady().then(() => {
+    app.setAppUserModelId('com.sandveldveedienste.app'); // so Windows shows notifications under this app's name
     registerPermissionHandler();
     secretStore.install({ ipcMain, safeStorage, dir: app.getPath('userData') });
     registerContentSecurityPolicy();
