@@ -51,8 +51,13 @@ def read_settings(session: Session = Depends(get_session)):
 @router.put("/settings", dependencies=[Depends(require_admin)])
 def save_settings(body: MailSettingsIn, session: Session = Depends(get_session)):
     row = session.get(MailSettings, 1) or MailSettings(id=1)
+    username = (body.username or "").strip() or None
+    # The saved password only ever goes to the server and user it was entered for: moving it to a different
+    # host would let anyone with an admin session read it back by pointing the app at their own server.
+    if row.password and not body.password and (row.host.lower() != body.host.lower() or row.username != username):
+        raise HTTPException(status_code=422, detail="Enter the password again when you change the mail server or user name")
     row.host, row.port, row.security = body.host, body.port, body.security
-    row.username = (body.username or "").strip() or None
+    row.username = username
     row.from_address, row.from_name = body.from_address, (body.from_name or "").strip() or None
     if body.password:
         row.password = field_crypto.encrypt(body.password)

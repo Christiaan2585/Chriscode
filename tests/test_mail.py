@@ -73,6 +73,21 @@ class SettingsTests(MailCase):
         self.configure(password=None, from_name="Kantoor")
         self.assertEqual(field_crypto.decrypt(self.s.get(MailSettings, 1).password), "s3cret pass")
 
+    def test_the_saved_password_is_never_handed_to_a_different_server_or_user(self):
+        self.configure()
+        for change in (dict(host="evil.example.net"), dict(username="someone@else.com"), dict(host="SMTP.EXAMPLE.COM.evil.net")):
+            with self.assertRaises(HTTPException) as ctx:
+                self.configure(password=None, **change)
+            self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(self.s.get(MailSettings, 1).host, "smtp.example.com")  # the refused change was not saved
+        self.configure(password="new password", host="evil.example.net")  # typing the password again is allowed
+        self.assertEqual(field_crypto.decrypt(self.s.get(MailSettings, 1).password), "new password")
+
+    def test_the_same_server_in_other_capitals_keeps_the_password(self):
+        self.configure()
+        self.configure(password=None, host="SMTP.Example.com")
+        self.assertEqual(field_crypto.decrypt(self.s.get(MailSettings, 1).password), "s3cret pass")
+
     def test_status_says_whether_sending_is_set_up(self):
         self.assertFalse(mail_api.status(session=self.s)["configured"])
         self.configure()
