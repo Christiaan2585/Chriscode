@@ -11,11 +11,13 @@ from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from app.api.business import get_business
+from app.core import brochures
 from app.core import catalogue_library as lib
 from app.core import kyron_catalogue as kc
 from app.core.db import get_session
 from app.core.pdf import _logo_bytes
 from app.core.security import require_admin
+from app.models.brochure import BrochureSend
 from app.models.catalogue import CatalogueLink
 from app.models.client import Client
 from app.models.product import Product
@@ -204,7 +206,39 @@ def rename_in_library(catalogue_id: str, data: RenameRequest):
 
 
 @router.delete("/library/{catalogue_id}", dependencies=[Depends(require_admin)])
-def delete_from_library(catalogue_id: str):
+def delete_from_library(catalogue_id: str, session: Session = Depends(get_session)):
     if not lib.remove_catalogue(catalogue_id):
         raise HTTPException(status_code=404, detail="That catalogue isn't in the list")
+    for row in session.exec(select(BrochureSend).where(BrochureSend.catalogue_id == catalogue_id)).all():
+        session.delete(row)
+    session.commit()
     return {"ok": True}
+
+
+# --- Sending a brochure to chosen clients (any signed-in user; app/core/brochures.py) ---
+
+class EmailClientsRequest(BaseModel):
+    client_ids: List[int] = Field(min_length=1, max_length=brochures.MAX_CLIENTS)
+    subject: str = Field(min_length=1, max_length=200)
+    message: str = Field(default="", max_length=5000)  # {name} becomes each client's own name
+
+
+class SentNote(BaseModel):
+    client_id: int
+    via: Literal["whatsapp"]  # emails are recorded by the server itself
+
+
+@router.post("/library/{catalogue_id}/email")
+def email_brochure(catalogue_id: str, data: EmailClientsRequest, session: Session = Depends(get_session)):
+    return brochures.email_to_clients(session, catalogue_id, data.client_ids, data.subject, data.message)
+
+
+@router.post("/library/{catalogue_id}/sent")
+def note_brochure_sent(catalogue_id: str, data: SentNote, session: Session = Depends(get_session)):
+    brochures.record_send(session, catalogue_id, data.client_id, data.via)
+    return {"ok": True}
+
+
+@router.get("/library/{catalogue_id}/sends")
+def brochure_sends(catalogue_id: str, session: Session = Depends(get_session)):
+    return brochures.latest_sends(session, catalogue_id)

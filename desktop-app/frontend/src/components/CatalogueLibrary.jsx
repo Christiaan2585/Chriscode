@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Download, Eye, Plus } from "lucide-react";
+import { BookOpen, Download, Eye, PackagePlus, Plus, Send } from "lucide-react";
 import apiClient from "../api/client";
+import BrochureProducts from "./BrochureProducts";
 import DocumentPreview from "./DocumentPreview";
+import SendBrochureDialog from "./SendBrochureDialog";
 import InlineEdit from "./InlineEdit";
 import { BulkBar, SelectBox } from "./BulkSelect";
 import { fetchDocumentPdf, saveBlob } from "../utils/documents";
@@ -21,6 +23,8 @@ const CatalogueLibrary = ({ canEdit }) => {
   const queryClient = useQueryClient();
   const { data: books = [] } = useQuery({ queryKey: LIBRARY, queryFn: async () => (await apiClient.get("/catalogue/library")).data });
   const [preview, setPreview] = useState(null);
+  const [sending, setSending] = useState(null); // the brochure being sent to clients
+  const [addingFrom, setAddingFrom] = useState(null); // the brochure products are being added from
   const [progress, setProgress] = useState(null); // {done, total, failed: [..]}
   const selection = useSelection(books.map((b) => b.id));
   const refresh = () => queryClient.invalidateQueries({ queryKey: LIBRARY });
@@ -53,15 +57,15 @@ const CatalogueLibrary = ({ canEdit }) => {
   const download = async (book) => saveBlob(await fetchDocumentPdf("catalogue-library", book.id, `/catalogue/library/${book.id}.pdf`), `${book.name}.pdf`);
 
   return (
-    <section aria-label="More catalogues" className="space-y-3 border-t border-slate-200 p-4">
+    <section aria-label="Brochures and catalogues" className="space-y-3 border-t border-slate-200 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="flex items-center gap-2 text-lg font-bold text-slate-800">
-          <BookOpen size={18} className="text-emerald-600" /> More catalogues <span className="text-sm font-normal text-slate-400">{books.length}</span>
+          <BookOpen size={18} className="text-emerald-600" /> Brochures &amp; catalogues <span className="text-sm font-normal text-slate-400">{books.length}</span>
         </h3>
         {canEdit && (
           <label className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-emerald-400 ${progress && progress.done < progress.total ? "pointer-events-none opacity-50" : ""}`}>
             <Plus size={16} />
-            {progress && progress.done < progress.total ? `Adding ${progress.done + 1} of ${progress.total}…` : "Add a catalogue"}
+            {progress && progress.done < progress.total ? `Adding ${progress.done + 1} of ${progress.total}…` : "Add a brochure or catalogue"}
             <input type="file" multiple accept="application/pdf,.pdf" className="sr-only"
               onChange={(e) => { const files = [...e.target.files]; e.target.value = ""; if (files.length) addFiles(files); }} />
           </label>
@@ -85,8 +89,8 @@ const CatalogueLibrary = ({ canEdit }) => {
 
       {books.length === 0 ? (
         <p className="text-sm text-slate-500">
-          {canEdit ? "No other catalogues yet. Add a PDF and it is listed here; add more and each one goes below the last."
-            : "No other catalogues have been added yet."}
+          {canEdit ? "No brochures yet. Add a PDF and it is listed here; you can send it to clients and add its products to your list."
+            : "No brochures have been added yet."}
         </p>
       ) : (
         <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
@@ -99,6 +103,8 @@ const CatalogueLibrary = ({ canEdit }) => {
                 </div>
                 <div className="text-xs text-slate-400">{book.pages} {book.pages === 1 ? "page" : "pages"} · {sizeLabel(book.size)} · added {shortDate(book.uploaded_at)}</div>
               </div>
+              <button type="button" onClick={() => setSending(book)} title="Send to clients" aria-label={`Send ${book.name} to clients`} className={iconButton}><Send size={16} /></button>
+              <button type="button" onClick={() => setAddingFrom(book)} title="Add its products to the products list" aria-label={`Add products from ${book.name}`} className={iconButton}><PackagePlus size={16} /></button>
               <button type="button" onClick={() => open(book)} title="View" aria-label={`View ${book.name}`} className={iconButton}><Eye size={16} /></button>
               <button type="button" onClick={() => download(book)} title="Download" aria-label={`Download ${book.name}`} className={iconButton}><Download size={16} /></button>
             </li>
@@ -106,6 +112,8 @@ const CatalogueLibrary = ({ canEdit }) => {
         </ul>
       )}
       <DocumentPreview doc={preview} onClose={() => setPreview(null)} />
+      {sending && <SendBrochureDialog book={sending} onClose={() => setSending(null)} />}
+      {addingFrom && <BrochureProducts book={addingFrom} onClose={() => setAddingFrom(null)} />}
     </section>
   );
 };
