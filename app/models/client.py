@@ -11,6 +11,7 @@ class Client(SQLModel, table=True):
     postal_address: Optional[str] = None
     vat_number: Optional[str] = None
     farm_name: Optional[str] = None
+    town: Optional[str] = None  # the farm's town or area - the Clients list filters and sorts by it
     # When this client was given the standard herding program (or already had a
     # program). Set once, so deleting a client's program doesn't bring it back.
     standard_program_at: Optional[datetime] = None

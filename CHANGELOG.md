@@ -2,6 +2,13 @@
 
 All notable changes to Sandveld Vee Dienste. Newest first.
 
+## 1.0.13 - 2026-10-14
+
+### New
+- **Brochures**: the catalogue library (Products) now takes any PDF as a brochure. "Send to clients" ticks any number of clients: email goes out in one go through the business's own mail server (one message each, `{name}` becomes the client's own name, clients without an address are skipped and named, a refused address is reported and the rest carry on, a mail server that is down stops the run at once), WhatsApp is one client at a time as for order forms; every send is remembered (`BrochureSend`) so the list shows who already has it.
+- **Add products from a brochure**: its pages are drawn in the app (pdf.js); draw a box round a product and the selection snaps to the product's own outline (edge found from the colours around the box, holes filled, cut out on white; a sensitivity slider and a plain-box fallback), type the name and price and it is added to the products list with that picture.
+- **Clients: filter and sort by town and animals**: a Town / area field on every client (also read from a Town/Area/City/Dorp/District/Streek column when importing), and the Clients list can be filtered by town and by a minimum/maximum number of animals and sorted by name, most/fewest animals or town. The animal number is the same one the client page shows (the newest program that has a headcount); clients with no headcount are left out of an animal filter and sorted last.
+
 ## 1.0.12 - 2026-10-13
 
 ### New

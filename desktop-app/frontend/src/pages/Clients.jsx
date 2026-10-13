@@ -11,8 +11,10 @@ import { toTelLink, toWhatsAppLink } from "../utils/contact";
 import Modal from "../components/Modal";
 import { ClientHover } from "../components/PreviewCards";
 import { farmLabel } from "../utils/format";
+import { NO_TOWN, SORTS, filterAndSort, townsOf } from "../utils/clientList";
 
-const emptyClient = { name: "", email: "", phone: "", address: "", postal_address: "", vat_number: "", farm_name: "" };
+const emptyClient = { name: "", email: "", phone: "", address: "", postal_address: "", vat_number: "", farm_name: "", town: "" };
+const filterInput = "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
 
 const Clients = () => {
   const navigate = useNavigate();
@@ -21,10 +23,20 @@ const Clients = () => {
   const [editingId, setEditingId] = useState(null); // null = "add" mode, id = "edit" mode
   const [form, setForm] = useState(emptyClient);
   const [search, setSearch] = useState("");
+  const [town, setTown] = useState("");
+  const [minAnimals, setMinAnimals] = useState("");
+  const [maxAnimals, setMaxAnimals] = useState("");
+  const [sort, setSort] = useState("name");
 
   const { data: clients, isLoading } = useQuery({
     queryKey: ["clients"],
     queryFn: clientService.getAll
+  });
+
+  // {client id: animals on the farm} - the number the client page shows; missing = not recorded
+  const { data: headcounts = {} } = useQuery({
+    queryKey: ["client-headcounts"],
+    queryFn: async () => (await apiClient.get("/clients/headcounts")).data,
   });
 
   const addMutation = useMutation({
@@ -82,6 +94,7 @@ const Clients = () => {
       postal_address: client.postal_address || "",
       vat_number: client.vat_number || "",
       farm_name: client.farm_name || "",
+      town: client.town || "",
     });
     setIsModalOpen(true);
   };
@@ -94,16 +107,10 @@ const Clients = () => {
     }
   };
 
-  const filtered = (clients || []).filter((c) => {
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      c.name?.toLowerCase().includes(q) ||
-      c.farm_name?.toLowerCase().includes(q) ||
-      c.email?.toLowerCase().includes(q) ||
-      c.phone?.toLowerCase().includes(q)
-    );
-  });
+  const filtered = filterAndSort(clients || [], headcounts, { search, town, minAnimals, maxAnimals, sort });
+  const towns = townsOf(clients || []);
+  const narrowed = Boolean(search.trim() || town || minAnimals !== "" || maxAnimals !== "" || sort !== "name");
+  const clearFilters = () => { setSearch(""); setTown(""); setMinAnimals(""); setMaxAnimals(""); setSort("name"); };
   const selection = useSelection((filtered).map((r) => r.id));
 
   useOpenNew(() => openAddModal()); // from the dashboard's quick actions (?new=1)
@@ -133,10 +140,28 @@ const Clients = () => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search clients by name, farm, email or phone..."
+              placeholder="Search clients by name, farm, town, email or phone..."
               className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
+        </div>
+        <div className="flex flex-wrap items-end gap-3 border-b border-slate-200 bg-white px-4 py-3" role="group" aria-label="Filter and sort clients">
+          <label className="text-xs text-slate-500">Town / area
+            <select className={`${filterInput} mt-1 block`} value={town} onChange={(e) => setTown(e.target.value)}>
+              <option value="">All towns</option>
+              {towns.map((t) => <option key={t} value={t}>{t}</option>)}
+              <option value={NO_TOWN}>No town set</option>
+            </select></label>
+          <label className="text-xs text-slate-500">Animals from
+            <input className={`${filterInput} mt-1 block w-28`} type="number" min="0" inputMode="numeric" placeholder="any" value={minAnimals} onChange={(e) => setMinAnimals(e.target.value)} /></label>
+          <label className="text-xs text-slate-500">to
+            <input className={`${filterInput} mt-1 block w-28`} type="number" min="0" inputMode="numeric" placeholder="any" value={maxAnimals} onChange={(e) => setMaxAnimals(e.target.value)} /></label>
+          <label className="text-xs text-slate-500">Sort by
+            <select className={`${filterInput} mt-1 block`} value={sort} onChange={(e) => setSort(e.target.value)}>
+              {SORTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select></label>
+          {narrowed && <button type="button" onClick={clearFilters} className="pb-2 text-sm text-emerald-700 hover:underline">Clear filters</button>}
+          <p className="ml-auto pb-2 text-xs text-slate-500" aria-live="polite">Showing {filtered.length} of {clients?.length || 0}</p>
         </div>
         <div className="space-y-2 p-3 empty:hidden">
           <BulkBar selection={selection} noun="client" describe={(id) => farmLabel(clients?.find((r) => r.id === id)) || `#${id}`}
@@ -150,7 +175,8 @@ const Clients = () => {
               <SelectAllTh selection={selection} />
               <th className="px-6 py-3 font-medium">Farm</th>
               <th className="px-6 py-3 font-medium">Contact</th>
-              <th className="px-6 py-3 font-medium">Location</th>
+              <th className="px-6 py-3 font-medium">Town &amp; address</th>
+              <th className="px-6 py-3 font-medium text-right">Animals</th>
               <th className="px-6 py-3 font-medium text-right">Actions</th>
             </tr>
           </thead>
@@ -178,7 +204,13 @@ const Clients = () => {
                     <div>{client.email || "—"}</div>
                     <div className="text-xs text-slate-400">{client.phone || ""}</div>
                   </td>
-                  <td data-label="Location" data-wide className="px-6 py-4 text-slate-600">{client.address}</td>
+                  <td data-label="Town & address" data-wide className="px-6 py-4 text-slate-600">
+                    {client.town && <div className="font-medium text-slate-700">{client.town}</div>}
+                    <div className={client.town ? "text-xs text-slate-400" : ""}>{client.address}</div>
+                  </td>
+                  <td data-label="Animals" className="px-6 py-4 text-right text-slate-700">
+                    {headcounts[client.id] !== undefined ? headcounts[client.id].toLocaleString() : <span className="text-slate-300">—</span>}
+                  </td>
                   <td data-actions className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-1">
                       {telLink && (
@@ -226,8 +258,8 @@ const Clients = () => {
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
-                  {clients?.length ? "No clients match your search." : "No clients yet - add your first one above."}
+                <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                  {clients?.length ? "No clients match your search or filters." : "No clients yet - add your first one above."}
                 </td>
               </tr>
             )}
@@ -276,6 +308,19 @@ const Clients = () => {
                 className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Town / area</label>
+            <input
+              type="text"
+              list="client-towns"
+              maxLength={100}
+              value={form.town}
+              onChange={(e) => setForm({ ...form, town: e.target.value })}
+              placeholder="e.g. Prieska"
+              className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+            />
+            <datalist id="client-towns">{towns.map((t) => <option key={t} value={t} />)}</datalist>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>

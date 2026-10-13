@@ -3,6 +3,20 @@
 // people will notice. (Never put the business's program steps, products or doses here: the repository is public.)
 export const NOTES = [
   {
+    version: "1.0.13",
+    title: "Brochures, and finding clients by town and herd size",
+    sections: [
+      {
+        heading: "New",
+        items: [
+          "Brochures: add a PDF brochure (Products > Brochures & catalogues) and send it to as many clients as you tick - by email in one click (each client gets their own name in the greeting), or by WhatsApp one client at a time. The list shows who already got it.",
+          "Add the brochure's products to your products list: open its pages, draw a box round a product and the picture snaps to the product's own outline. Type the name and price and it is added with that picture.",
+          "Clients: filter by town or area and by the number of animals, and sort by name, most or fewest animals, or town. Each client now has a Town / area field (it can also be imported from a spreadsheet).",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.12",
     title: "Money, reports, stock and email",
     sections: [

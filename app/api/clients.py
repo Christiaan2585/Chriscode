@@ -35,6 +35,7 @@ _COLUMN_ALIASES = {
     "phone": ["phone", "cell", "cellphone", "cell number", "telephone", "tel", "contact number", "mobile"],
     "address": ["address", "farm address", "physical address", "postal address"],
     "farm_name": ["farm_name", "farm name", "farm", "business name"],
+    "town": ["town", "area", "city", "dorp", "district", "streek"],
 }
 
 @router.post("/", response_model=Client)
@@ -129,6 +130,22 @@ def delete_tax_certificate(client_id: int, session: Session = Depends(get_sessio
 def read_clients(session: Session = Depends(get_session)):
     clients = session.exec(select(Client)).all()
     return clients
+
+@router.get("/headcounts")
+def headcounts(session: Session = Depends(get_session)):
+    """{client id: animals on the farm} for the Clients list - the same number as the client page's "The farm" card:
+    the headcounts of the client's newest program that has any. A client with no headcount is simply not in the answer."""
+    rows = session.exec(
+        select(HerdingProgram.client_id, AnimalGroup.program_id, AnimalGroup.group_size)
+        .join(HerdingProgram, AnimalGroup.program_id == HerdingProgram.id)
+        .order_by(HerdingProgram.created_at.desc(), HerdingProgram.id.desc())
+    ).all()
+    newest, totals = {}, {}
+    for client_id, program_id, size in rows:
+        if newest.setdefault(client_id, program_id) == program_id:
+            totals[client_id] = totals.get(client_id, 0) + size
+    return totals
+
 
 @router.get("/{client_id}", response_model=Client)
 def read_client(client_id: int, session: Session = Depends(get_session)):
@@ -271,6 +288,7 @@ async def import_clients(file: UploadFile = File(...), session: Session = Depend
             phone = _clean(row_dict.get(column_map.get("phone"))) if "phone" in column_map else None
             address = _clean(row_dict.get(column_map.get("address"))) if "address" in column_map else None
             farm_name = _clean(row_dict.get(column_map.get("farm_name"))) if "farm_name" in column_map else None
+            town = _clean(row_dict.get(column_map.get("town"))) if "town" in column_map else None
 
             existing = None
             if email:
@@ -288,10 +306,12 @@ async def import_clients(file: UploadFile = File(...), session: Session = Depend
                     existing.address = address
                 if farm_name:
                     existing.farm_name = farm_name
+                if town:
+                    existing.town = town
                 session.add(existing)
                 updated += 1
             else:
-                client = Client(name=name, email=email, phone=phone, address=address, farm_name=farm_name)
+                client = Client(name=name, email=email, phone=phone, address=address, farm_name=farm_name, town=town)
                 session.add(client)
                 created += 1
         except Exception as exc:
