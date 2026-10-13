@@ -4,6 +4,8 @@ import QRCode from "qrcode";
 import { QrCode, Smartphone, Trash2 } from "lucide-react";
 import apiClient from "../api/client";
 import Modal from "./Modal";
+import ReadyForPhones from "./ReadyForPhones";
+import { isTailnetAddress } from "../utils/addresses";
 
 const when = (iso) => (iso ? new Date(`${iso}Z`).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "never");
 
@@ -99,7 +101,7 @@ const PhoneSettings = () => {
       </h3>
       <p className="text-sm text-slate-500">
         Let your team's phones use this PC's data over the office Wi-Fi. Only phones you pair here can connect,
-        and only while the Sandveld app is open on this PC.
+        and only while the Sandveld app is running on this PC.
       </p>
 
       <label className="flex items-center gap-3 text-sm font-medium text-slate-700">
@@ -118,6 +120,12 @@ const PhoneSettings = () => {
         </p>
       )}
       {on && !status?.running && status?.error && <p role="alert" className="text-sm text-red-600">{status.error}</p>}
+      {on && status?.running && (
+        status.addresses.some(isTailnetAddress)
+          ? <p className="text-sm text-emerald-700">Tailscale is on: phones can also connect from anywhere, not just the office Wi-Fi.</p>
+          : <p className="text-xs text-slate-500">Tip: if a phone sometimes cannot reach this PC (for example on a different Wi-Fi point), install Tailscale on this PC and the phone - it makes the connection work from anywhere.</p>
+      )}
+      <ReadyForPhones />
 
       <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
         <h4 className="text-sm font-semibold text-slate-800">Paired phones ({phones.length})</h4>

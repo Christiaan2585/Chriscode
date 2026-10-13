@@ -31,8 +31,9 @@ export async function trustHost(host, port, fingerprint) {
   await PairingStorePlugin.trust({ host, port, fingerprint });
 }
 
-export async function savePairing(host, port, fingerprint, token, deviceName) {
-  await PairingStorePlugin.save({ host, port, fingerprint, token, deviceName });
+// `hosts` = every address the PC offered: the phone remembers all of them and uses whichever answers.
+export async function savePairing(host, port, fingerprint, token, deviceName, hosts = [host]) {
+  await PairingStorePlugin.save({ host, port, fingerprint, token, deviceName, hosts });
 }
 
 export async function clearPairing() {

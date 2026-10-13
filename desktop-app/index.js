@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog, session, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, session, safeStorage, Tray, Menu, nativeImage, powerSaveBlocker, Notification } = require('electron');
 const { pathToFileURL } = require('url');
 const path = require('path');
 const fs = require('fs');
@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { spawn, execFile } = require('child_process');
 const localSecret = require('./local-secret');
 const secretStore = require('./secret-store');
+const readyMode = require('./ready-mode');
 const { autoUpdater } = require('electron-updater');
 
 // Not using the `electron-is-dev` package: its current release is ESM-only
@@ -252,6 +253,19 @@ function stopBackend() {
   backendProcess = null;
 }
 
+let ready = null; // ready-mode.js: stays reachable for phones (tray, start with Windows, keep awake)
+
+// Are phones allowed right now? Read from the same file the backend keeps (app/core/lan.py default_dir), so the
+// window knows without asking the backend: closing the window only hides it while phones are in use.
+function phonesEnabled() {
+  const dir = app.isPackaged ? path.join(app.getPath('userData'), 'lan') : path.join(PROJECT_ROOT, 'config', 'lan');
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dir, 'settings.json'), 'utf8')).enabled === true;
+  } catch {
+    return false;
+  }
+}
+
 async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -297,7 +311,15 @@ async function createWindow() {
     mainWindow.loadFile(indexPath);
   }
 
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  // Started by Windows at sign-in with "Start with Windows": stay in the tray, no window until someone opens it.
+  mainWindow.once('ready-to-show', () => { if (!ready || !ready.startedHidden(process.argv)) mainWindow.show(); });
+  // "Always ready for phones" (ready-mode.js): closing the window hides it to the tray so the phone listener stays up.
+  mainWindow.on('close', (event) => {
+    if (ready && ready.shouldHideOnClose()) {
+      event.preventDefault();
+      ready.hideToTray();
+    }
+  });
 
   // The window only ever shows this app. A link or window.open must never make
   // it load someone else's page - such a page would inherit the preload bridge
@@ -716,12 +738,20 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show(); // it may be hidden in the tray
       mainWindow.focus();
     }
   });
   app.whenReady().then(() => {
     app.setAppUserModelId('com.sandveldveedienste.app'); // so Windows shows notifications under this app's name
     registerPermissionHandler();
+    ready = readyMode.install({
+      app, ipcMain, Tray, Menu, nativeImage, powerSaveBlocker, Notification,
+      dir: app.getPath('userData'), iconPath: path.join(__dirname, 'build', 'icon.ico'), isPackaged: app.isPackaged,
+      phonesEnabled,
+      showWindow: () => { if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.show(); mainWindow.focus(); } },
+      hideWindow: () => { if (mainWindow) mainWindow.hide(); },
+    });
     secretStore.install({ ipcMain, safeStorage, dir: app.getPath('userData') });
     registerContentSecurityPolicy();
     localSecret.installHeader(session.defaultSession, LOCAL_SECRET, [`http://${BACKEND_HOST}:${BACKEND_PORT}/*`, `http://localhost:${BACKEND_PORT}/*`]);
@@ -734,7 +764,7 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', stopBackend);
+app.on('before-quit', () => { if (ready) ready.noteQuitting(); stopBackend(); });
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();

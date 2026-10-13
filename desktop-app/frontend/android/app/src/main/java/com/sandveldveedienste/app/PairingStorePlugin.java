@@ -92,7 +92,14 @@ public class PairingStorePlugin extends Plugin {
             call.reject("host, port, fingerprint and token are all required");
             return;
         }
-        PairingStore.save(getContext(), host, port, fingerprint, token, deviceName);
+        java.util.List<String> hosts = new java.util.ArrayList<>();
+        try {
+            org.json.JSONArray offered = call.getArray("hosts");
+            if (offered != null) for (int i = 0; i < offered.length(); i++) hosts.add(offered.getString(i));
+        } catch (org.json.JSONException ignored) {
+            // just the one host
+        }
+        PairingStore.save(getContext(), host, port, fingerprint, token, deviceName, hosts);
         call.resolve();
     }
 
@@ -116,12 +123,76 @@ public class PairingStorePlugin extends Plugin {
         ret.put("paired", paired);
         if (paired) {
             ret.put("host", PairingStore.getHost(getContext()));
+            ret.put("hosts", new org.json.JSONArray(PairingStore.getHosts(getContext())));
             ret.put("port", PairingStore.getPort(getContext()));
             ret.put("fingerprint", PairingStore.getFingerprint(getContext()));
             ret.put("token", PairingStore.getToken(getContext()));
             ret.put("deviceName", PairingStore.getDeviceName(getContext()));
         }
         call.resolve(ret);
+    }
+
+    /** "Check connection": can this phone reach the PC on each address it knows, how fast, and is it really the PC? */
+    @PluginMethod
+    public void diagnose(final PluginCall call) {
+        network.execute(() -> {
+            try {
+                final int port = PairingStore.getPort(getContext());
+                final String fingerprint = PairingStore.getFingerprint(getContext());
+                java.util.List<String> hosts = PairingStore.getHosts(getContext());
+                org.json.JSONArray results = new org.json.JSONArray();
+                for (String host : hosts) {
+                    org.json.JSONObject row = new org.json.JSONObject();
+                    row.put("host", host);
+                    long started = System.currentTimeMillis();
+                    boolean tcp = false;
+                    try (java.net.Socket probe = new java.net.Socket()) {
+                        probe.connect(new java.net.InetSocketAddress(host, port), 3500);
+                        tcp = true;
+                    } catch (Exception e) {
+                        row.put("problem", e instanceof java.net.SocketTimeoutException ? "no answer" : e instanceof java.net.ConnectException ? "refused" : "unreachable");
+                    }
+                    if (tcp) {
+                        boolean pc = Discovery.answersAsThePc(host, port, fingerprint, 3500);
+                        row.put("ok", pc);
+                        if (!pc) row.put("problem", "something answers, but it is not the office PC");
+                    } else {
+                        row.put("ok", false);
+                    }
+                    row.put("ms", System.currentTimeMillis() - started);
+                    results.put(row);
+                }
+                JSObject ret = new JSObject();
+                ret.put("results", results);
+                ret.put("current", PairingStore.getHost(getContext()));
+                ret.put("phoneAddresses", new org.json.JSONArray(Discovery.phoneAddresses()));
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject("Could not check the connection");
+            }
+        });
+    }
+
+    /** "Find the PC again": looks for it on this network by its certificate, whatever address it has now. */
+    @PluginMethod
+    public void rediscover(final PluginCall call) {
+        network.execute(() -> {
+            String found = Discovery.find(getContext(), PairingStore.getHosts(getContext()), true);
+            JSObject ret = new JSObject();
+            ret.put("found", found);
+            call.resolve(ret);
+        });
+    }
+
+    /** Debug builds only: addresses to scan instead of the real network (testing without Wi-Fi access to the PC). */
+    @PluginMethod
+    public void debugScanCandidates(PluginCall call) {
+        if (!Discovery.debuggable(getContext())) {
+            call.reject("Not available");
+            return;
+        }
+        getContext().getSharedPreferences("sandveld_debug", android.content.Context.MODE_PRIVATE).edit().putString("scan_candidates", call.getString("list", "")).apply();
+        call.resolve();
     }
 
     @PluginMethod

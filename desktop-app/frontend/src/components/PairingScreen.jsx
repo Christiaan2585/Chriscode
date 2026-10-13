@@ -86,7 +86,7 @@ const PairingScreen = ({ onPaired }) => {
     try {
       const { host, token } = await pairAgainst(hosts, port, fp, code);
       await wipeOfflineData(); // a copy of some other office's data must never mix with this one
-      await savePairing(host, port, fp, token, deviceName());
+      await savePairing(host, port, fp, token, deviceName(), hosts);
       setDeviceConnection({ host, port, token });
       onPaired();
     } catch (e) {

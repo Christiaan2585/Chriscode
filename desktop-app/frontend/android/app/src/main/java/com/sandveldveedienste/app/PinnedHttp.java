@@ -49,6 +49,10 @@ final class PinnedHttp {
         return hex.toString();
     }
 
+    static javax.net.ssl.SSLSocketFactory pinnedFactory(String fingerprint) throws Exception {
+        return pinnedContext(fingerprint).getSocketFactory();
+    }
+
     private static SSLContext pinnedContext(final String fingerprint) throws Exception {
         TrustManager trust = new X509TrustManager() {
             @Override public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
@@ -75,14 +79,13 @@ final class PinnedHttp {
     /** Opens the connection, trying again if the PC cannot be reached yet: an office PC on Wi-Fi often goes
      * quiet when idle and only answers a moment after the first attempt. Only the connecting is repeated
      * (nothing has been sent), so a retry can never do something twice. */
-    private static HttpsURLConnection connect(URL url, String fingerprint, int timeoutMs, String method, JSONObject headers, int bodyLength, boolean fast) throws Exception {
+    private static HttpsURLConnection connect(URL url, String fingerprint, int timeoutMs, String method, JSONObject headers, int bodyLength, int connectMs, int attempts) throws Exception {
         IOException last = null;
-        int attempts = fast ? 1 : 3;
         for (int attempt = 0; attempt < attempts; attempt++) {
             HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
             conn.setSSLSocketFactory(pinnedContext(fingerprint).getSocketFactory());
             conn.setHostnameVerifier((hostname, session) -> true); // the pinned certificate IS the identity check
-            conn.setConnectTimeout(Math.min(timeoutMs, fast ? 3500 : 6000));
+            conn.setConnectTimeout(Math.min(timeoutMs, connectMs));
             conn.setReadTimeout(timeoutMs);
             conn.setInstanceFollowRedirects(false);
             conn.setRequestMethod(method);
@@ -100,7 +103,7 @@ final class PinnedHttp {
             try {
                 conn.connect();
                 return conn;
-            } catch (java.net.SocketTimeoutException | java.net.ConnectException | java.net.NoRouteToHostException e) {
+            } catch (java.net.SocketTimeoutException | java.net.ConnectException | java.net.NoRouteToHostException | java.net.UnknownHostException e) {
                 last = e;
                 conn.disconnect();
             }
@@ -109,17 +112,58 @@ final class PinnedHttp {
     }
 
     static Reply execute(Context ctx, String address, String method, JSONObject headers, byte[] body, int timeoutMs, boolean fast) throws Exception {
-        String host = PairingStore.getHost(ctx);
         int port = PairingStore.getPort(ctx);
         String fingerprint = PairingStore.getFingerprint(ctx);
         URL url = new URL(address);
         int urlPort = url.getPort() == -1 ? 443 : url.getPort();
-        if (host == null || fingerprint == null || !"https".equals(url.getProtocol())
-                || !host.equalsIgnoreCase(url.getHost()) || urlPort != port) {
+        // Only the PC this phone is paired with, on any address it has been known by: the app always asks for the
+        // address it was given, and this decides which of the PC's addresses actually answers right now.
+        if (PairingStore.getHost(ctx) == null || fingerprint == null || !"https".equals(url.getProtocol())
+                || !PairingStore.knowsHost(ctx, url.getHost()) || urlPort != port) {
             throw new IOException("This phone only talks to the office PC it is paired with");
         }
+        String path = url.getFile();
+        int bodyLength = body == null ? 0 : body.length;
 
-        HttpsURLConnection conn = connect(url, fingerprint, timeoutMs, method, headers, body == null ? 0 : body.length, fast);
+        // Every known address gets one try, the one that worked last first. An office PC on Wi-Fi often only answers on
+        // the second try after being idle, so if none answered the best address is tried once more, patiently.
+        // Still nothing: look for the PC on this network (the router may have given it a new address).
+        List<String> hosts = PairingStore.getHosts(ctx);
+        boolean several = hosts.size() > 1;
+        HttpsURLConnection conn = null;
+        String used = null;
+        IOException last = null;
+        for (int i = 0; i < hosts.size() && conn == null; i++) {
+            int connectMs = fast || i > 0 ? 3500 : several ? 4500 : 6000;
+            int attempts = fast || several || i > 0 ? 1 : 3;
+            try {
+                conn = connect(new URL("https://" + hosts.get(i) + ":" + port + path), fingerprint, timeoutMs, method, headers, bodyLength, connectMs, attempts);
+                used = hosts.get(i);
+            } catch (IOException e) {
+                last = e;
+            }
+        }
+        if (conn == null && !fast && several) {
+            try {
+                conn = connect(new URL("https://" + hosts.get(0) + ":" + port + path), fingerprint, timeoutMs, method, headers, bodyLength, 6000, 1);
+                used = hosts.get(0);
+            } catch (IOException e) {
+                last = e;
+            }
+        }
+        if (conn == null) {
+            String found = Discovery.find(ctx, hosts, false);
+            if (found != null) {
+                try {
+                    conn = connect(new URL("https://" + found + ":" + port + path), fingerprint, timeoutMs, method, headers, bodyLength, 3500, 1);
+                    used = found;
+                } catch (IOException e) {
+                    last = e;
+                }
+            }
+        }
+        if (conn == null) throw last != null ? last : new IOException("Could not reach the office PC");
+        if (used != null && !used.equalsIgnoreCase(hosts.get(0))) PairingStore.promote(ctx, used);
         if (body != null && body.length > 0) {
             try (OutputStream out = conn.getOutputStream()) {
                 out.write(body);

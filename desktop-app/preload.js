@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
   getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
   chooseFolder: () => ipcRenderer.invoke('choose-folder'),
+  // Settings -> Phones -> "Always ready for phones" (see ready-mode.js): tray, start with Windows, keep awake.
+  getReadyMode: () => ipcRenderer.invoke('ready-mode-get'),
+  setReadyMode: (change) => ipcRenderer.invoke('ready-mode-set', change),
   openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
   // Order forms / catalogues for clients: save the PDF where it's easy to
   // attach and show it in Explorer; open WhatsApp (wa.me) or email (mailto:) only.

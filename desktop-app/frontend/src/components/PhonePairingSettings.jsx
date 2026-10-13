@@ -5,6 +5,7 @@ import { clearPairing } from "../utils/pairing";
 import { useReachable } from "../offline/connectivity";
 import { forgetSyncState, syncNow, useSyncState } from "../offline/sync";
 import { wipeOfflineData } from "../offline/store";
+import PhoneConnection from "./PhoneConnection";
 
 const when = (ms) =>
   ms ? new Date(ms).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "never";
@@ -30,6 +31,7 @@ const PhonePairingSettings = () => {
 
   return (
     <>
+      <PhoneConnection />
       <div className={card}>
         <h3 className="flex items-center gap-2 font-semibold text-slate-800">
           <CloudDownload size={18} /> Office data on this phone

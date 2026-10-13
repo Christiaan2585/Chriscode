@@ -3,7 +3,12 @@ package com.sandveldveedienste.app;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+
 import java.security.GeneralSecurityException;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Where this phone's pairing with the office PC lives: the host/port to
  * call, the PC certificate's pinned SHA-256 fingerprint, and the device
@@ -17,6 +22,7 @@ import java.security.GeneralSecurityException;
  * version is encrypted the first time it is read. */
 final class PairingStore {
     private static final String PREFS = "sandveld_pairing";
+    private static final int MAX_HOSTS = 8;
 
     private PairingStore() {}
 
@@ -24,7 +30,7 @@ final class PairingStore {
         return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    static void save(Context ctx, String host, int port, String fingerprint, String token, String deviceName) {
+    static void save(Context ctx, String host, int port, String fingerprint, String token, String deviceName, List<String> hosts) {
         String sealed;
         try {
             sealed = SecretBox.seal(token);
@@ -33,6 +39,7 @@ final class PairingStore {
         }
         prefs(ctx).edit()
             .putString("host", host)
+            .putString("hosts", joinHosts(host, hosts))
             .putInt("port", port)
             .putString("fingerprint", fingerprint)
             .putString("token_enc", sealed)
@@ -52,6 +59,54 @@ final class PairingStore {
             .remove("token")
             .remove("token_enc")
             .apply();
+    }
+
+    /** `first` first, then the others, no repeats, at most MAX_HOSTS. */
+    private static String joinHosts(String first, List<String> others) {
+        JSONArray array = new JSONArray();
+        List<String> seen = new ArrayList<>();
+        List<String> all = new ArrayList<>();
+        all.add(first);
+        if (others != null) all.addAll(others);
+        for (String h : all) {
+            if (h == null) continue;
+            String clean = h.trim();
+            boolean repeat = false;
+            for (String s : seen) if (s.equalsIgnoreCase(clean)) repeat = true;
+            if (clean.isEmpty() || repeat || seen.size() >= MAX_HOSTS) continue;
+            seen.add(clean);
+            array.put(clean);
+        }
+        return array.toString();
+    }
+
+    /** Every address this phone knows for the PC, the one that worked last first. */
+    static List<String> getHosts(Context ctx) {
+        List<String> out = new ArrayList<>();
+        String current = getHost(ctx);
+        try {
+            JSONArray array = new JSONArray(prefs(ctx).getString("hosts", "[]"));
+            for (int i = 0; i < array.length(); i++) out.add(array.getString(i));
+        } catch (JSONException ignored) {
+            // fall through: just the current host
+        }
+        if (current != null) {
+            boolean listed = false;
+            for (String h : out) if (h.equalsIgnoreCase(current)) listed = true;
+            if (!listed) out.add(0, current);
+        }
+        return out;
+    }
+
+    static boolean knowsHost(Context ctx, String host) {
+        for (String h : getHosts(ctx)) if (h.equalsIgnoreCase(host)) return true;
+        return false;
+    }
+
+    /** `host` answered: use it first from now on (added to the list if it is new, e.g. found by Discovery). */
+    static void promote(Context ctx, String host) {
+        List<String> rest = getHosts(ctx);
+        prefs(ctx).edit().putString("host", host).putString("hosts", joinHosts(host, rest)).apply();
     }
 
     static void clear(Context ctx) {
