@@ -3,11 +3,12 @@ import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
 import { useSelection } from "../utils/useSelection";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Search, Trash2, Edit, Eye, Download, X, Truck, Building2, Boxes } from "lucide-react";
+import { Plus, Search, Trash2, Edit, Eye, Download, X, Truck, Building2, Boxes, Zap } from "lucide-react";
 import apiClient from "../api/client";
 import Modal from "../components/Modal";
 import SearchableSelect from "../components/SearchableSelect";
 import DocumentPreview from "../components/DocumentPreview";
+import QuickOrder from "../components/QuickOrder";
 import StockPanel from "../components/StockPanel";
 import { downloadDocumentPdf, lineTotal } from "../utils/documents";
 import { money, newestFirst, shortDate, statusStyle } from "../utils/format";
@@ -99,6 +100,7 @@ const PurchaseOrders = () => {
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState(null);
   const [suppliersOpen, setSuppliersOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
   const [editing, setEditing] = useState(null); // null = closed, "new", or an order
   const [order, setOrder] = useState(emptyOrder);
   const [existingLines, setExistingLines] = useState([]);
@@ -199,8 +201,12 @@ const PurchaseOrders = () => {
             className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-slate-700 shadow-sm hover:border-emerald-400">
             <Building2 size={18} /> Suppliers
           </button>
-          <button onClick={openNew}
+          <button onClick={() => setQuickOpen(true)}
             className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-white shadow-sm transition-colors hover:bg-emerald-700">
+            <Zap size={18} /> Quick order
+          </button>
+          <button onClick={openNew}
+            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-slate-700 shadow-sm hover:border-emerald-400">
             <Plus size={20} /> New Purchase Order
           </button>
         </div>
@@ -216,7 +222,7 @@ const PurchaseOrders = () => {
         ))}
       </div>
 
-      {tab === "stock" ? <StockPanel /> : (
+      {tab === "stock" ? <StockPanel onQuickOrder={() => setQuickOpen(true)} /> : (
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 bg-slate-50 p-4">
           <div className="relative">
@@ -364,6 +370,7 @@ const PurchaseOrders = () => {
         </div>
       </Modal>
 
+      {quickOpen && <QuickOrder onClose={() => setQuickOpen(false)} onCreated={setPreview} />}
       <SuppliersModal isOpen={suppliersOpen} onClose={() => setSuppliersOpen(false)} suppliers={suppliers} />
       <DocumentPreview doc={preview} onClose={() => setPreview(null)} />
     </div>

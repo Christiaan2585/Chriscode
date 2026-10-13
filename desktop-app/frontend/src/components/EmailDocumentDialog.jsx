@@ -22,7 +22,7 @@ const EmailDocumentDialog = ({ blob, filename, send, onClose }) => {
       form.append("file", new File([blob], filename, { type: "application/pdf" }));
       return apiClient.post("/mail/send", form, { silent: true, headers: { "Content-Type": "multipart/form-data" } });
     },
-    onSuccess: () => { setError(""); setDone(true); },
+    onSuccess: () => { setError(""); setDone(true); send.onSent?.(); },
     onError: (err) => setError(Array.isArray(err?.response?.data?.detail) ? "That isn't a valid email address." : err?.response?.data?.detail?.toString?.() || "That didn't send."),
   });
 

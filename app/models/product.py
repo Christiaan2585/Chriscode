@@ -24,6 +24,7 @@ class Product(SQLModel, table=True):
     # Stock on the shelf (app/core/stock.py). None = not counted yet, so not tracked: only the in_stock switch.
     stock_quantity: Optional[float] = None
     reorder_level: Optional[float] = None  # at or below this the dashboard says "order more"
+    supplier_id: Optional[int] = None  # who it is usually bought from (quick ordering); no foreign key on purpose
 
 
 class StockMovement(SQLModel, table=True):

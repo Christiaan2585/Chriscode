@@ -24,6 +24,7 @@ const SendButtons = ({ blob, filename, send }) => {
     setStatus(null);
     try {
       const savedTo = await sendDocument(blob, filename, via, send);
+      send.onSent?.(); // e.g. a purchase order becomes "Sent"
       const app = via === "whatsapp" ? "WhatsApp" : "your email";
       setStatus({ ok: true, text: savedTo
         ? `Saved in Documents > Sandveld Vee Dienste > Sent to clients (shown in Explorer) and opened ${app} - drag the file in and send.`

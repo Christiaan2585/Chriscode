@@ -52,7 +52,8 @@ def overview(session: Session = Depends(get_session)):
                              .where(StockMovement.reason != "opening").group_by(StockMovement.product_id)).all())
     rows = session.exec(select(Product).where(Product.is_active != False).order_by(Product.name)).all()  # noqa: E712 - NULL = active
     return [{"id": p.id, "name": p.name, "code": p.code, "category": p.category, "stock_quantity": p.stock_quantity,
-             "reorder_level": p.reorder_level, "status": _status(p), "last_movement": last.get(p.id)} for p in rows]
+             "reorder_level": p.reorder_level, "supplier_id": p.supplier_id, "status": _status(p),
+             "last_movement": last.get(p.id)} for p in rows]
 
 
 @router.get("/movements")

@@ -130,6 +130,7 @@ class ProductPatch(BaseModel):
     in_stock: Optional[bool] = None
     is_active: Optional[bool] = None
     reorder_level: Optional[float] = Field(default=None, ge=0)
+    supplier_id: Optional[int] = Field(default=None, ge=1)
 
 
 class StockCount(BaseModel):

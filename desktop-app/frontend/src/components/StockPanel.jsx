@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownRight, ArrowUpRight, ClipboardCheck, History, Search, SlidersHorizontal } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, ClipboardCheck, History, Search, ShoppingCart, SlidersHorizontal } from "lucide-react";
 import apiClient from "../api/client";
 import InlineEdit from "./InlineEdit";
 import Modal from "./Modal";
@@ -42,7 +42,7 @@ const AdjustDialog = ({ product, onClose, onDone }) => {
 
 // The Stock tab on the Purchase Orders page: what is on the shelf, and a timeline of every movement. Invoices take
 // stock off and received purchase orders add to it by themselves (app/core/stock.py); counting and adjusting is here.
-const StockPanel = () => {
+const StockPanel = ({ onQuickOrder }) => {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -50,6 +50,7 @@ const StockPanel = () => {
   const [kind, setKind] = useState("");
   const [adjusting, setAdjusting] = useState(null);
 
+  const { data: suppliers = [] } = useQuery({ queryKey: ["suppliers"], queryFn: async () => (await apiClient.get("/suppliers/")).data });
   const { data: rows = [], isLoading } = useQuery({ queryKey: ["stock-overview"], queryFn: async () => (await apiClient.get("/stock/")).data });
   const movementsKey = ["stock-movements", productId, kind];
   const { data: movements = [] } = useQuery({
@@ -59,6 +60,7 @@ const StockPanel = () => {
   const refresh = () => ["stock-overview", "stock-movements", "products", "analytics"].forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
 
   const count = useMutation({ mutationFn: ({ id, quantity }) => apiClient.post(`/products/${id}/stock-count`, { quantity }), onSuccess: refresh });
+  const usualSupplier = useMutation({ mutationFn: ({ id, supplier }) => apiClient.patch(`/products/${id}`, { supplier_id: supplier ? Number(supplier) : null }), onSuccess: refresh });
   const reorder = useMutation({ mutationFn: ({ id, level }) => apiClient.patch(`/products/${id}`, { reorder_level: level }), onSuccess: refresh });
 
   const tally = useMemo(() => ({
@@ -85,6 +87,15 @@ const StockPanel = () => {
         Edit, cancel or delete either one and the stock corrects itself. Count a product once to start keeping track of it.
       </p>
 
+      {tally.low + tally.out > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-white px-4 py-3 text-sm text-slate-700">
+          <span><b>{tally.low + tally.out}</b> {tally.low + tally.out === 1 ? "product is" : "products are"} low or out of stock.</span>
+          <button type="button" onClick={onQuickOrder} className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700">
+            <ShoppingCart size={16} /> Order what is low
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {tile("Products counted", `${tally.counted} / ${rows.length}`, "", "text-slate-800")}
         {tile("Low", tally.low, "low", tally.low ? "text-amber-600" : "text-slate-800")}
@@ -106,11 +117,11 @@ const StockPanel = () => {
           <table className="card-table w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr><th className="px-4 py-3 font-medium">Product</th><th className="px-4 py-3 text-right font-medium">On the shelf</th>
-                <th className="px-4 py-3 text-right font-medium">Reorder at</th><th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 text-right font-medium">Reorder at</th><th className="px-4 py-3 font-medium">Usual supplier</th><th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Last change</th><th className="px-4 py-3 text-right font-medium">Actions</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {isLoading && <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Loading...</td></tr>}
+              {isLoading && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Loading...</td></tr>}
               {shown.map((r) => (
                 <tr key={r.id}>
                   <td data-primary className="px-4 py-3 font-medium text-slate-800">{r.name}{r.code && <span className="ml-2 text-xs font-normal text-slate-400">{r.code}</span>}</td>
@@ -120,6 +131,13 @@ const StockPanel = () => {
                   </td>
                   <td data-label="Reorder at" className="px-4 py-3 text-right text-slate-500">
                     <InlineEdit value={r.reorder_level} type="number" label="Reorder level" placeholder="—" onSave={(v) => reorder.mutateAsync({ id: r.id, level: v })} format={num} />
+                  </td>
+                  <td data-label="Usual supplier" className="px-4 py-3">
+                    <select aria-label={`Usual supplier of ${r.name}`} className="max-w-40 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700"
+                      value={r.supplier_id ?? ""} onChange={(e) => usualSupplier.mutate({ id: r.id, supplier: e.target.value })}>
+                      <option value="">—</option>
+                      {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
                   </td>
                   <td data-label="Status" className="px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${BADGE[r.status]}`}>{statusLabel(r.status)}</span></td>
                   <td data-label="Last change" className="px-4 py-3 text-slate-500">{r.last_movement ? shortDate(r.last_movement) : "—"}</td>
@@ -133,7 +151,7 @@ const StockPanel = () => {
                   </td>
                 </tr>
               ))}
-              {!isLoading && shown.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No products match.</td></tr>}
+              {!isLoading && shown.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">No products match.</td></tr>}
             </tbody>
           </table>
         </div>
