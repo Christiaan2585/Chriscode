@@ -13,7 +13,7 @@ import re
 from fastapi.responses import Response
 from app.core.db import get_session
 from app.core.uploads import read_capped, read_table
-from app.core import cascade, herding
+from app.core import cascade, herding, trash
 from pydantic import BaseModel
 from app.core.security import require_admin
 from app.models.animal import Animal
@@ -194,6 +194,7 @@ def update_client(client_id: int, client_data: Client, session: Session = Depend
     return db_client
 
 @router.delete("/{client_id}", dependencies=[Depends(require_admin)])
+@trash.recorded("client", "client")
 def delete_client(client_id: int, session: Session = Depends(get_session)):
     client = session.get(Client, client_id)
     if not client:

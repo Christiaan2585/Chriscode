@@ -7,7 +7,7 @@ from openpyxl import load_workbook
 from app.core.db import get_session
 from app.core.security import get_current_user, require_admin
 from app.core.uploads import read_capped
-from app.core import cascade, stock
+from app.core import cascade, stock, trash
 from app.models.user import User
 import base64
 from datetime import datetime
@@ -187,6 +187,7 @@ def update_product(product_id: int, product_data: Product, session: Session = De
 
 
 @router.delete("/{product_id}", dependencies=[Depends(require_admin)])
+@trash.recorded("product", "product")
 def delete_product(product_id: int, session: Session = Depends(get_session)):
     product = session.get(Product, product_id)
     if not product:

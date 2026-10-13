@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 
 from app.api.business import get_business, next_document_number, price_line, product_label, sales_rep_for, totals_for
-from app.core import stock
+from app.core import stock, trash
 from app.core.dates import coerce_datetime
 from app.core.db import get_session
 from app.core.pdf import generate_purchase_order_pdf
@@ -60,6 +60,7 @@ def update_supplier(supplier_id: int, data: Supplier, session: Session = Depends
 
 
 @router.delete("/suppliers/{supplier_id}", dependencies=[Depends(require_admin)])
+@trash.recorded("supplier", "supplier")
 def delete_supplier(supplier_id: int, session: Session = Depends(get_session)):
     supplier = _get_or_404(session, Supplier, supplier_id, "Supplier")
     orders = session.exec(select(PurchaseOrder).where(PurchaseOrder.supplier_id == supplier_id)).all()
@@ -111,6 +112,7 @@ def update_purchase_order(po_id: int, data: PurchaseOrder, session: Session = De
 
 
 @router.delete("/purchase-orders/{po_id}", dependencies=[Depends(require_admin)])
+@trash.recorded("purchase order", "purchaseorder")
 def delete_purchase_order(po_id: int, session: Session = Depends(get_session)):
     po = _get_or_404(session, PurchaseOrder, po_id, "Purchase order")
     for item in session.exec(select(PurchaseOrderItem).where(PurchaseOrderItem.purchase_order_id == po_id)).all():

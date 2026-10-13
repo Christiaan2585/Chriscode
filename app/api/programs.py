@@ -7,7 +7,7 @@ from typing import List, Literal, Optional
 import re
 from app.api.business import get_business, totals_for
 from app.api.invoices import _recalculate_total as recalculate_invoice, create_invoice
-from app.core import herding, program_quote
+from app.core import herding, program_quote, trash
 from app.core.db import get_session
 from app.core.uploads import read_capped, read_table
 from app.core.dates import coerce_datetime
@@ -119,6 +119,7 @@ def copy_program(program_id: int, data: CopyProgram, session: Session = Depends(
 
 
 @router.delete("/{program_id}", dependencies=[Depends(require_admin)])
+@trash.recorded("herding program", "herdingprogram")
 def delete_program(program_id: int, session: Session = Depends(get_session)):
     program = session.get(HerdingProgram, program_id)
     if not program:

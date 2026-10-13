@@ -8,7 +8,7 @@ from app.core.dates import coerce_datetime
 from app.models.quote import Quote
 from app.models.quote_item import QuoteItem
 from app.models.program import HerdingProgram
-from app.core import herding, program_quote
+from app.core import herding, program_quote, trash
 from app.models.client import Client
 from app.core.security import get_current_user, require_admin
 from app.models.user import User
@@ -128,6 +128,7 @@ def update_quote(quote_id: int, quote_data: Quote, session: Session = Depends(ge
     return db_quote
 
 @router.delete("/{quote_id}", dependencies=[Depends(require_admin)])
+@trash.recorded("quote", "quote")
 def delete_quote(quote_id: int, session: Session = Depends(get_session)):
     quote = session.get(Quote, quote_id)
     if not quote:

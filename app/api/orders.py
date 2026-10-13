@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
+from app.core import trash
 from app.core.db import get_session
 from app.core.dates import coerce_datetime
 from app.core.security import require_admin
@@ -54,6 +55,7 @@ def update_order(order_id: int, order_data: Order, session: Session = Depends(ge
     return db_order
 
 @router.delete("/{order_id}", dependencies=[Depends(require_admin)])
+@trash.recorded("order", "order")
 def delete_order(order_id: int, session: Session = Depends(get_session)):
     order = session.get(Order, order_id)
     if not order:

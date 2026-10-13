@@ -7,7 +7,7 @@ from app.core.db import get_session
 from app.core.dates import coerce_datetime
 from app.models.invoice import Invoice, InvoiceItem
 from app.models.payment import CreditNote, Payment
-from app.core import settlement, stock
+from app.core import settlement, stock, trash
 from app.models.product import Product
 from app.core.pdf import generate_invoice_pdf
 from app.api.business import default_due_date, document_lines, get_business, next_document_number, price_line, sales_rep_for, totals_for
@@ -69,6 +69,7 @@ def update_invoice(invoice_id: int, invoice_data: Invoice, session: Session = De
     return db_invoice
 
 @router.delete("/{invoice_id}", dependencies=[Depends(require_admin)])
+@trash.recorded("invoice", "invoice")
 def delete_invoice(invoice_id: int, session: Session = Depends(get_session)):
     invoice = session.get(Invoice, invoice_id)
     if not invoice:

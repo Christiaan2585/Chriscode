@@ -6,12 +6,12 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlmodel import Session
-from app.core import audit, field_crypto, herding, stock
+from app.core import audit, field_crypto, herding, stock, trash
 from app.core.db import create_db_and_tables, database_file_path, engine
 from app.core.backup import backup_on_version_change, start_scheduler
 from app.core.local_secret import LocalSecretGuard, configured_secret
 from app.core.security import require_settled_password
-from app.api import audit as audit_api, payments, reports, auth, clients, animals, rams, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups, exports, business, purchase_orders, devices, catalogue
+from app.api import audit as audit_api, payments, reports, trash as trash_api, auth, clients, animals, rams, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups, exports, business, purchase_orders, devices, catalogue
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -92,6 +92,7 @@ app.include_router(products.router, dependencies=_protected)
 app.include_router(invoices.router, dependencies=_protected)
 app.include_router(payments.router, dependencies=_protected)
 app.include_router(reports.router, dependencies=_protected)
+app.include_router(trash_api.router, dependencies=_protected)
 app.include_router(notes.router, dependencies=_protected)
 app.include_router(weights.router, dependencies=_protected)
 app.include_router(schedules.router, dependencies=_protected)
@@ -132,6 +133,7 @@ def on_startup():
         with Session(engine) as session:
             herding.ensure_standard_programs(session)  # clients from before the master program existed
             stock.book_existing_paperwork(session)  # once: invoices/orders from before stock tracking
+            trash.purge_old(session)  # recycle bin: nothing is kept longer than 30 days
     except Exception:
         logger.exception("Couldn't give the clients the standard herding program")
     try:
