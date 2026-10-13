@@ -5,7 +5,8 @@ import apiClient from "../api/client";
 import Modal from "./Modal";
 import { savePictureChange } from "./ProductPicture";
 import { cropRect, toCanvasPoint, wholePage } from "../utils/cropRect";
-import { cropToFile, drawPage, openPdf } from "../utils/pdfPages";
+import { cropToFile, cutOutToFile, drawOutline, drawPage, openPdf, sampleRegion } from "../utils/pdfPages";
+import { snapOutline } from "../utils/snapOutline";
 import { fetchDocumentPdf } from "../utils/documents";
 
 const field = "w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500";
@@ -16,11 +17,16 @@ const VAT = 1.15; // same default as utils/products.js; the price excl VAT can b
 const BrochureProducts = ({ book, onClose }) => {
   const queryClient = useQueryClient();
   const canvas = useRef(null);
+  const overlay = useRef(null);
   const [doc, setDoc] = useState(null);
   const [page, setPage] = useState(1);
   const [loadError, setLoadError] = useState("");
   const [rect, setRect] = useState(null);
   const [drag, setDrag] = useState(null);
+  const [snapOn, setSnapOn] = useState(true); // follow the product's own edge instead of the plain box
+  const [threshold, setThreshold] = useState(60);
+  const [snap, setSnap] = useState(null);
+  const [snapNote, setSnapNote] = useState("");
   const [form, setForm] = useState({ name: "", price: "", category: "" });
   const [added, setAdded] = useState([]);
   const [message, setMessage] = useState(null);
@@ -41,6 +47,20 @@ const BrochureProducts = ({ book, onClose }) => {
     setRect(null);
     drawPage(doc, page, canvas.current).catch(() => setLoadError("Could not draw this page."));
   }, [doc, page]);
+
+  // After a box is drawn (not while dragging): find the product's edge inside it and trace it on the page.
+  useEffect(() => {
+    setSnap(null);
+    setSnapNote("");
+    if (!rect || drag || !snapOn || !canvas.current) return;
+    const found = snapOutline(sampleRegion(canvas.current, rect), { threshold });
+    setSnap(found);
+    if (!found) setSnapNote("No clear edge found in this box - the whole box will be used. Draw it a little wider round the product, or turn the sensitivity down.");
+  }, [rect, drag, snapOn, threshold]);
+
+  useEffect(() => {
+    if (overlay.current && canvas.current) drawOutline(overlay.current, canvas.current, rect, snap);
+  }, [snap, rect, page, doc]);
 
   const bounds = () => ({ width: canvas.current.width, height: canvas.current.height });
   const point = (e) => toCanvasPoint(e, canvas.current.getBoundingClientRect(), bounds());
@@ -67,7 +87,8 @@ const BrochureProducts = ({ book, onClose }) => {
       let pictureNote = "";
       if (rect) {
         try {
-          await savePictureChange(created.id, { file: await cropToFile(canvas.current, rect, `${name}.jpg`) });
+          const file = snap ? await cutOutToFile(canvas.current, rect, snap, `${name}.jpg`) : await cropToFile(canvas.current, rect, `${name}.jpg`);
+          await savePictureChange(created.id, { file });
         } catch {
           pictureNote = " The picture did not save - add it from the products table.";
         }
@@ -75,6 +96,7 @@ const BrochureProducts = ({ book, onClose }) => {
       setAdded((list) => [...list, { id: created.id, name, picture: Boolean(rect) && !pictureNote }]);
       setForm({ name: "", price: "", category: form.category });
       setRect(null);
+      setSnap(null);
       setMessage({ ok: !pictureNote, text: `${name} added.${pictureNote}${price ? "" : " Its price is R0 until you set it in the products table."}` });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["product-thumbnails"] });
@@ -100,6 +122,7 @@ const BrochureProducts = ({ book, onClose }) => {
           <div className="max-h-[65vh] overflow-auto rounded-lg border border-slate-200 bg-slate-100">
             <div className="relative mx-auto w-full max-w-[640px]">
               <canvas ref={canvas} aria-label={`Page ${page} of the brochure`} className="block h-auto w-full" />
+              <canvas ref={overlay} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full" />
               {doc && (
                 <div className="absolute inset-0 cursor-crosshair touch-none" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} data-testid="crop-layer">
                   {rect && canvas.current && (
@@ -112,7 +135,7 @@ const BrochureProducts = ({ book, onClose }) => {
             </div>
           </div>
           <p className="text-xs text-slate-500">
-            Drag a box round the product's picture. {rect ? "Picture chosen." : "No box drawn - the product will have no picture."}
+            Drag a box round the product - the picture snaps to its outline. {rect ? (snap ? "Outline found." : "Picture chosen.") : "No box drawn - the product will have no picture."}
             {doc && (
               <> <button type="button" className="text-emerald-700 hover:underline" onClick={() => setRect(wholePage(bounds()))}>Use the whole page</button>
                 {rect && <> · <button type="button" className="text-emerald-700 hover:underline" onClick={() => setRect(null)}>Clear the box</button></>}</>
@@ -121,6 +144,17 @@ const BrochureProducts = ({ book, onClose }) => {
         </div>
 
         <form className="space-y-3 text-sm" onSubmit={add}>
+          <fieldset className="space-y-1 rounded-lg border border-slate-200 p-3">
+            <label className="flex items-center gap-2 font-medium text-slate-700">
+              <input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={snapOn} onChange={(e) => setSnapOn(e.target.checked)} />
+              Snap to the product's outline
+            </label>
+            {snapOn && (
+              <label className="block text-xs text-slate-500">Sensitivity - {threshold < 45 ? "picks up faint edges" : threshold > 90 ? "only strong edges" : "normal"}
+                <input type="range" min="25" max="140" step="5" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} className="w-full accent-emerald-600" /></label>
+            )}
+            {snapNote && <p className="text-xs text-amber-700">{snapNote}</p>}
+          </fieldset>
           <label className="block"><span className="text-xs text-slate-500">Product name</span>
             <input className={field} required maxLength={200} value={form.name} onChange={set("name")} placeholder="e.g. Attila 5 l" /></label>
           {known && <p className="text-xs text-amber-700">{known.name} is already in your products.</p>}
