@@ -3,6 +3,29 @@
 // people will notice. (Never put the business's program steps, products or doses here: the repository is public.)
 export const NOTES = [
   {
+    version: "1.0.12",
+    title: "Money, reports, stock and email",
+    sections: [
+      {
+        heading: "New",
+        items: [
+          "Payments and credit notes on every invoice (the wallet button): the invoice shows what is still owed and marks itself paid. Credit notes are numbered CRN and print as a PDF.",
+          "A Reports page: who owes you money (by how late it is), a statement for any client that you can send by WhatsApp or email, and an Excel file for your accountant with invoices, payments, credit notes and VAT per month. Each client's page has a Statement button too.",
+          "Stock counts: type the number you have in the new Stock column on the Products page. Invoices take stock off, received purchase orders add to it, and the dashboard warns when something is at its reorder level.",
+          "Email straight from the app: an admin sets up your email account once (Settings > Email); then every document preview has Send from app, with the PDF attached.",
+          "A daily reminder in Windows about overdue or due-this-week treatments, scans and unpaid invoices (switch it off in Settings > Security).",
+          "A recycle bin: what an admin deletes is kept for 30 days and can be put back with everything that went with it (Settings > Recycle bin).",
+        ],
+      },
+      {
+        heading: "Smaller and safer",
+        items: [
+          "The installer is smaller and imports are safer: very large spreadsheets are refused. Old .xls files must be saved as .xlsx first.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.10",
     title: "A calmer look, safer sign-in and the phone works offline",
     sections: [

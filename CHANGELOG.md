@@ -2,6 +2,19 @@
 
 All notable changes to Sandveld Vee Dienste. Newest first.
 
+## 1.0.12 - 2026-10-13
+
+### New
+- **Payments and credit notes** (`Payment`, `CreditNote`): record money received against an invoice (EFT, cash, card, other); the invoice's balance, its paid/unpaid status, the "Owed" column, the invoice PDF's balance due and the dashboard's money owed all follow. Credit notes (CRN0000001...) carry the VAT part, print as a PDF and lower the balance. Removing either is admin-only.
+- **Reports page**: aged debtors (not due, 1-30, 31-60, 61-90, over 90 days), per-client statements of account (PDF, WhatsApp/email buttons, also on each client's page) and an admin-only Excel export for the accountant (invoices, payments, credit notes, VAT per month; typed text can never become a live formula).
+- **Stock counts**: a count sets the number on the shelf, received purchase orders add, invoices take off (editing, cancelling, un-cancelling and deleting a document book only the difference), with a movement history and a reorder level that feeds the dashboard. Old paperwork is booked once without changing counts.
+- **Email from the app**: Settings -> Email (admin) takes the business's own SMTP server (STARTTLS or SSL, certificate always checked, password stored encrypted); document previews get "Send from app" with the PDF attached. Header injection, non-PDF attachments and over-size files are refused.
+- **Daily Windows reminder** (once a day, switchable).
+- **Recycle bin**: admin deletes of clients, invoices, quotes, orders, products, purchase orders, suppliers and programs are kept 30 days with their cascades; restoring refuses (with the reason) if a row id or document number has been reused, and re-books stock for invoices and received orders. "Delete for good" removes at once; older backups can still hold deleted records.
+
+### Changed
+- **pandas is no longer used** (client and program imports read CSV/.xlsx with the standard library and openpyxl); pandas and numpy are left out of the backend bundle. Dates in program imports are read day first. Old .xls files are refused with a message. Imports stop at 20,000 rows / 100 columns (a small .xlsx can unpack into millions of cells).
+
 ## 1.0.10 - 2026-10-08
 
 ### New
