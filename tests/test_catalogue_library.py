@@ -81,6 +81,12 @@ class LibraryEndpointTests(unittest.TestCase):
         patcher = mock.patch.object(kc, "catalogue_dir", return_value=self.dir)
         patcher.start()
         self.addCleanup(patcher.stop)
+        from sqlmodel import Session, SQLModel, create_engine
+        from app import main  # noqa: F401 - registers every table
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        self.session = Session(engine)
+        self.addCleanup(self.session.close)
 
     def upload(self, data=None, filename="book.pdf", name=None):
         return asyncio.run(catalogue.add_to_library(UploadFile(file=io.BytesIO(data or made_up_book()), filename=filename), name=name))
@@ -95,7 +101,7 @@ class LibraryEndpointTests(unittest.TestCase):
         self.assertEqual(len(PdfReader(io.BytesIO(open(response.path, "rb").read())).pages), 7)
 
         self.assertEqual(catalogue.rename_in_library(b["id"], catalogue.RenameRequest(name="Renamed"))["name"], "Renamed")
-        catalogue.delete_from_library(a["id"])
+        catalogue.delete_from_library(a["id"], session=self.session)
         self.assertEqual([c["name"] for c in catalogue.read_library()], ["Renamed"])
 
     def test_not_a_pdf_is_a_422(self):
@@ -110,7 +116,7 @@ class LibraryEndpointTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 413)
 
     def test_unknown_catalogue_is_a_404(self):
-        for call in (lambda: catalogue.library_pdf("0" * 32), lambda: catalogue.delete_from_library("0" * 32),
+        for call in (lambda: catalogue.library_pdf("0" * 32), lambda: catalogue.delete_from_library("0" * 32, session=self.session),
                      lambda: catalogue.rename_in_library("0" * 32, catalogue.RenameRequest(name="x"))):
             with self.assertRaises(HTTPException) as ctx:
                 call()
