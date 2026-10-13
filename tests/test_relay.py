@@ -214,6 +214,12 @@ async def _register(port, office, secret=PC_SECRET):
     return answer, writer
 
 
+class DefaultsTests(unittest.TestCase):
+    def test_who_owns_an_office_is_remembered_for_weeks_not_hours(self):
+        # forgetting an owner lets anyone who knows the office id claim it, so it takes a long absence
+        self.assertGreaterEqual(RelayServer().office_ttl, 30 * 86400)
+
+
 class AbuseTests(unittest.IsolatedAsyncioTestCase):
     async def serve(self, **options):
         self.relay = RelayServer(rate_limit=1000, **options)

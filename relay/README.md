@@ -75,7 +75,7 @@ WantedBy=multi-user.target
 ## Good to know
 
 * `--state` keeps (only) a hash of each PC's secret on disk, so after a restart nobody who learnt an office id can take
-  the office over; without it a restart forgets who owns what. Offices unused for 24 hours are forgotten, and one
+  the office over; without it a restart forgets who owns what. Offices unused for 30 days are forgotten, and one
   address can create only 10 new offices an hour.
 * If the relay restarts, PCs reconnect by themselves within a few seconds (they back off up to 30 s);
   phones in the middle of a request see an error and the next call works.

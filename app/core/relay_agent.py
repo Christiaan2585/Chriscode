@@ -64,9 +64,10 @@ def load_identity(directory: str) -> Identity:
 
 
 def rotate_phone_key(directory: str) -> Identity:
-    """A new key for phones: whoever had the old one can no longer reach the PC through the relay."""
-    current = load_identity(directory)
-    fresh = Identity(current.office, current.pc_secret, secrets.token_hex(32))
+    """A whole new identity (office id, PC secret and phone key): a phone that was removed or lost knew the old office
+    id and key, and with them could neither use the relay nor claim the office for itself. Phones still paired learn
+    the new details the next time they reach the PC."""
+    fresh = Identity(secrets.token_hex(16), secrets.token_hex(32), secrets.token_hex(32))
     _write(directory, fresh)
     return fresh
 

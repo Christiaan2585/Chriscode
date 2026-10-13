@@ -58,7 +58,7 @@ class _Waiting:
 class RelayServer:
     def __init__(self, pending_timeout=10.0, handshake_timeout=8.0, rate_limit=20, rate_window=60.0, max_pending=8,
                  max_active=5000, max_offices=10000, idle_timeout=900.0, ping_interval=25.0, max_per_ip=60,
-                 office_ttl=86400.0, max_new_offices_per_ip=10, new_office_window=3600.0, state_file=None):
+                 office_ttl=30 * 86400.0, max_new_offices_per_ip=10, new_office_window=3600.0, state_file=None):
         self.pending_timeout = pending_timeout
         self.handshake_timeout = handshake_timeout
         self.rate_limit = rate_limit  # failed handshakes per address per window before it is turned away

@@ -39,13 +39,14 @@ class IdentityTests(unittest.TestCase):
         self.assertNotIn(identity.pc_secret, text)
         self.assertNotIn(identity.phone_key, text)
 
-    def test_a_new_phone_key_locks_out_the_old_one_but_keeps_the_office(self):
+    def test_a_new_key_makes_a_whole_new_identity_so_what_a_removed_phone_knew_is_worthless(self):
         folder = tempfile.mkdtemp()
         before = relay_agent.load_identity(folder)
         after = relay_agent.rotate_phone_key(folder)
-        self.assertEqual(after.office, before.office)
+        self.assertNotEqual(after.office, before.office)      # a removed phone cannot squat the old office id
+        self.assertNotEqual(after.pc_secret, before.pc_secret)
         self.assertNotEqual(after.phone_key, before.phone_key)
-        self.assertEqual(relay_agent.load_identity(folder).phone_key, after.phone_key)
+        self.assertEqual(relay_agent.load_identity(folder).office, after.office)
 
     def test_the_phone_key_is_registered_with_the_relay_only_as_a_hash(self):
         identity = relay_agent.load_identity(tempfile.mkdtemp())
