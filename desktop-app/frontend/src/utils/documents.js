@@ -1,6 +1,6 @@
 import apiClient from "../api/client";
 import { isNativeApp, shareBlob } from "./nativeFiles";
-export { programSend, quoteDoc } from "./clientSend";
+export { invoiceDoc, programSend, quoteDoc } from "./clientSend";
 
 const API_PATH = { invoice: "invoices", quote: "quotes", "purchase-order": "purchase-orders", "credit-note": "credit-notes" };
 

@@ -11,7 +11,7 @@ import SearchableSelect from "../components/SearchableSelect";
 import DocumentPreview from "../components/DocumentPreview";
 import InvoicePayments from "../components/InvoicePayments";
 import { ClientHover, DocumentHover } from "../components/PreviewCards";
-import { downloadDocumentPdf } from "../utils/documents";
+import { downloadDocumentPdf, invoiceDoc } from "../utils/documents";
 import { newestFirst } from "../utils/format";
 import { pickerProducts } from "../utils/products";
 
@@ -302,7 +302,7 @@ const Invoices = () => {
                 </td>
                 <td data-actions className="px-6 py-4 text-right flex justify-end gap-2">
                   <button
-                    onClick={() => setPreview({ kind: "invoice", id: inv.id, title: inv.number })}
+                    onClick={() => setPreview(invoiceDoc(inv, clients?.find((c) => c.id === inv.client_id)))}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
                     title="Preview"
                   >

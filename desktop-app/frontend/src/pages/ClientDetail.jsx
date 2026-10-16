@@ -16,7 +16,7 @@ import TaxCertificate from "../components/TaxCertificate";
 import RamsPanel from "../components/RamsPanel";
 import { loadedLanguages, useSupplierBook } from "../components/SupplierCatalogue";
 import { DocumentHover } from "../components/PreviewCards";
-import { downloadDocumentPdf, orderFormFor, quoteDoc, markQuoteSent, statementFor } from "../utils/documents";
+import { downloadDocumentPdf, orderFormFor, invoiceDoc, quoteDoc, markQuoteSent, statementFor } from "../utils/documents";
 import { farmLabel, money, statusStyle } from "../utils/format";
 
 
@@ -653,7 +653,7 @@ const ClientDetail = () => {
                           <option value="cancelled">Cancelled</option>
                         </select>
                         <button
-                          onClick={() => setPreview({ kind: "invoice", id: inv.id, title: inv.number })}
+                          onClick={() => setPreview(invoiceDoc(inv, client))}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
                           title="Preview"
                         >

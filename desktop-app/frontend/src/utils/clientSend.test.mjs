@@ -17,3 +17,11 @@ test("programSend tells costs from the program sheet and survives a missing clie
   assert.doesNotMatch(mod.programSend({ name: "Piet" }, false).subject, /costs/);
   assert.equal(mod.programSend(undefined, false).phone, undefined);
 });
+
+test("invoiceDoc carries the client's contact details and the invoice number", () => {
+  const doc = mod.invoiceDoc({ id: 3, number: "INV0000182" }, { name: "Piet", phone: "0821234567", email: "p@x.co" });
+  assert.equal(doc.kind, "invoice");
+  assert.equal(doc.send.phone, "0821234567");
+  assert.match(doc.send.subject, /INV0000182/);
+  assert.match(doc.send.message, /invoice \(INV0000182\)/);
+});
