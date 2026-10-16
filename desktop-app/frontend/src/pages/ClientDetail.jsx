@@ -11,6 +11,7 @@ import apiClient from "../api/client";
 import { toTelLink, toWhatsAppLink } from "../utils/contact";
 import Modal from "../components/Modal";
 import DocumentPreview from "../components/DocumentPreview";
+import TreatmentReminder from "../components/TreatmentReminder";
 import HerdingProgramPanel from "../components/HerdingProgramPanel";
 import TaxCertificate from "../components/TaxCertificate";
 import RamsPanel from "../components/RamsPanel";
@@ -258,6 +259,7 @@ const ClientDetail = () => {
           >
             <FileText size={18} /> Statement
           </button>
+          <TreatmentReminder client={client} />
           <button
             onClick={openEditClient}
             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm text-sm font-medium"

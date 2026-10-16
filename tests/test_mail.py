@@ -124,6 +124,16 @@ class SendTests(MailCase):
         self.assertIn(("starttls",), FakeSMTP.log)
         self.assertIn(("login", "office@example.com", "s3cret pass"), FakeSMTP.log)
 
+    def test_a_message_can_go_without_an_attachment(self):
+        # Treatment reminders are plain messages: POST /mail/send with no file.
+        import asyncio
+        self.configure()
+        asyncio.run(mail_api.send(to="client@example.com", subject="Dates", message="- 24 Oct: dosing", file=None, session=self.s))
+        [msg] = FakeSMTP.sent
+        parsed = message_from_bytes(msg.as_bytes(), policy=policy.default)
+        self.assertEqual(list(parsed.iter_attachments()), [])
+        self.assertIn("24 Oct", parsed.get_body(("plain",)).get_content())
+
     def test_ssl_security_connects_straight_over_tls(self):
         self.configure(port=465, security="ssl")
         self.send()

@@ -7,24 +7,32 @@ import Modal from "./Modal";
 import { fetchDocumentPdf, pdfFilename, saveBlob } from "../utils/documents";
 import { sendDocument, sendLink } from "../utils/sending";
 import { isNativeApp } from "../utils/nativeFiles";
+import { describeSend, sendKindOf } from "../utils/sends";
+import { useRecordSend, useSends } from "../utils/useSends";
 
 const sendButton =
   "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-emerald-400 disabled:opacity-50";
 
 // "Send on WhatsApp" / "Send by email" for a document meant for a client
 // (doc.send = { phone, email, subject, message }) - see utils/sending.js.
-const SendButtons = ({ blob, filename, send }) => {
+const SendButtons = ({ blob, filename, send, doc }) => {
   const [status, setStatus] = useState(null);
   const [busy, setBusy] = useState(false);
   const [composing, setComposing] = useState(false);
   // Shown only once an admin has set up the business's mail server (Settings -> Email).
   const { data: mail } = useQuery({ queryKey: ["mail-status"], queryFn: async () => (await apiClient.get("/mail/status")).data });
+  const record = useRecordSend();
+  const kind = sendKindOf(doc);
+  const perDocument = kind && kind !== "statement" && kind !== "order-form";
+  const { data: sent } = useSends(perDocument ? kind : null);
+  const last = perDocument ? describeSend(sent?.[String(doc.id)], kind) : null;
   const go = async (via) => {
     setBusy(true);
     setStatus(null);
     try {
       const savedTo = await sendDocument(blob, filename, via, send);
       send.onSent?.(); // e.g. a purchase order becomes "Sent"
+      record(doc, via, via === "whatsapp" ? send.phone : send.email);
       const app = via === "whatsapp" ? "WhatsApp" : "your email";
       setStatus({ ok: true, text: savedTo
         ? `Saved in Documents > Sandveld Vee Dienste > Sent to clients (shown in Explorer) and opened ${app} - drag the file in and send.`
@@ -48,11 +56,12 @@ const SendButtons = ({ blob, filename, send }) => {
           <Send size={16} /> Send from app
         </button>
       )}
-      {composing && <EmailDocumentDialog blob={blob} filename={filename} send={send} onClose={() => setComposing(false)} />}
+      {composing && <EmailDocumentDialog blob={blob} filename={filename} send={send} onClose={() => setComposing(false)} onDone={(to) => record(doc, "app-email", to)} />}
       <button type="button" className={sendButton} disabled={!blob || busy || noEmail} onClick={() => go("email")}
         title={noEmail ? "This client has no email address" : "Send by email"}>
         <Mail size={16} /> Email
       </button>
+      {last && <p className="basis-full text-xs text-slate-500" title={last.long}>{last.long}</p>}
       {status && (
         <p role={status.ok ? "status" : "alert"} className={`basis-full text-sm ${status.ok ? "text-emerald-700" : "text-red-600"}`}>
           {status.text}
@@ -118,7 +127,7 @@ const DocumentPreview = ({ doc, onClose }) => {
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-end gap-3">
           {doc?.hint && <p className="mr-auto text-sm text-slate-600">{doc.hint}</p>}
-          {doc?.send && <SendButtons key={doc.url} blob={blob} filename={filename} send={doc.send} />}
+          {doc?.send && <SendButtons key={doc.url} blob={blob} filename={filename} send={doc.send} doc={doc} />}
           {!doc?.noPrint && !phone && (
             <button type="button" disabled={!blob} onClick={printIt} className={sendButton}>
               <Printer size={16} /> Print

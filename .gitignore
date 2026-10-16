@@ -55,3 +55,6 @@ desktop-app/backend/
 
 # graphify knowledge graph (rebuilt with `graphify update .`)
 graphify-out/
+
+# Build output logs from build_and_package.bat
+build-*.log

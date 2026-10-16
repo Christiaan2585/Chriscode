@@ -11,7 +11,7 @@ from app.core.db import create_db_and_tables, database_file_path, engine
 from app.core.backup import backup_on_version_change, start_scheduler
 from app.core.local_secret import LocalSecretGuard, configured_secret
 from app.core.security import require_settled_password
-from app.api import audit as audit_api, payments, reports, trash as trash_api, mail, stock as stock_api, auth, clients, animals, rams, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups, exports, business, purchase_orders, devices, catalogue
+from app.api import audit as audit_api, payments, reports, trash as trash_api, mail, stock as stock_api, auth, clients, animals, rams, medical, programs, products, invoices, notes, weights, schedules, analytics, herds, appointments, quotes, orders, dosing, backups, exports, business, purchase_orders, devices, catalogue, sends
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -94,6 +94,7 @@ app.include_router(payments.router, dependencies=_protected)
 app.include_router(reports.router, dependencies=_protected)
 app.include_router(trash_api.router, dependencies=_protected)
 app.include_router(mail.router, dependencies=_protected)
+app.include_router(sends.router, dependencies=_protected)
 app.include_router(stock_api.router, dependencies=_protected)
 app.include_router(notes.router, dependencies=_protected)
 app.include_router(weights.router, dependencies=_protected)

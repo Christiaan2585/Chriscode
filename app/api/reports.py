@@ -5,9 +5,10 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response, StreamingResponse
+from pydantic import BaseModel, Field
 from sqlmodel import Session
 
-from app.core import reports
+from app.core import reports, statement_mail
 from app.core.db import get_session
 from app.core.security import require_admin
 from app.models.client import Client
@@ -56,3 +57,16 @@ def accounting(start: Optional[date] = None, end: Optional[date] = None, session
     return Response(reports.accounting_workbook(session, start, end),
                     media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f'attachment; filename="sandveld-accounts-{start}-to-{end}.xlsx"'})
+
+
+class EmailStatements(BaseModel):
+    client_ids: list[int] = Field(max_length=statement_mail.MAX_CLIENTS)
+    start: Optional[date] = None
+    end: Optional[date] = None
+
+
+@router.post("/statements/email")
+def email_statements(body: EmailStatements, session: Session = Depends(get_session)):
+    """Month-end statements by email to the chosen clients (see app/core/statement_mail.py)."""
+    start, end = _period(body.start, body.end)
+    return statement_mail.email_statements(session, body.client_ids, start, end)

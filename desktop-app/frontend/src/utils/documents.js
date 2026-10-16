@@ -1,6 +1,7 @@
 import apiClient from "../api/client";
 import { isNativeApp, shareBlob } from "./nativeFiles";
-export { invoiceDoc, programSend, quoteDoc } from "./clientSend";
+import { statementMessage } from "./clientSend";
+export { invoiceDoc, languageOf, programSend, quoteDoc, reminderDoc, statementMessage, treatmentMessage } from "./clientSend";
 
 const API_PATH = { invoice: "invoices", quote: "quotes", "purchase-order": "purchase-orders", "credit-note": "credit-notes" };
 
@@ -64,12 +65,7 @@ export const statementFor = (client, start = "", end = "") => {
     title: `for ${client.farm_name || client.name}`,
     url: `/reports/clients/${client.id}/statement.pdf${query ? `?${query}` : ""}`,
     filename: `Statement - ${name}${end ? ` ${end}` : ""}.pdf`,
-    send: {
-      phone: client.phone,
-      email: client.email,
-      subject: "Your statement of account",
-      message: `Good day ${client.name}, please find your statement of account attached. Thank you!`,
-    },
+    send: { phone: client.phone, email: client.email, clientId: client.id, ...statementMessage(client) },
   };
 };
 

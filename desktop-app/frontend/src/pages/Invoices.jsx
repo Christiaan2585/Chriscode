@@ -1,11 +1,13 @@
 import ShowMore from "../components/ShowMore";
+import SentNote from "../components/SentNote";
+import { useSends } from "../utils/useSends";
 import { usePaged } from "../utils/usePaged";
 import React, { useState } from "react";
 import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
 import { useSelection } from "../utils/useSelection";
 import { useOpenNew } from "../utils/useOpenNew";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, FileText, Trash2, Download, X, Edit, Eye, Wallet } from "lucide-react";
+import { Plus, Search, FileText, Trash2, Download, X, Edit, Eye, Wallet, BellRing } from "lucide-react";
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
 import Modal from "../components/Modal";
@@ -13,8 +15,9 @@ import SearchableSelect from "../components/SearchableSelect";
 import DocumentPreview from "../components/DocumentPreview";
 import InvoicePayments from "../components/InvoicePayments";
 import { ClientHover, DocumentHover } from "../components/PreviewCards";
-import { downloadDocumentPdf, invoiceDoc } from "../utils/documents";
-import { newestFirst } from "../utils/format";
+import { downloadDocumentPdf, invoiceDoc, reminderDoc } from "../utils/documents";
+import { isOverdue } from "../utils/overdue";
+import { money, newestFirst } from "../utils/format";
 import { pickerProducts } from "../utils/products";
 
 const emptyInvoice = { client_id: "", status: "unpaid", notes: "", reference: "", due_date: "" };
@@ -69,6 +72,8 @@ const Invoices = () => {
     );
   }).sort(newestFirst);
   const paged = usePaged(filteredInvoices);
+  const { data: sentInvoices } = useSends("invoice");
+  const { data: sentReminders } = useSends("reminder");
   const selection = useSelection((filteredInvoices).map((r) => r.id));
 
   const closeModal = () => {
@@ -281,6 +286,8 @@ const Invoices = () => {
                 <SelectTd selection={selection} id={inv.id} label={`Select ${((id) => invoices?.find((r) => r.id === id)?.number || `#${id}`)(inv.id)}`} />
                 <td data-primary className="px-6 py-4 text-slate-600 font-medium">
                   <DocumentHover kind="invoice" doc={inv} clientName={clientName(inv.client_id)}>{inv.number || `#${inv.id}`}</DocumentHover>
+                  <SentNote entry={sentInvoices?.[String(inv.id)]} />
+                  <SentNote entry={sentReminders?.[String(inv.id)]} kind="reminder" />
                 </td>
                 <td data-label="Date" className="px-6 py-4 text-slate-600">{new Date(inv.date).toLocaleDateString()}</td>
                 <td data-label="Client" className="px-6 py-4 text-slate-600">
@@ -311,6 +318,16 @@ const Invoices = () => {
                   >
                     <Eye size={18} />
                   </button>
+                  {isOverdue(inv, balances?.[inv.id]) && (
+                    <button
+                      onClick={() => setPreview(reminderDoc(inv, clients?.find((c) => c.id === inv.client_id), { amountText: money(balances[inv.id].balance), dueDate: inv.due_date }))}
+                      className="p-2 text-amber-500 hover:text-amber-600 transition-colors"
+                      title="Send a payment reminder"
+                      aria-label="Send a payment reminder"
+                    >
+                      <BellRing size={18} />
+                    </button>
+                  )}
                   <button
                     onClick={() => setPaying(inv)}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"

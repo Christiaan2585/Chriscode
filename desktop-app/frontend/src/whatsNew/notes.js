@@ -3,6 +3,31 @@
 // people will notice. (Never put the business's program steps, products or doses here: the repository is public.)
 export const NOTES = [
   {
+    version: "1.0.18",
+    title: "Faster, and easier to keep in touch with clients",
+    sections: [
+      {
+        heading: "Faster",
+        items: [
+          "The app opens about a third quicker, and the window shows straight away while it gets ready.",
+          "Screens load their data faster, and long lists (hundreds of invoices or clients) show 100 at a time with Show more, so they no longer slow down.",
+        ],
+      },
+      {
+        heading: "New",
+        items: [
+          "Send invoices, quotes and herding programs to a client by WhatsApp or email, and see at a glance what was sent and when (a small \"Sent by email\" note under each one).",
+          "Payment reminders: a bell button on every overdue invoice sends a friendly reminder with the invoice attached.",
+          "Month-end statements: on the Reports page, email a statement to everyone who owes money in one go.",
+          "Remind of dates: on a client's page, send the farmer their coming herding program dates.",
+          "Each client can be set to English or Afrikaans, and everything the app sends them is written in that language.",
+          "Settings now shows an amber badge when something still needs filling in, instead of a pop-up every time the app opens.",
+          "Setting up email is much easier: pick Gmail, Outlook or Yahoo, type your address and password, and the app tests it for you.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.17",
     title: "Send invoices, and quotes that turn to Sent",
     sections: [

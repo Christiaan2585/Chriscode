@@ -14,6 +14,7 @@ from app.api.business import default_due_date, document_lines, get_business, nex
 from app.models.client import Client
 from app.core.security import get_current_user, require_admin
 from app.models.user import User
+from app.api import sends
 
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
 
@@ -80,6 +81,8 @@ def delete_invoice(invoice_id: int, session: Session = Depends(get_session)):
         for row in session.exec(select(model).where(model.invoice_id == invoice_id)).all():
             session.delete(row)
     stock.sync_invoice(session, invoice, deleted=True)
+    sends.forget(session, "invoice", invoice_id)  # what was sent about it goes with it
+    sends.forget(session, "reminder", invoice_id)
     session.delete(invoice)
     session.commit()
     return {"ok": True}

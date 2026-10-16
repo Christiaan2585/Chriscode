@@ -1,4 +1,6 @@
 import ShowMore from "../components/ShowMore";
+import SentNote from "../components/SentNote";
+import { useSends } from "../utils/useSends";
 import { usePaged } from "../utils/usePaged";
 import React, { useState, useEffect } from "react";
 import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
@@ -70,6 +72,7 @@ const Quotes = () => {
     );
   }).sort(newestFirst);
   const paged = usePaged(filteredQuotes);
+  const { data: sentQuotes } = useSends("quote");
   const selection = useSelection((filteredQuotes).map((r) => r.id));
 
   // Arriving from the Calculator's "Create Quote" button: open the builder
@@ -306,6 +309,7 @@ const Quotes = () => {
                 <SelectTd selection={selection} id={q.id} label={`Select ${((id) => quotes?.find((r) => r.id === id)?.number || `#${id}`)(q.id)}`} />
                 <td data-primary className="px-6 py-4 text-slate-600">
                   <DocumentHover kind="quote" doc={q} clientName={clientName(q.client_id)}>{q.number || `#${q.id}`}</DocumentHover>
+                  <SentNote entry={sentQuotes?.[String(q.id)]} />
                   {q.program_id && (
                     <Link to={`/programs/${q.program_id}`} title="This quote is a herding program - open it"
                       className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100">

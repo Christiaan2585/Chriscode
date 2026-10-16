@@ -5,6 +5,7 @@ import { Download, FileText } from "lucide-react";
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
 import DocumentPreview from "../components/DocumentPreview";
+import StatementRun from "../components/StatementRun";
 import { saveBlob, statementFor } from "../utils/documents";
 import { money } from "../utils/format";
 
@@ -115,6 +116,8 @@ const Reports = () => {
           </div>
         )}
       </section>
+
+      <StatementRun debtors={data?.clients} period={statementPeriod} />
 
       <section data-admin-only className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h3 className="text-lg font-semibold text-slate-800">Export for the accountant</h3>

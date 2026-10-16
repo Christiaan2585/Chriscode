@@ -21,6 +21,7 @@ from app.models.medical import MedicalRecord
 from app.models.note import ClientNote
 from app.models.order import Order
 from app.models.brochure import BrochureSend
+from app.models.sends import DocumentSend
 from app.models.product import Product, ProductImage, StockMovement
 from app.models.product_dosing import ProductDosing
 from app.models.purchase_order import PurchaseOrderItem
@@ -87,7 +88,7 @@ def delete_client(session: Session, client: Client) -> None:
         for step in herding.ordered_steps(session, program.id):  # the client's own copy
             herding.delete_step(session, step)
         session.delete(program)
-    for model in (Appointment, ClientNote, Herd, ClientDocument, BrochureSend):
+    for model in (Appointment, ClientNote, Herd, ClientDocument, BrochureSend, DocumentSend):
         for row in _rows(session, model, model.client_id, client.id):
             session.delete(row)
     session.delete(client)

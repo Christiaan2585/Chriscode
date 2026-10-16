@@ -77,10 +77,13 @@ def send_test(body: TestIn, session: Session = Depends(get_session)):
 
 
 @router.post("/send")
-async def send(to: str = Form(...), subject: str = Form(""), message: str = Form(""), file: UploadFile = File(...),
+async def send(to: str = Form(...), subject: str = Form(""), message: str = Form(""), file: Optional[UploadFile] = File(None),
                session: Session = Depends(get_session)):
     if not mailer.is_configured(session):
         raise HTTPException(status_code=409, detail="Email isn't set up yet - an admin can do that in Settings -> Email")
+    if file is None:  # a plain message (e.g. a treatment reminder)
+        mailer.send_message(session, to.strip(), subject, message)
+        return {"ok": True}
     data = await read_capped(file, mailer.MAX_ATTACHMENT_BYTES)
     mailer.send_document(session, to.strip(), subject, message, file.filename or "document.pdf", data)
     return {"ok": True}

@@ -12,6 +12,7 @@ class Client(SQLModel, table=True):
     vat_number: Optional[str] = None
     farm_name: Optional[str] = None
     town: Optional[str] = None  # the farm's town or area - the Clients list filters and sorts by it
+    language: Optional[str] = None  # "en" or "af": what the app writes to them (quotes, invoices, reminders); blank = English
     # When this client was given the standard herding program (or already had a
     # program). Set once, so deleting a client's program doesn't bring it back.
     standard_program_at: Optional[datetime] = None

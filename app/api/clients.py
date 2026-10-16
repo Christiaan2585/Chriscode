@@ -38,9 +38,21 @@ _COLUMN_ALIASES = {
     "town": ["town", "area", "city", "dorp", "district", "streek"],
 }
 
+LANGUAGES = {"en", "af"}
+
+
+def _clean_language(value):
+    """'' and None mean English (stored as NULL); anything but en/af is refused."""
+    value = (value or "").strip().lower()
+    if value and value not in LANGUAGES:
+        raise HTTPException(status_code=422, detail="Language must be English (en) or Afrikaans (af)")
+    return value or None
+
+
 @router.post("/", response_model=Client)
 def create_client(client: Client, session: Session = Depends(get_session)):
     client.id = None  # the database picks the number
+    client.language = _clean_language(client.language)
     client.standard_program_at = client.erased_at = None  # not something a caller sets
     session.add(client)
     session.commit()
@@ -202,7 +214,10 @@ def update_client(client_id: int, client_data: Client, session: Session = Depend
     # details, not the client's original registration date - without this
     # exclusion, editing a client would silently reset when they were added).
     # exclude_unset: a form that doesn't know a field (e.g. VAT number) mustn't blank it.
-    for key, value in client_data.model_dump(exclude_unset=True, exclude={"id", "created_at", "standard_program_at", "erased_at"}).items():
+    changes = client_data.model_dump(exclude_unset=True, exclude={"id", "created_at", "standard_program_at", "erased_at"})
+    if "language" in changes:
+        changes["language"] = _clean_language(changes["language"])
+    for key, value in changes.items():
         setattr(db_client, key, value)
 
     session.add(db_client)

@@ -12,6 +12,7 @@ from app.core import herding, program_quote, trash
 from app.models.client import Client
 from app.core.security import get_current_user, require_admin
 from app.models.user import User
+from app.api import sends
 from app.core.pdf import generate_quote_pdf
 from app.core.order_form import NotAnOrderForm, read_order_form
 from app.models.product import Product
@@ -141,6 +142,7 @@ def delete_quote(quote_id: int, session: Session = Depends(get_session)):
     statement = select(QuoteItem).where(QuoteItem.quote_id == quote_id)
     for item in session.exec(statement).all():
         session.delete(item)
+    sends.forget(session, "quote", quote_id)  # what was sent about it goes with it
     session.delete(quote)
     session.commit()
     return {"ok": True}

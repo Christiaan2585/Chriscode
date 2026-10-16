@@ -15,7 +15,7 @@ import { ClientHover } from "../components/PreviewCards";
 import { farmLabel } from "../utils/format";
 import { NO_TOWN, SORTS, filterAndSort, townsOf } from "../utils/clientList";
 
-const emptyClient = { name: "", email: "", phone: "", address: "", postal_address: "", vat_number: "", farm_name: "", town: "" };
+const emptyClient = { name: "", email: "", phone: "", address: "", postal_address: "", vat_number: "", farm_name: "", town: "", language: "" };
 const filterInput = "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
 
 const Clients = () => {
@@ -97,6 +97,7 @@ const Clients = () => {
       vat_number: client.vat_number || "",
       farm_name: client.farm_name || "",
       town: client.town || "",
+      language: client.language || "",
     });
     setIsModalOpen(true);
   };
@@ -325,6 +326,19 @@ const Clients = () => {
               className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
             />
             <datalist id="client-towns">{towns.map((t) => <option key={t} value={t} />)}</datalist>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="client-language">Language for messages</label>
+            <select
+              id="client-language"
+              value={form.language}
+              onChange={(e) => setForm({ ...form, language: e.target.value })}
+              className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+            >
+              <option value="">English</option>
+              <option value="af">Afrikaans</option>
+            </select>
+            <p className="mt-1 text-xs text-slate-500">Quotes, invoices, statements and reminders sent to this client are written in this language.</p>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>

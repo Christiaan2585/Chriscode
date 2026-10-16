@@ -7,7 +7,7 @@ const field = "w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline
 
 // "Send from the app": the PDF goes to the office PC, which emails it through the business's own mail server
 // (app/api/mail.py). `send` = { email, subject, message } as for the WhatsApp/Email buttons.
-const EmailDocumentDialog = ({ blob, filename, send, onClose }) => {
+const EmailDocumentDialog = ({ blob, filename, send, onClose, onDone }) => {
   const [to, setTo] = useState(send.email || "");
   const [subject, setSubject] = useState(send.subject || "");
   const [message, setMessage] = useState(send.message || "");
@@ -22,7 +22,7 @@ const EmailDocumentDialog = ({ blob, filename, send, onClose }) => {
       form.append("file", new File([blob], filename, { type: "application/pdf" }));
       return apiClient.post("/mail/send", form, { silent: true, headers: { "Content-Type": "multipart/form-data" } });
     },
-    onSuccess: () => { setError(""); setDone(true); send.onSent?.(); },
+    onSuccess: () => { setError(""); setDone(true); send.onSent?.(); onDone?.(to.trim()); },
     onError: (err) => setError(Array.isArray(err?.response?.data?.detail) ? "That isn't a valid email address." : err?.response?.data?.detail?.toString?.() || "That didn't send."),
   });
 
