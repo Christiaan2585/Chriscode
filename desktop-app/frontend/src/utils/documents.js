@@ -73,6 +73,15 @@ export const statementFor = (client, start = "", end = "") => {
   };
 };
 
+// A Draft quote that has been sent to the client becomes "Sent". A herding program's own quote is changed
+// through the program (it keeps the program and quote in step); anything not a Draft is left alone.
+export async function markQuoteSent(quote, queryClient, programId = null) {
+  if (quote.status !== "Draft") return;
+  if (programId) await apiClient.put(`/programs/${programId}/quote/status`, { status: "Sent" });
+  else await apiClient.put(`/quotes/${quote.id}`, { ...quote, status: "Sent" });
+  for (const key of ["quotes", "program-schedule", "programs", "clients"]) queryClient.invalidateQueries({ queryKey: [key] });
+}
+
 export async function downloadDocumentPdf(kind, id, number) {
   saveBlob(await fetchDocumentPdf(kind, id), pdfFilename(kind, id, number));
 }

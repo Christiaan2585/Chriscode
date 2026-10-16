@@ -16,7 +16,7 @@ import TaxCertificate from "../components/TaxCertificate";
 import RamsPanel from "../components/RamsPanel";
 import { loadedLanguages, useSupplierBook } from "../components/SupplierCatalogue";
 import { DocumentHover } from "../components/PreviewCards";
-import { downloadDocumentPdf, orderFormFor, quoteDoc, statementFor } from "../utils/documents";
+import { downloadDocumentPdf, orderFormFor, quoteDoc, markQuoteSent, statementFor } from "../utils/documents";
 import { farmLabel, money, statusStyle } from "../utils/format";
 
 
@@ -539,7 +539,7 @@ const ClientDetail = () => {
                           <option value="Accepted">Accepted</option>
                         </select>
                         <button
-                          onClick={() => setPreview(quoteDoc(q, client))}
+                          onClick={() => setPreview(quoteDoc(q, client, () => markQuoteSent(q, queryClient, q.program_id)))}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
                           title="Preview"
                         >

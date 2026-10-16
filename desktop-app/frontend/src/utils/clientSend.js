@@ -8,11 +8,12 @@ const clientSend = (client, subject, what, number) => ({
 });
 
 // A quote ready to send: the preview's WhatsApp / Email buttons need `send`.
-export const quoteDoc = (quote, client) => ({
+// `onSent` runs once it has gone (the quote becomes "Sent", see documents.js markQuoteSent).
+export const quoteDoc = (quote, client, onSent) => ({
   kind: "quote",
   id: quote.id,
   title: quote.number,
-  send: clientSend(client, "Your quote", "quote", quote.number),
+  send: { ...clientSend(client, "Your quote", "quote", quote.number), onSent },
 });
 
 // The herding program sheet (kind "program") or its costs (kind "program-costs") for a client.
