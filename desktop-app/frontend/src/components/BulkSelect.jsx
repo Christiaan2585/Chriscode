@@ -1,3 +1,5 @@
+import { t } from "../utils/i18n";
+import { UNDO_NOTE } from "../utils/confirmText";
 import React, { useState } from "react";
 import { Trash2, X } from "lucide-react";
 import { deleteMany } from "../utils/useSelection";
@@ -28,14 +30,15 @@ export const SelectBox = ({ selection, id, label, className = "" }) => (
 // Appears once something is ticked: "3 selected - Delete selected". Asks first,
 // deletes one by one with `deleteOne(id)`, and says what couldn't be deleted.
 // `describe(id)` names a record for that list; `onDone` refreshes the page.
-export const BulkBar = ({ selection, noun, deleteOne, describe, onDone }) => {
+// inBin: the records go to the recycle bin, so they can be brought back (false for things that are really gone, like files).
+export const BulkBar = ({ selection, noun, deleteOne, describe, onDone, inBin = true }) => {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
 
   const run = async () => {
     const ids = selection.selected;
     const plural = ids.length === 1 ? noun : `${noun}s`;
-    if (!window.confirm(`Delete ${ids.length} ${plural}? This can't be undone.`)) return;
+    if (!window.confirm(`Delete ${ids.length} ${plural}? ${inBin ? UNDO_NOTE : "This can't be undone."}`)) return;
     setBusy(true);
     const outcome = await deleteMany(ids, deleteOne);
     setBusy(false);
@@ -47,14 +50,14 @@ export const BulkBar = ({ selection, noun, deleteOne, describe, onDone }) => {
   return (
     <>
       {selection.count > 0 && (
-        <div role="region" aria-label="Selected" className="flex flex-wrap items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-900">
+        <div role="region" aria-label={t("Selected")} className="flex flex-wrap items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-900">
           <span className="font-medium">{selection.count} selected</span>
           <button type="button" onClick={run} disabled={busy}
             className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 font-medium text-white hover:bg-red-700 disabled:opacity-50">
             <Trash2 size={14} /> {busy ? "Deleting…" : "Delete selected"}
           </button>
           <button type="button" onClick={selection.clear} disabled={busy} className="flex items-center gap-1 text-emerald-800 hover:underline">
-            <X size={14} /> Clear
+            <X size={14} /> {t("Clear")}
           </button>
         </div>
       )}
@@ -65,7 +68,7 @@ export const BulkBar = ({ selection, noun, deleteOne, describe, onDone }) => {
               Deleted {result.deleted} {result.deleted === 1 ? result.noun : `${result.noun}s`}
               {result.failed.length > 0 && <>; {result.failed.length} couldn't be deleted:</>}
             </p>
-            <button type="button" onClick={() => setResult(null)} aria-label="Dismiss" className="text-slate-500 hover:text-slate-800"><X size={14} /></button>
+            <button type="button" onClick={() => setResult(null)} aria-label={t("Dismiss")} className="text-slate-500 hover:text-slate-800"><X size={14} /></button>
           </div>
           {result.failed.length > 0 && (
             <ul className="mt-1 list-disc space-y-0.5 pl-5">

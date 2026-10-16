@@ -326,3 +326,27 @@ button.bg-emerald-600, a.bg-emerald-600 {
 
 /* Delete buttons and the tick boxes that start a bulk delete are for admins only (the server enforces it; AuthContext sets the class). */
 .staff-user [data-admin-only] { display: none !important; }
+
+/* ---------------------------------------------------------------------
+   High contrast (Settings > General > Appearance). Secondary text becomes
+   near-black (near-white in the dark theme) and the borders much stronger.
+   The !important is deliberate: the colour scheme writes these same variables
+   inline on <html>, and this choice has to win over it.
+   --------------------------------------------------------------------- */
+html.high-contrast {
+  --color-slate-200: #94a3b8 !important;
+  --color-slate-300: #64748b !important;
+  --color-slate-400: #334155 !important;
+  --color-slate-500: #1e293b !important;
+  --color-slate-600: #0f172a !important;
+  --color-slate-700: #020617 !important;
+}
+html.theme-dark.high-contrast {
+  --dk-text: #ffffff !important;
+  --color-slate-200: #64748b !important;
+  --color-slate-300: #94a3b8 !important;
+  --color-slate-400: #e2e8f0 !important;
+  --color-slate-500: #f1f5f9 !important;
+  --color-slate-600: #f8fafc !important;
+  --color-slate-700: #ffffff !important;
+}

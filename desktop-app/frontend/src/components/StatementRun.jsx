@@ -1,3 +1,4 @@
+import { t } from "../utils/i18n";
 import React, { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Send } from "lucide-react";
@@ -32,15 +33,15 @@ const StatementRun = ({ debtors, period }) => {
     <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 bg-slate-50 p-4">
         <div>
-          <h3 className="text-lg font-semibold text-slate-800">Email statements</h3>
-          <p className="text-sm text-slate-500">Send everyone who owes money their statement of account, for the statement period above. Each is written in the client's language.</p>
+          <h3 className="text-lg font-semibold text-slate-800">{t("Email statements")}</h3>
+          <p className="text-sm text-slate-500">{t("Send everyone who owes money their statement of account, for the statement period above. Each is written in the client's language.")}</p>
         </div>
         <button type="button" onClick={send} disabled={!mail?.configured || run.isPending || selected.size === 0}
           className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50">
           <Send size={16} /> {run.isPending ? "Sending..." : `Email ${selected.size} statement${selected.size === 1 ? "" : "s"}`}
         </button>
       </div>
-      {mail && !mail.configured && <p className="px-4 pt-3 text-sm text-amber-700">Email isn't set up yet. An admin can set it up under Settings → Email.</p>}
+      {mail && !mail.configured && <p className="px-4 pt-3 text-sm text-amber-700">{t("Email isn't set up yet. An admin can set it up under Settings → Email.")}</p>}
       <ul className="max-h-72 divide-y divide-slate-100 overflow-y-auto">
         {rows.map((r) => (
           <li key={r.client_id} className="flex items-center gap-3 px-4 py-2 text-sm">

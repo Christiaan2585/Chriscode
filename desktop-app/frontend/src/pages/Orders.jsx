@@ -1,3 +1,5 @@
+import { t } from "../utils/i18n";
+import { deleteConfirm } from "../utils/confirmText";
 import ShowMore from "../components/ShowMore";
 import { usePaged } from "../utils/usePaged";
 import React, { useState } from "react";
@@ -8,7 +10,7 @@ import { Plus, Search, ShoppingCart, Trash2, Edit } from "lucide-react";
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
 import Modal from "../components/Modal";
-import SearchableSelect from "../components/SearchableSelect";
+import ClientPicker from "../components/ClientPicker";
 
 const emptyOrder = { client_id: "", quote_id: "", total_amount: 0, status: "Pending" };
 
@@ -132,20 +134,20 @@ const Orders = () => {
     }
   };
 
-  if (isLoading) return <div className="p-8 text-center">Loading orders...</div>;
+  if (isLoading) return <div className="p-8 text-center">{t("Loading orders...")}</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-slate-800">Orders Management</h2>
-          <p className="text-slate-500">Track financial orders and shipment status</p>
+          <h2 className="text-3xl font-bold text-slate-800">{t("Orders Management")}</h2>
+          <p className="text-slate-500">{t("Track financial orders and shipment status")}</p>
         </div>
         <button
           onClick={openAddModal}
           className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
         >
-          <Plus size={20} /> Create New Order
+          <Plus size={20} /> {t("Create New Order")}
         </button>
       </div>
 
@@ -157,7 +159,7 @@ const Orders = () => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search orders by client, status or #..."
+              placeholder={t("Search orders by client, status or #...")}
               className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
@@ -172,11 +174,11 @@ const Orders = () => {
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
             <tr>
               <SelectAllTh selection={selection} />
-              <th className="px-6 py-3 font-medium">Order ID</th>
-              <th className="px-6 py-3 font-medium">Client ID</th>
-              <th className="px-6 py-3 font-medium">Total Amount</th>
-              <th className="px-6 py-3 font-medium">Status</th>
-              <th className="px-6 py-3 font-medium text-right">Actions</th>
+              <th className="px-6 py-3 font-medium">{t("Order ID")}</th>
+              <th className="px-6 py-3 font-medium">{t("Client ID")}</th>
+              <th className="px-6 py-3 font-medium">{t("Total Amount")}</th>
+              <th className="px-6 py-3 font-medium">{t("Status")}</th>
+              <th className="px-6 py-3 font-medium text-right">{t("Actions")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -191,28 +193,28 @@ const Orders = () => {
               <tr key={order.id} className="hover:bg-slate-50 transition-colors">
                 <SelectTd selection={selection} id={order.id} label={`Select ${((id) => `Order #${id}`)(order.id)}`} />
                 <td data-primary className="px-6 py-4 text-slate-600 font-medium">#{order.id}</td>
-                <td data-label="Client" className="px-6 py-4 text-slate-600">{clientName(order.client_id)}</td>
-                <td data-label="Total" className="px-6 py-4 font-medium text-slate-800">R {order.total_amount.toLocaleString()}</td>
-                <td data-label="Status" className="px-6 py-4">
+                <td data-label={t("Client")} className="px-6 py-4 text-slate-600">{clientName(order.client_id)}</td>
+                <td data-label={t("Total")} className="px-6 py-4 font-medium text-slate-800">R {order.total_amount.toLocaleString()}</td>
+                <td data-label={t("Status")} className="px-6 py-4">
                   <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                     order.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' :
                     order.status === 'Shipped' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
                   }`}>
-                    {order.status}
+                    {t(order.status)}
                   </span>
                 </td>
                 <td data-actions className="px-6 py-4 text-right flex justify-end gap-2">
-                  <button onClick={() => openEditModal(order)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors" title="Edit">
+                  <button onClick={() => openEditModal(order)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors" title={t("Edit")}>
                     <Edit size={18} />
                   </button>
                   <button
                     onClick={() => {
-                      if (window.confirm(`Delete order #${order.id}? This can't be undone.`)) {
+                      if (window.confirm(deleteConfirm(`order #${order.id}`))) {
                         deleteOrderMutation.mutate(order.id);
                       }
                     }}
                     className="p-2 text-slate-400 hover:text-red-600 transition-colors"
-                    title="Delete" data-admin-only
+                    title={t("Delete")} data-admin-only
                   >
                     <Trash2 size={18} />
                   </button>
@@ -229,23 +231,17 @@ const Orders = () => {
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Client</label>
-              <SearchableSelect
-                value={form.client_id}
-                onChange={(v) => setForm({ ...form, client_id: v })}
-                options={(clients || []).map((c) => ({ value: c.id, label: c.name, sublabel: c.farm_name }))}
-                placeholder="Select a client…"
-                searchPlaceholder="Search clients…"
-              />
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Client")}</label>
+              <ClientPicker value={form.client_id} onChange={(v) => setForm({ ...form, client_id: v })} clients={clients} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Quote (Optional)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Quote (Optional)")}</label>
               <select
                 value={form.quote_id}
                 onChange={e => setForm({...form, quote_id: e.target.value})}
                 className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               >
-                <option value="">None</option>
+                <option value="">{t("None")}</option>
                 {quotes?.map(q => (
                   <option key={q.id} value={q.id}>
                     Quote #{q.id} — {clientName(q.client_id)} (R {q.total_amount.toLocaleString()})
@@ -256,7 +252,7 @@ const Orders = () => {
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Total Amount</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Total Amount")}</label>
               <input
                 type="number"
                 value={form.total_amount}
@@ -265,15 +261,15 @@ const Orders = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Status")}</label>
               <select
                 value={form.status}
                 onChange={e => setForm({...form, status: e.target.value})}
                 className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               >
-                <option value="Pending">Pending</option>
-                <option value="Paid">Paid</option>
-                <option value="Shipped">Shipped</option>
+                <option value="Pending">{t("Pending")}</option>
+                <option value="Paid">{t("Paid")}</option>
+                <option value="Shipped">{t("Shipped")}</option>
               </select>
             </div>
           </div>

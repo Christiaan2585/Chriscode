@@ -33,3 +33,11 @@ test("which kind of send a preview is recorded as", () => {
   assert.equal(sendKindOf({ kind: "tax-certificate" }), null);
   assert.equal(sendKindOf({ kind: "purchase-order" }), null);
 });
+
+test("in Afrikaans the sent note is Afrikaans", () => {
+  const d = describeSend(entry, "", "af");
+  assert.match(d.short, /^Gestuur per e-pos · 16 /);
+  assert.match(d.long, /^Gestuur per e-pos aan piet@example.com op 16 Oktober 2026 deur Sarah$/);
+  assert.match(describeSend({ via: "whatsapp", at: "2026-10-16T08:30:00" }, "", "af").short, /^Gestuur per WhatsApp · /);
+  assert.match(describeSend(entry, "reminder", "af").short, /^Herinnering gestuur per e-pos/);
+});

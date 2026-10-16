@@ -34,3 +34,5 @@ class BusinessSettings(SQLModel, table=True):
     quote_start_number: int = 1
     po_prefix: str = "PO"
     po_start_number: int = 1
+    # What the app writes to clients, only where the business changed the standard wording (JSON, see app/core/message_templates.py).
+    message_templates: Optional[str] = None

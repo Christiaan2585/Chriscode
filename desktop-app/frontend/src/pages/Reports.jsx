@@ -1,3 +1,4 @@
+import { t } from "../utils/i18n";
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -12,13 +13,13 @@ import { money } from "../utils/format";
 const iso = (d) => d.toISOString().slice(0, 10);
 const daysAgo = (n) => iso(new Date(Date.now() - n * 86400000));
 const input = "rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500";
-const BUCKETS = [["current", "Not due yet"], ["days_30", "1-30 days"], ["days_60", "31-60 days"], ["days_90", "61-90 days"], ["older", "Over 90 days"]];
+const BUCKETS = [["current", t("Not due yet")], ["days_30", t("1-30 days")], ["days_60", t("31-60 days")], ["days_90", t("61-90 days")], ["older", t("Over 90 days")]];
 
 const Period = ({ value, onChange }) => (
   <div className="flex flex-wrap items-end gap-2 text-sm">
-    <label><span className="block text-xs text-slate-500">From</span>
+    <label><span className="block text-xs text-slate-500">{t("From")}</span>
       <input type="date" className={input} value={value.start} max={value.end} onChange={(e) => onChange({ ...value, start: e.target.value })} /></label>
-    <label><span className="block text-xs text-slate-500">To</span>
+    <label><span className="block text-xs text-slate-500">{t("To")}</span>
       <input type="date" className={input} value={value.end} min={value.start} onChange={(e) => onChange({ ...value, end: e.target.value })} /></label>
   </div>
 );
@@ -55,32 +56,32 @@ const Reports = () => {
   return (
     <div className="app-bg space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-slate-800">Reports</h2>
-        <p className="text-slate-500">Who owes what, statements for clients, and the export for your accountant.</p>
+        <h2 className="text-3xl font-bold text-slate-800">{t("Reports")}</h2>
+        <p className="text-slate-500">{t("Who owes what, statements for clients, and the export for your accountant.")}</p>
       </div>
 
       <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 bg-slate-50 p-4">
           <div>
-            <h3 className="text-lg font-semibold text-slate-800">Who owes money</h3>
+            <h3 className="text-lg font-semibold text-slate-800">{t("Who owes money")}</h3>
             <p className="text-sm text-slate-500">Unpaid amounts by how long they are past the due date{data ? `, as of ${data.as_of}` : ""}.</p>
           </div>
           <div>
-            <p className="mb-1 text-xs font-medium text-slate-600">Statement period</p>
+            <p className="mb-1 text-xs font-medium text-slate-600">{t("Statement period")}</p>
             <Period value={statementPeriod} onChange={setStatementPeriod} />
           </div>
         </div>
-        {!data ? <p className="p-6 text-sm text-slate-500">Loading...</p> : !data.clients.length ? (
-          <p className="p-6 text-sm text-slate-500">Nobody owes anything. Well done.</p>
+        {!data ? <p className="p-6 text-sm text-slate-500">{t("Loading...")}</p> : !data.clients.length ? (
+          <p className="p-6 text-sm text-slate-500">{t("Nobody owes anything. Well done.")}</p>
         ) : (
           <div className="relative overflow-x-auto">
             <table className="card-table w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Client</th>
+                  <th className="px-4 py-3 font-medium">{t("Client")}</th>
                   {BUCKETS.map(([key, label]) => <th key={key} className="px-4 py-3 text-right font-medium">{label}</th>)}
-                  <th className="px-4 py-3 text-right font-medium">Total owed</th>
-                  <th className="px-4 py-3 text-right font-medium">Statement</th>
+                  <th className="px-4 py-3 text-right font-medium">{t("Total owed")}</th>
+                  <th className="px-4 py-3 text-right font-medium">{t("Statement")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -98,7 +99,7 @@ const Reports = () => {
                     <td data-actions className="px-4 py-3 text-right">
                       <button type="button" onClick={() => openStatement(row.client_id)} disabled={!clients}
                         className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-700 hover:border-emerald-400 disabled:opacity-50">
-                        <FileText size={14} /> Statement
+                        <FileText size={14} /> {t("Statement")}
                       </button>
                     </td>
                   </tr>
@@ -106,7 +107,7 @@ const Reports = () => {
               </tbody>
               <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-semibold text-slate-800">
                 <tr>
-                  <td data-primary className="px-4 py-3">Total</td>
+                  <td data-primary className="px-4 py-3">{t("Total")}</td>
                   {BUCKETS.map(([key, label]) => <td key={key} data-label={label} className="px-4 py-3 text-right">{money(data.totals[key])}</td>)}
                   <td data-key className="px-4 py-3 text-right">{money(data.totals.total)}</td>
                   <td />
@@ -120,8 +121,8 @@ const Reports = () => {
       <StatementRun debtors={data?.clients} period={statementPeriod} />
 
       <section data-admin-only className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h3 className="text-lg font-semibold text-slate-800">Export for the accountant</h3>
-        <p className="mb-3 text-sm text-slate-500">An Excel file with the invoices, payments, credit notes and a VAT summary per month for the dates you choose.</p>
+        <h3 className="text-lg font-semibold text-slate-800">{t("Export for the accountant")}</h3>
+        <p className="mb-3 text-sm text-slate-500">{t("An Excel file with the invoices, payments, credit notes and a VAT summary per month for the dates you choose.")}</p>
         <div className="flex flex-wrap items-end gap-3">
           <Period value={exportPeriod} onChange={setExportPeriod} />
           <button type="button" onClick={exportAccounts} disabled={exporting || !exportPeriod.start || !exportPeriod.end}

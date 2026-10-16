@@ -2,12 +2,13 @@
 their language. Clients with no address or nothing owing are skipped (with the reason), a refused address is listed and
 the rest still go, and a mail server that is down stops the run and lists who was not sent."""
 from datetime import date
-from typing import List
+from typing import List, Optional
 
 from fastapi import HTTPException
 from sqlmodel import Session
 
-from app.core import mailer, reports
+from app.core import mailer, message_templates, reports
+from app.api.business import get_business
 from app.models.client import Client
 from app.models.sends import DocumentSend
 
@@ -20,9 +21,13 @@ _WORDS = {
 }
 
 
-def statement_message(client: Client) -> tuple:
-    subject, body = _WORDS["af" if client.language == "af" else "en"]
-    return subject, body.format(name=client.name)
+def statement_message(client: Client, templates: Optional[dict] = None) -> tuple:
+    """(subject, body) for one client: the business's own wording where it set some, the standard wording otherwise."""
+    lang = "af" if client.language == "af" else "en"
+    subject, body = _WORDS[lang]
+    custom = ((templates or {}).get(lang) or {}).get("statement") or {}
+    values = {"name": client.name}
+    return message_templates.fill(custom.get("subject") or subject, values), message_templates.fill(custom.get("body") or body, values)
 
 
 def email_statements(session: Session, client_ids: List[int], start: date, end: date) -> dict:
@@ -31,6 +36,7 @@ def email_statements(session: Session, client_ids: List[int], start: date, end: 
     if not mailer.is_configured(session):
         raise HTTPException(status_code=409, detail="Email isn't set up yet - an admin can do that in Settings -> Email")
 
+    templates = message_templates.load(get_business(session).message_templates)
     result = {"sent": [], "skipped": [], "failed": [], "not_sent": [], "stopped": None}
     queue = list(dict.fromkeys(client_ids))
     for position, client_id in enumerate(queue):
@@ -46,7 +52,7 @@ def email_statements(session: Session, client_ids: List[int], start: date, end: 
         if reports.client_statement(session, client.id, start, end)["closing_balance"] <= 0:
             result["skipped"].append({**row, "reason": "Nothing owing"})
             continue
-        subject, body = statement_message(client)
+        subject, body = statement_message(client, templates)
         try:
             mailer.send_message(session, address, subject, body, f"Statement - {label} {end.isoformat()}.pdf",
                                 reports.statement_pdf(session, client.id, start, end).getvalue())  # the PDF is a buffer

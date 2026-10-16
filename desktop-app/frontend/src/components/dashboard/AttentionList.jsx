@@ -1,13 +1,14 @@
+import { t } from "../../utils/i18n";
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Bell, FileText, ScanLine, Stethoscope, UserRound } from "lucide-react";
 import { dayLabel } from "../../utils/herding";
 
 export const FILTERS = [
-  ["all", "Everything", () => true],
-  ["treatments", "Treatments", (i) => i.type === "treatment" || i.type === "scan"],
-  ["money", "Money", (i) => i.type === "invoice_overdue" || i.type === "ready_to_invoice"],
-  ["quotes", "Quotes", (i) => i.type === "quote_followup"],
+  ["all", t("Everything"), () => true],
+  ["treatments", t("Treatments"), (i) => i.type === "treatment" || i.type === "scan"],
+  ["money", t("Money"), (i) => i.type === "invoice_overdue" || i.type === "ready_to_invoice"],
+  ["quotes", t("Quotes"), (i) => i.type === "quote_followup"],
   ["clients", "Client details", (i) => i.type === "client_info"],
 ];
 
@@ -76,7 +77,7 @@ const AttentionList = ({ items, older, filter, onFilter }) => {
       </div>
 
       {shown.length === 0 ? (
-        <p className="py-4 text-sm text-slate-400">Nothing here - you're on top of it.</p>
+        <p className="py-4 text-sm text-slate-400">{t("Nothing here - you're on top of it.")}</p>
       ) : grouped ? (
         <div className="space-y-2">
           {groups.map(([name, rows]) => (

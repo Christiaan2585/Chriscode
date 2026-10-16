@@ -93,3 +93,48 @@ test("a treatment reminder lists each date with what happens", () => {
 test("with nothing coming up there is no message to send", () => {
   assert.equal(mod.treatmentMessage(piet, []), null);
 });
+
+// --- The business can change the wording (Settings -> Messages to clients) ---
+test("a business's own wording replaces the standard one, with placeholders filled in", () => {
+  mod.setMessageTemplates({ en: { quote: { subject: "Quote {number} for {name}", body: "Hi {name}, quote {number} is attached. Regards" } } });
+  try {
+    const q = mod.quoteDoc({ id: 1, number: "QUO0000007" }, piet);
+    assert.equal(q.send.subject, "Quote QUO0000007 for Piet");
+    assert.equal(q.send.message, "Hi Piet, quote QUO0000007 is attached. Regards");
+    assert.equal(mod.invoiceDoc({ id: 2, number: "INV1" }, piet).send.subject, "Your invoice INV1"); // not overridden
+    assert.equal(mod.quoteDoc({ id: 1, number: "QUO1" }, pietAf).send.subject, "U kwotasie QUO1"); // other language untouched
+  } finally {
+    mod.setMessageTemplates({});
+  }
+});
+
+test("one field can be overridden and the other stays standard", () => {
+  mod.setMessageTemplates({ af: { reminder: { body: "Hallo {name}, faktuur {number} vir {amount} is agterstallig." } } });
+  try {
+    const d = mod.reminderDoc({ id: 5, number: "INV9" }, pietAf, { amountText: "R 10,00", dueDate: "2026-09-30T00:00:00" });
+    assert.equal(d.send.subject, "Betalingsherinnering - faktuur INV9");
+    assert.equal(d.send.message, "Hallo Piet, faktuur INV9 vir R 10,00 is agterstallig.");
+  } finally {
+    mod.setMessageTemplates({});
+  }
+});
+
+test("fill: known placeholders are replaced, unknown ones stay, empty brackets vanish", () => {
+  assert.equal(mod.fill("Hi {name}, {number} {unknown}", { name: "Piet", number: "Q1" }), "Hi Piet, Q1 {unknown}");
+  assert.equal(mod.fill("Quote ({number}) for {name}", { name: "Piet", number: "" }), "Quote for Piet");
+});
+
+test("the standard wording is available for the editor, in both languages and for every message", () => {
+  for (const lang of ["en", "af"]) {
+    for (const kind of ["quote", "invoice", "reminder", "statement", "program", "costs", "treatments"]) {
+      assert.ok(mod.DEFAULTS[lang][kind].subject && mod.DEFAULTS[lang][kind].body, `${lang}/${kind}`);
+    }
+  }
+});
+
+test("a preview shows a message with sample values", () => {
+  const p = mod.previewMessage("quote", "en", {});
+  assert.match(p.subject, /^Your quote QUO/);
+  assert.match(p.message, /Good day /);
+  assert.match(mod.previewMessage("treatments", "af", {}).message, /\n- /);
+});

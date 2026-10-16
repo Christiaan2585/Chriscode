@@ -262,7 +262,7 @@ def _clean(value) -> Optional[str]:
 
 
 @router.post("/import")
-async def import_clients(file: UploadFile = File(...), session: Session = Depends(get_session)):
+async def import_clients(file: UploadFile = File(...), dry_run: bool = False, session: Session = Depends(get_session)):
     """Import clients from a spreadsheet. Recognises common header spellings for
     name/email/phone/address/farm name (see _COLUMN_ALIASES) - it does not need
     an exact column layout.
@@ -332,12 +332,16 @@ async def import_clients(file: UploadFile = File(...), session: Session = Depend
         except Exception as exc:
             errors.append({"row": excel_row_num, "error": str(exc)})
 
-    session.commit()
-    herding.ensure_standard_programs(session)  # the newly imported clients start with the standard program too
+    if dry_run:  # a check: say what would happen, change nothing
+        session.rollback()
+    else:
+        session.commit()
+        herding.ensure_standard_programs(session)  # the newly imported clients start with the standard program too
     return {
         "created": created,
         "updated": updated,
         "skipped_blank": skipped,
         "columns_matched": column_map,
         "errors": errors,
+        "dry_run": dry_run,
     }

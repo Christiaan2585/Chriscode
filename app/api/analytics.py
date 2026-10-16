@@ -4,7 +4,9 @@ from sqlmodel import Session, select, func
 from typing import Dict
 from app.core.db import get_session
 from app.core import dashboard
+from app.models.client import Client
 from app.models.invoice import Invoice
+from app.models.quote import Quote
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
@@ -60,6 +62,13 @@ def get_revenue_by_month(months: int = 12, session: Session = Depends(get_sessio
             "previous_year": round(totals_by_key.get(_add_months(month_date, -12).strftime("%Y-%m"), 0.0), 2),
         })
     return result
+
+
+@router.get("/counts")
+def get_counts(session: Session = Depends(get_session)):
+    """How many clients, quotes and invoices there are, without loading them (for the Getting started checklist)."""
+    count = lambda model: session.exec(select(func.count()).select_from(model)).one()  # noqa: E731
+    return {"clients": count(Client), "quotes": count(Quote), "invoices": count(Invoice)}
 
 
 @router.get("/dashboard")

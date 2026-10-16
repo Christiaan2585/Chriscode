@@ -1,3 +1,4 @@
+import { t } from "../../utils/i18n";
 import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -41,12 +42,12 @@ export const Visits = ({ appointments, clients }) => {
     .sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 5);
 
   return (
-    <Panel icon={<CalendarClock size={18} className="text-emerald-600" />} title="Visits">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Today</h4>
-      {today.length === 0 ? <p className="mb-3 mt-1 text-sm text-slate-400">No visits today.</p>
+    <Panel icon={<CalendarClock size={18} className="text-emerald-600" />} title={t("Visits")}>
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("Today")}</h4>
+      {today.length === 0 ? <p className="mb-3 mt-1 text-sm text-slate-400">{t("No visits today.")}</p>
         : <ul className="mb-3">{today.map((v) => <Visit key={v.id} visit={v} client={byId[v.client_id]} />)}</ul>}
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Coming up</h4>
-      {next.length === 0 ? <p className="mt-1 text-sm text-slate-400">Nothing scheduled.</p> : (
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("Coming up")}</h4>
+      {next.length === 0 ? <p className="mt-1 text-sm text-slate-400">{t("Nothing scheduled.")}</p> : (
         <ul>
           {next.map((v) => (
             <li key={v.id} className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm hover:bg-slate-50">
@@ -58,7 +59,7 @@ export const Visits = ({ appointments, clients }) => {
           ))}
         </ul>
       )}
-      <Link to="/calendar" className="mt-3 inline-block text-sm font-medium text-emerald-700 hover:underline">Open the calendar</Link>
+      <Link to="/calendar" className="mt-3 inline-block text-sm font-medium text-emerald-700 hover:underline">{t("Open the calendar")}</Link>
     </Panel>
   );
 };
@@ -90,13 +91,13 @@ export const WeatherGlance = () => {
   const alerts = data ? livestockAlerts(data.daily).slice(0, 2) : [];
 
   return (
-    <Panel icon={<CloudSun size={18} className="text-sky-500" />} title="Weather">
+    <Panel icon={<CloudSun size={18} className="text-sky-500" />} title={t("Weather")}>
       {!location ? (
-        <p className="text-sm text-slate-500">Pick your location on the <Link to="/weather" className="text-emerald-700 hover:underline">Weather page</Link> to see the day and any frost, heat or rain alerts here.</p>
+        <p className="text-sm text-slate-500">{t("Pick your location on the")} <Link to="/weather" className="text-emerald-700 hover:underline">{t("Weather page")}</Link> {t("to see the day and any frost, heat or rain alerts here.")}</p>
       ) : forecast.isError ? (
-        <p className="text-sm text-slate-400">Couldn't load the weather right now.</p>
+        <p className="text-sm text-slate-400">{t("Couldn't load the weather right now.")}</p>
       ) : !data ? (
-        <p className="text-sm text-slate-400">Loading…</p>
+        <p className="text-sm text-slate-400">{t("Loading…")}</p>
       ) : (
         <div className="space-y-3">
           <div className="flex items-center gap-3">
@@ -110,9 +111,9 @@ export const WeatherGlance = () => {
               <div>{data.daily.precipitation_probability_max[0] ?? 0}% rain</div>
             </div>
           </div>
-          {alerts.length === 0 ? <p className="text-xs text-emerald-700">No livestock alerts this week.</p>
+          {alerts.length === 0 ? <p className="text-xs text-emerald-700">{t("No livestock alerts this week.")}</p>
             : <ul className="space-y-1">{alerts.map((a) => <li key={a.text} className={`rounded-lg px-2 py-1 text-xs ${a.level === "high" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-800"}`}>{a.text}</li>)}</ul>}
-          <Link to="/weather" className="inline-block text-sm font-medium text-emerald-700 hover:underline">Full forecast</Link>
+          <Link to="/weather" className="inline-block text-sm font-medium text-emerald-700 hover:underline">{t("Full forecast")}</Link>
         </div>
       )}
     </Panel>
@@ -120,12 +121,12 @@ export const WeatherGlance = () => {
 };
 
 export const LowStock = ({ data }) => (
-  <Panel icon={<PackageX size={18} className="text-red-500" />} title="Low or out of stock">
-    {!data || data.count === 0 ? <p className="text-sm text-slate-400">Everything is in stock.</p> : (
+  <Panel icon={<PackageX size={18} className="text-red-500" />} title={t("Low or out of stock")}>
+    {!data || data.count === 0 ? <p className="text-sm text-slate-400">{t("Everything is in stock.")}</p> : (
       <>
         <ul className="space-y-1 text-sm text-slate-700">{data.items.map((p) => <li key={p.id}>{p.name}{p.stock_quantity != null && <span className="text-slate-500"> - {p.stock_quantity} left</span>}</li>)}</ul>
         {data.count > data.items.length && <p className="mt-1 text-xs text-slate-500">and {data.count - data.items.length} more</p>}
-        <Link to="/purchase-orders?tab=stock" className="mt-3 inline-block text-sm font-medium text-emerald-700 hover:underline">Open stock</Link>
+        <Link to="/purchase-orders?tab=stock" className="mt-3 inline-block text-sm font-medium text-emerald-700 hover:underline">{t("Open stock")}</Link>
       </>
     )}
   </Panel>
@@ -163,7 +164,7 @@ export const SystemStatus = ({ backendUp }) => {
 
   const last = backups.data?.backups?.[0];
   return (
-    <Panel icon={<ServerCog size={18} className="text-slate-500" />} title="System status">
+    <Panel icon={<ServerCog size={18} className="text-slate-500" />} title={t("System status")}>
       <ul className="space-y-2">
         <StatusLine ok={backendUp}>{backendUp ? "Backend connected" : "Can't reach the backend - is it running?"}</StatusLine>
         {user?.is_admin && backups.data && (
@@ -173,7 +174,7 @@ export const SystemStatus = ({ backendUp }) => {
         )}
         {update?.state === "downloaded" && <StatusLine ok={null}>Version {update.version} is ready - restart to install (Settings)</StatusLine>}
         {update?.state === "downloading" && <StatusLine ok={null}>Downloading an update{update.percent ? ` (${Math.round(update.percent)}%)` : ""}…</StatusLine>}
-        {update?.state === "up-to-date" && <StatusLine ok>App is up to date</StatusLine>}
+        {update?.state === "up-to-date" && <StatusLine ok>{t("App is up to date")}</StatusLine>}
         {waiting > 0 && (
           <li className="flex items-start gap-2 text-sm text-amber-800"><CloudOff size={14} className="mt-1 shrink-0" />{waiting} {waiting === 1 ? "change" : "changes"} waiting to sync with the office PC</li>
         )}

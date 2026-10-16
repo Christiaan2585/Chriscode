@@ -1,3 +1,4 @@
+import { t } from "../utils/i18n";
 import React from "react";
 import { pageInfo } from "../utils/usePaged";
 
@@ -8,9 +9,9 @@ const ShowMore = ({ paged }) => {
   const button = "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-emerald-400";
   return (
     <div className="flex flex-wrap items-center justify-center gap-3 border-t border-slate-100 p-3 text-sm text-slate-500">
-      <span role="status">Showing {paged.shown.toLocaleString()} of {paged.total.toLocaleString()}</span>
-      <button type="button" className={button} onClick={paged.showMore}>Show {next.toLocaleString()} more</button>
-      <button type="button" className={button} onClick={paged.showAll}>Show all</button>
+      <span role="status">{t("Showing {shown} of {total}", { shown: paged.shown.toLocaleString(), total: paged.total.toLocaleString() })}</span>
+      <button type="button" className={button} onClick={paged.showMore}>{t("Show {n} more", { n: next.toLocaleString() })}</button>
+      <button type="button" className={button} onClick={paged.showAll}>{t("Show all")}</button>
     </div>
   );
 };

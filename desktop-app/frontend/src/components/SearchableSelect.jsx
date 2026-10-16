@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Plus, Search } from "lucide-react";
+import { pushRecent, readStored, writeStored } from "../utils/stored";
 
 // A searchable dropdown for picking one item out of a list that can get
 // long (clients, products) - plain HTML <select> options aren't searchable,
@@ -12,6 +13,9 @@ import { ChevronDown, Search } from "lucide-react";
 // options: [{ value, label, sublabel? }]. value/onChange behave like a
 // native select's value/e.target.value (always a string) so this drops into
 // existing state handlers with minimal changes.
+//
+// recentKey: remember the last few picks on this device and list them first under "Recent".
+// onCreate(query) + createLabel: a "+ New ..." button under the list (e.g. add a client without leaving the form).
 export default function SearchableSelect({
   value,
   onChange,
@@ -20,6 +24,9 @@ export default function SearchableSelect({
   searchPlaceholder = "Search...",
   className = "",
   disabled = false,
+  recentKey = null,
+  onCreate = null,
+  createLabel = "New",
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -45,13 +52,30 @@ export default function SearchableSelect({
     if (!open) setQuery("");
   }, [open]);
 
+  const storageKey = recentKey ? `sandveld_recent_${recentKey}` : null;
+  const [recent, setRecent] = useState(() => (storageKey ? readStored(storageKey, []) : []));
+  const choose = (v) => {
+    onChange(String(v));
+    setOpen(false);
+    if (storageKey) {
+      const next = pushRecent(recent, v);
+      setRecent(next);
+      writeStored(storageKey, next);
+    }
+  };
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return options;
+    if (!q) {
+      // Recent picks first (only the ones that still exist), then everything else once.
+      const recents = recent.map((r) => options.find((o) => String(o.value) === String(r))).filter(Boolean);
+      if (!recents.length) return options;
+      return [...recents.map((o) => ({ ...o, recent: true })), ...options.filter((o) => !recents.includes(o))];
+    }
     return options.filter(
       (o) => o.label.toLowerCase().includes(q) || o.sublabel?.toLowerCase().includes(q)
     );
-  }, [options, query]);
+  }, [options, query, recent]);
 
   const selected = options.find((o) => String(o.value) === String(value));
 
@@ -88,17 +112,14 @@ export default function SearchableSelect({
               const isSelected = String(o.value) === String(value);
               return (
                 <button
-                  key={o.value}
+                  key={`${o.recent ? "r" : "o"}-${o.value}`}
                   type="button"
-                  onClick={() => {
-                    onChange(String(o.value));
-                    setOpen(false);
-                  }}
+                  onClick={() => choose(o.value)}
                   className={`w-full text-left px-3 py-2 text-sm transition-colors hover:bg-emerald-50 ${
                     isSelected ? "bg-emerald-50 font-semibold text-emerald-800" : "text-slate-700"
                   }`}
                 >
-                  <div>{o.label}</div>
+                  <div>{o.label}{o.recent && <span className="ml-2 text-xs font-normal text-slate-400">recent</span>}</div>
                   {o.sublabel && <div className="text-xs text-slate-400">{o.sublabel}</div>}
                 </button>
               );
@@ -107,6 +128,12 @@ export default function SearchableSelect({
               <p className="px-3 py-4 text-center text-sm text-slate-400">No matches for "{query}".</p>
             )}
           </div>
+          {onCreate && (
+            <button type="button" onClick={() => { setOpen(false); onCreate(query.trim()); }}
+              className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50">
+              <Plus size={14} /> {createLabel}{query.trim() ? ` "${query.trim()}"` : ""}
+            </button>
+          )}
         </div>
       )}
     </div>

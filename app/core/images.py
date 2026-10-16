@@ -8,6 +8,8 @@ from PIL import Image, ImageOps
 MAX_SIZE = 800
 THUMB_SIZE = 160
 AVATAR_SIZE = 256
+PHOTO_SIZE = 1280  # a client photo: sharp enough to see a hoof or a gate, small enough to keep
+PHOTO_THUMB = 240
 # A small file can still claim to be an enormous image ("decompression
 # bomb"); Pillow refuses anything above this many pixels.
 Image.MAX_IMAGE_PIXELS = 50_000_000
@@ -29,6 +31,13 @@ def process_image(data: bytes) -> tuple:
     """(image, thumbnail) JPEG bytes, or NotAnImage."""
     img = _decode(data)
     return _jpeg(img, MAX_SIZE, 82), _jpeg(img, THUMB_SIZE, 75)
+
+
+def process_photo(data: bytes) -> tuple:
+    """A client photo: (image, thumbnail) JPEG bytes - at most PHOTO_SIZE / PHOTO_THUMB across, turned upright, with camera
+    and GPS data gone - or NotAnImage."""
+    img = _decode(data)
+    return _jpeg(img, PHOTO_SIZE, 82), _jpeg(img, PHOTO_THUMB, 75)
 
 
 def process_avatar(data: bytes) -> bytes:

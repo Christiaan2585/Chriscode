@@ -1,3 +1,4 @@
+import { deleteConfirm } from "../utils/confirmText";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -428,7 +429,7 @@ const HerdingProgramPanel = ({ clientId, clientName }) => {
         <div className="space-y-3">
           {programs.map((p) => (
             <ProgramCard key={p.id} program={p} onOpen={() => navigate(`/programs/${p.id}`)} onCopy={() => copyProgram(p, clientName)}
-              onDelete={() => { if (window.confirm(`Delete program "${p.name}"? Its quote goes too while it's still a draft. This can't be undone.`)) remove.mutate(p.id); }} />
+              onDelete={() => { if (window.confirm(deleteConfirm(`program "${p.name}"`, "Its quote goes too while it's still a draft."))) remove.mutate(p.id); }} />
           ))}
         </div>
       )}

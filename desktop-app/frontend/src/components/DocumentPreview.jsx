@@ -1,3 +1,4 @@
+import { t } from "../utils/i18n";
 import React, { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, Mail, MessageCircle, Printer, Send } from "lucide-react";
@@ -52,14 +53,14 @@ const SendButtons = ({ blob, filename, send, doc }) => {
         <MessageCircle size={16} /> WhatsApp
       </button>
       {mail?.configured && (
-        <button type="button" className={sendButton} disabled={!blob || busy} onClick={() => setComposing(true)} title="Email it from the app, with the PDF attached">
-          <Send size={16} /> Send from app
+        <button type="button" className={sendButton} disabled={!blob || busy} onClick={() => setComposing(true)} title={t("Email it from the app, with the PDF attached")}>
+          <Send size={16} /> {t("Send from app")}
         </button>
       )}
       {composing && <EmailDocumentDialog blob={blob} filename={filename} send={send} onClose={() => setComposing(false)} onDone={(to) => record(doc, "app-email", to)} />}
       <button type="button" className={sendButton} disabled={!blob || busy || noEmail} onClick={() => go("email")}
         title={noEmail ? "This client has no email address" : "Send by email"}>
-        <Mail size={16} /> Email
+        <Mail size={16} /> {t("Email")}
       </button>
       {last && <p className="basis-full text-xs text-slate-500" title={last.long}>{last.long}</p>}
       {status && (
@@ -130,7 +131,7 @@ const DocumentPreview = ({ doc, onClose }) => {
           {doc?.send && <SendButtons key={doc.url} blob={blob} filename={filename} send={doc.send} doc={doc} />}
           {!doc?.noPrint && !phone && (
             <button type="button" disabled={!blob} onClick={printIt} className={sendButton}>
-              <Printer size={16} /> Print
+              <Printer size={16} /> {t("Print")}
             </button>
           )}
           <button
@@ -152,7 +153,7 @@ const DocumentPreview = ({ doc, onClose }) => {
             <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-sm text-slate-600">
               <p>{title} is ready. On a phone it opens in your PDF app, or you can send it by WhatsApp or email.</p>
               <button type="button" onClick={() => saveBlob(blob, filename)}
-                className="rounded-lg bg-emerald-600 px-5 py-3 font-medium text-white shadow-sm hover:bg-emerald-700">Open or share</button>
+                className="rounded-lg bg-emerald-600 px-5 py-3 font-medium text-white shadow-sm hover:bg-emerald-700">{t("Open or share")}</button>
             </div>
           ) : (
             <iframe ref={frame} src={url} title={`${title} PDF`} className="h-full w-full border-0" />

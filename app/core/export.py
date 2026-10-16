@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from openpyxl import Workbook
 
 # productimage / userphoto: binary pictures, meaningless in a spreadsheet cell.
-EXCLUDED_TABLES = frozenset({"user", "remembertoken", "productimage", "userphoto", "clientdocument", "trashitem", "mailsettings"})
+EXCLUDED_TABLES = frozenset({"user", "remembertoken", "productimage", "userphoto", "clientdocument", "trashitem", "mailsettings", "clientphoto"})
 
 
 def _clean(value):

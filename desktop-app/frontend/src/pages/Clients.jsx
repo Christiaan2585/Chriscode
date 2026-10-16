@@ -1,4 +1,7 @@
+import { t } from "../utils/i18n";
+import { deleteConfirm } from "../utils/confirmText";
 import ShowMore from "../components/ShowMore";
+import { usePersistedState } from "../utils/usePersisted";
 import { usePaged } from "../utils/usePaged";
 import React, { useState } from "react";
 import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
@@ -25,10 +28,11 @@ const Clients = () => {
   const [editingId, setEditingId] = useState(null); // null = "add" mode, id = "edit" mode
   const [form, setForm] = useState(emptyClient);
   const [search, setSearch] = useState("");
-  const [town, setTown] = useState("");
-  const [minAnimals, setMinAnimals] = useState("");
-  const [maxAnimals, setMaxAnimals] = useState("");
-  const [sort, setSort] = useState("name");
+  // The filters and sort are remembered on this device (the search text is not - it would only surprise).
+  const [town, setTown] = usePersistedState("clients.town", "");
+  const [minAnimals, setMinAnimals] = usePersistedState("clients.minAnimals", "");
+  const [maxAnimals, setMaxAnimals] = usePersistedState("clients.maxAnimals", "");
+  const [sort, setSort] = usePersistedState("clients.sort", "name");
 
   const { data: clients, isLoading } = useQuery({
     queryKey: ["clients"],
@@ -119,20 +123,20 @@ const Clients = () => {
 
   useOpenNew(() => openAddModal()); // from the dashboard's quick actions (?new=1)
 
-  if (isLoading) return <div className="p-8 text-center">Loading clients...</div>;
+  if (isLoading) return <div className="p-8 text-center">{t("Loading clients...")}</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-slate-800">Clients</h2>
-          <p className="text-slate-500">Manage your agricultural client database</p>
+          <h2 className="text-3xl font-bold text-slate-800">{t("Clients")}</h2>
+          <p className="text-slate-500">{t("Manage your agricultural client database")}</p>
         </div>
         <button
           onClick={openAddModal}
           className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
         >
-          <Plus size={20} /> Add Client
+          <Plus size={20} /> {t("Add Client")}
         </button>
       </div>
 
@@ -144,27 +148,27 @@ const Clients = () => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search clients by name, farm, town, email or phone..."
+              placeholder={t("Search clients by name, farm, town, email or phone...")}
               className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
         </div>
-        <div className="flex flex-wrap items-end gap-3 border-b border-slate-200 bg-white px-4 py-3" role="group" aria-label="Filter and sort clients">
-          <label className="text-xs text-slate-500">Town / area
+        <div className="flex flex-wrap items-end gap-3 border-b border-slate-200 bg-white px-4 py-3" role="group" aria-label={t("Filter and sort clients")}>
+          <label className="text-xs text-slate-500">{t("Town / area")}
             <select className={`${filterInput} mt-1 block`} value={town} onChange={(e) => setTown(e.target.value)}>
-              <option value="">All towns</option>
+              <option value="">{t("All towns")}</option>
               {towns.map((t) => <option key={t} value={t}>{t}</option>)}
-              <option value={NO_TOWN}>No town set</option>
+              <option value={NO_TOWN}>{t("No town set")}</option>
             </select></label>
-          <label className="text-xs text-slate-500">Animals from
-            <input className={`${filterInput} mt-1 block w-28`} type="number" min="0" inputMode="numeric" placeholder="any" value={minAnimals} onChange={(e) => setMinAnimals(e.target.value)} /></label>
-          <label className="text-xs text-slate-500">to
-            <input className={`${filterInput} mt-1 block w-28`} type="number" min="0" inputMode="numeric" placeholder="any" value={maxAnimals} onChange={(e) => setMaxAnimals(e.target.value)} /></label>
-          <label className="text-xs text-slate-500">Sort by
+          <label className="text-xs text-slate-500">{t("Animals from")}
+            <input className={`${filterInput} mt-1 block w-28`} type="number" min="0" inputMode="numeric" placeholder={t("any")} value={minAnimals} onChange={(e) => setMinAnimals(e.target.value)} /></label>
+          <label className="text-xs text-slate-500">{t("to")}
+            <input className={`${filterInput} mt-1 block w-28`} type="number" min="0" inputMode="numeric" placeholder={t("any")} value={maxAnimals} onChange={(e) => setMaxAnimals(e.target.value)} /></label>
+          <label className="text-xs text-slate-500">{t("Sort by")}
             <select className={`${filterInput} mt-1 block`} value={sort} onChange={(e) => setSort(e.target.value)}>
               {SORTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select></label>
-          {narrowed && <button type="button" onClick={clearFilters} className="pb-2 text-sm text-emerald-700 hover:underline">Clear filters</button>}
+          {narrowed && <button type="button" onClick={clearFilters} className="pb-2 text-sm text-emerald-700 hover:underline">{t("Clear filters")}</button>}
           <p className="ml-auto pb-2 text-xs text-slate-500" aria-live="polite">Showing {filtered.length} of {clients?.length || 0}</p>
         </div>
         <div className="space-y-2 p-3 empty:hidden">
@@ -177,11 +181,11 @@ const Clients = () => {
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
             <tr>
               <SelectAllTh selection={selection} />
-              <th className="px-6 py-3 font-medium">Farm</th>
-              <th className="px-6 py-3 font-medium">Contact</th>
-              <th className="px-6 py-3 font-medium">Town &amp; address</th>
-              <th className="px-6 py-3 font-medium text-right">Animals</th>
-              <th className="px-6 py-3 font-medium text-right">Actions</th>
+              <th className="px-6 py-3 font-medium">{t("Farm")}</th>
+              <th className="px-6 py-3 font-medium">{t("Contact")}</th>
+              <th className="px-6 py-3 font-medium">{t("Town & address")}</th>
+              <th className="px-6 py-3 font-medium text-right">{t("Animals")}</th>
+              <th className="px-6 py-3 font-medium text-right">{t("Actions")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -204,15 +208,15 @@ const Clients = () => {
                       {client.farm_name && <div className="text-xs text-slate-400">{client.name}</div>}
                     </div>
                   </td>
-                  <td data-label="Contact" data-wide className="px-6 py-4 text-slate-600">
+                  <td data-label={t("Contact")} data-wide className="px-6 py-4 text-slate-600">
                     <div>{client.email || "—"}</div>
                     <div className="text-xs text-slate-400">{client.phone || ""}</div>
                   </td>
-                  <td data-label="Town & address" data-wide className="px-6 py-4 text-slate-600">
+                  <td data-label={t("Town & address")} data-wide className="px-6 py-4 text-slate-600">
                     {client.town && <div className="font-medium text-slate-700">{client.town}</div>}
                     <div className={client.town ? "text-xs text-slate-400" : ""}>{client.address}</div>
                   </td>
-                  <td data-label="Animals" className="px-6 py-4 text-right text-slate-700">
+                  <td data-label={t("Animals")} className="px-6 py-4 text-right text-slate-700">
                     {headcounts[client.id] !== undefined ? headcounts[client.id].toLocaleString() : <span className="text-slate-300">—</span>}
                   </td>
                   <td data-actions className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
@@ -240,18 +244,18 @@ const Clients = () => {
                       <button
                         onClick={() => openEditModal(client)}
                         className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
-                        title="Edit"
+                        title={t("Edit")}
                       >
                         <Edit size={18} />
                       </button>
                       <button
                         onClick={() => {
-                          if (window.confirm(`Delete "${client.name}"? This can't be undone.`)) {
+                          if (window.confirm(deleteConfirm(`"${client.name}"`, "Their animals, notes, visits and herding programs go with them (a client who has invoices, quotes or orders can't be deleted)."))) {
                             deleteMutation.mutate(client.id);
                           }
                         }}
                         className="p-2 text-slate-400 hover:text-red-600 transition-colors"
-                        title="Delete" data-admin-only
+                        title={t("Delete")} data-admin-only
                       >
                         <Trash2 size={18} />
                       </button>
@@ -276,7 +280,7 @@ const Clients = () => {
       <Modal isOpen={isModalOpen} onClose={closeModal} title={editingId ? "Edit Client" : "Add New Client"}>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t("Full Name")}</label>
             <input
               type="text"
               value={form.name}
@@ -285,7 +289,7 @@ const Clients = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Farm / Business Name</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t("Farm / Business Name")}</label>
             <input
               type="text"
               value={form.farm_name}
@@ -295,7 +299,7 @@ const Clients = () => {
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Email Address")}</label>
               <input
                 type="email"
                 value={form.email}
@@ -304,7 +308,7 @@ const Clients = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Cell / WhatsApp Number</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Cell / WhatsApp Number")}</label>
               <input
                 type="tel"
                 value={form.phone}
@@ -315,34 +319,34 @@ const Clients = () => {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Town / area</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t("Town / area")}</label>
             <input
               type="text"
               list="client-towns"
               maxLength={100}
               value={form.town}
               onChange={(e) => setForm({ ...form, town: e.target.value })}
-              placeholder="e.g. Prieska"
+              placeholder={t("e.g. Prieska")}
               className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
             />
             <datalist id="client-towns">{towns.map((t) => <option key={t} value={t} />)}</datalist>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="client-language">Language for messages</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="client-language">{t("Language for messages")}</label>
             <select
               id="client-language"
               value={form.language}
               onChange={(e) => setForm({ ...form, language: e.target.value })}
               className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
             >
-              <option value="">English</option>
+              <option value="">{t("English")}</option>
               <option value="af">Afrikaans</option>
             </select>
-            <p className="mt-1 text-xs text-slate-500">Quotes, invoices, statements and reminders sent to this client are written in this language.</p>
+            <p className="mt-1 text-xs text-slate-500">{t("Quotes, invoices, statements and reminders sent to this client are written in this language.")}</p>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Physical Address</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Physical Address")}</label>
               <textarea
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
@@ -351,7 +355,7 @@ const Clients = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Postal Address</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Postal Address")}</label>
               <textarea
                 value={form.postal_address}
                 onChange={(e) => setForm({ ...form, postal_address: e.target.value })}
@@ -361,11 +365,11 @@ const Clients = () => {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Customer VAT Number</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t("Customer VAT Number")}</label>
             <input
               value={form.vat_number}
               onChange={(e) => setForm({ ...form, vat_number: e.target.value })}
-              placeholder="Printed on invoices if the client has one"
+              placeholder={t("Printed on invoices if the client has one")}
               className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
             />
           </div>

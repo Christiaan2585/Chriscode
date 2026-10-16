@@ -1,3 +1,5 @@
+import { t } from "../utils/i18n";
+import { deleteConfirm } from "../utils/confirmText";
 import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,6 +17,7 @@ import TreatmentReminder from "../components/TreatmentReminder";
 import HerdingProgramPanel from "../components/HerdingProgramPanel";
 import TaxCertificate from "../components/TaxCertificate";
 import RamsPanel from "../components/RamsPanel";
+import ClientPhotos from "../components/ClientPhotos";
 import { loadedLanguages, useSupplierBook } from "../components/SupplierCatalogue";
 import { DocumentHover } from "../components/PreviewCards";
 import { downloadDocumentPdf, orderFormFor, invoiceDoc, quoteDoc, markQuoteSent, statementFor } from "../utils/documents";
@@ -170,8 +173,8 @@ const ClientDetail = () => {
     onSuccess: refreshAppointments,
   });
 
-  if (clientLoading) return <div className="p-8 text-center">Loading client details...</div>;
-  if (!client) return <div className="p-8 text-center">Client not found.</div>;
+  if (clientLoading) return <div className="p-8 text-center">{t("Loading client details...")}</div>;
+  if (!client) return <div className="p-8 text-center">{t("Client not found.")}</div>;
 
   const clientAnimals = animals || [];
   const openNotes = (notes || []).filter((n) => !n.is_completed);
@@ -234,7 +237,7 @@ const ClientDetail = () => {
         <div className="flex flex-wrap items-center gap-2">
           {telLink && (
             <a href={telLink} className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:border-blue-300 hover:text-blue-600 transition-colors shadow-sm text-sm font-medium">
-              <Phone size={18} /> Call
+              <Phone size={18} /> {t("Call")}
             </a>
           )}
           {waLink && (
@@ -257,14 +260,14 @@ const ClientDetail = () => {
             onClick={() => setPreview(statementFor(client))}
             className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:border-emerald-300 hover:text-emerald-600 transition-colors shadow-sm text-sm font-medium"
           >
-            <FileText size={18} /> Statement
+            <FileText size={18} /> {t("Statement")}
           </button>
           <TreatmentReminder client={client} />
           <button
             onClick={openEditClient}
             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm text-sm font-medium"
           >
-            <Edit size={18} /> Edit Client
+            <Edit size={18} /> {t("Edit Client")}
           </button>
         </div>
       </div>
@@ -274,13 +277,13 @@ const ClientDetail = () => {
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="text-lg font-semibold mb-4 border-b pb-2 flex items-center gap-2">
-              <Home size={18} className="text-emerald-600" /> The farm
+              <Home size={18} className="text-emerald-600" /> {t("The farm")}
             </h3>
             <div className="space-y-4">
               <div className="flex items-start gap-3">
                 <PawPrint size={16} className="text-slate-400 mt-0.5" />
                 <div className="flex flex-col">
-                  <span className="text-xs text-slate-400 uppercase font-bold">Animals on the farm</span>
+                  <span className="text-xs text-slate-400 uppercase font-bold">{t("Animals on the farm")}</span>
                   {farmAnimalTotal > 0 ? (
                     <>
                       <span className="text-2xl font-bold text-slate-800 leading-tight">{farmAnimalTotal.toLocaleString()}</span>
@@ -293,35 +296,35 @@ const ClientDetail = () => {
                       </span>
                     </>
                   ) : (
-                    <span className="text-sm text-slate-500">Not counted yet - fill in the animal numbers on a herding program below.</span>
+                    <span className="text-sm text-slate-500">{t("Not counted yet - fill in the animal numbers on a herding program below.")}</span>
                   )}
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <Briefcase size={16} className="text-slate-400 mt-0.5" />
                 <div className="flex flex-col">
-                  <span className="text-xs text-slate-400 uppercase font-bold">Contact person</span>
+                  <span className="text-xs text-slate-400 uppercase font-bold">{t("Contact person")}</span>
                   <span className="text-slate-700">{client.name}</span>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <Phone size={16} className="text-slate-400 mt-0.5" />
                 <div className="flex flex-col">
-                  <span className="text-xs text-slate-400 uppercase font-bold">Phone</span>
+                  <span className="text-xs text-slate-400 uppercase font-bold">{t("Phone")}</span>
                   <span className="text-slate-700">{client.phone || "—"}</span>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <Mail size={16} className="text-slate-400 mt-0.5" />
                 <div className="flex flex-col">
-                  <span className="text-xs text-slate-400 uppercase font-bold">Email</span>
+                  <span className="text-xs text-slate-400 uppercase font-bold">{t("Email")}</span>
                   <span className="text-slate-700 break-all">{client.email || "—"}</span>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <MapPin size={16} className="text-slate-400 mt-0.5" />
                 <div className="flex flex-col">
-                  <span className="text-xs text-slate-400 uppercase font-bold">Farm address</span>
+                  <span className="text-xs text-slate-400 uppercase font-bold">{t("Farm address")}</span>
                   <span className="whitespace-pre-line text-slate-700">{client.address || "—"}</span>
                 </div>
               </div>
@@ -329,7 +332,7 @@ const ClientDetail = () => {
                 <div className="flex items-start gap-3">
                   <Mail size={16} className="text-slate-400 mt-0.5" />
                   <div className="flex flex-col">
-                    <span className="text-xs text-slate-400 uppercase font-bold">Postal address</span>
+                    <span className="text-xs text-slate-400 uppercase font-bold">{t("Postal address")}</span>
                     <span className="whitespace-pre-line text-slate-700">{client.postal_address}</span>
                   </div>
                 </div>
@@ -339,13 +342,14 @@ const ClientDetail = () => {
 
           <RamsPanel clientId={id} />
           <TaxCertificate clientId={id} clientName={farmLabel(client)} />
+          <ClientPhotos clientId={id} />
 
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
             <h3 className="text-lg font-semibold mb-4 border-b pb-2 flex items-center gap-2">
-              <StickyNote size={18} className="text-emerald-600" /> Notes & Reminders
+              <StickyNote size={18} className="text-emerald-600" /> {t("Notes & Reminders")}
             </h3>
             <div className="space-y-2 mb-4">
-              {openNotes.length === 0 && <p className="text-sm text-slate-400">No open notes.</p>}
+              {openNotes.length === 0 && <p className="text-sm text-slate-400">{t("No open notes.")}</p>}
               {openNotes.map((n) => (
                 <div key={n.id} className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm">
                   <div className="flex justify-between items-start gap-2">
@@ -361,14 +365,14 @@ const ClientDetail = () => {
                       <button
                         onClick={() => completeNoteMutation.mutate(n.id)}
                         className="p-1 text-slate-400 hover:text-emerald-600"
-                        title="Mark complete"
+                        title={t("Mark complete")}
                       >
                         <Check size={16} />
                       </button>
                       <button
                         onClick={() => deleteNoteMutation.mutate(n.id)}
                         className="p-1 text-slate-400 hover:text-red-600"
-                        title="Delete"
+                        title={t("Delete")}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -394,7 +398,7 @@ const ClientDetail = () => {
             </div>
             <div className="space-y-2 pt-3 border-t border-slate-100">
               <textarea
-                placeholder="Add a note or reminder..."
+                placeholder={t("Add a note or reminder...")}
                 value={noteContent}
                 onChange={(e) => setNoteContent(e.target.value)}
                 className="w-full p-2 border border-slate-200 rounded-lg text-sm"
@@ -412,7 +416,7 @@ const ClientDetail = () => {
                   onClick={() => addNoteMutation.mutate({ content: noteContent, reminder_date: noteReminderDate })}
                   className="bg-emerald-600 text-white px-3 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
                 >
-                  Add
+                  {t("Add")}
                 </button>
               </div>
             </div>
@@ -433,11 +437,11 @@ const ClientDetail = () => {
                 onClick={() => setIsScheduleModalOpen(true)}
                 className="text-sm bg-emerald-600 text-white px-3 py-1 rounded-md hover:bg-emerald-700 transition-colors"
               >
-                + Schedule Visit
+                {t("+ Schedule Visit")}
               </button>
             </div>
             {upcomingAppointments.length === 0 ? (
-              <p className="text-sm text-slate-400">No appointments scheduled for this client yet.</p>
+              <p className="text-sm text-slate-400">{t("No appointments scheduled for this client yet.")}</p>
             ) : (
               <div className="space-y-2">
                 {upcomingAppointments.map((app) => (
@@ -471,7 +475,7 @@ const ClientDetail = () => {
                       <button
                         onClick={() => openEditAppointment(app)}
                         className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
-                        title="Change date, time or reason"
+                        title={t("Change date, time or reason")}
                       >
                         <Pencil size={16} />
                       </button>
@@ -479,7 +483,7 @@ const ClientDetail = () => {
                         onClick={() => updateAppointmentMutation.mutate({ appointmentId: app.id, data: { ...app, status: "completed" } })}
                         disabled={app.status === "completed"}
                         className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        title="Mark completed"
+                        title={t("Mark completed")}
                       >
                         <CheckCircle size={16} />
                       </button>
@@ -487,7 +491,7 @@ const ClientDetail = () => {
                         onClick={() => updateAppointmentMutation.mutate({ appointmentId: app.id, data: { ...app, status: "cancelled" } })}
                         disabled={app.status === "cancelled"}
                         className="p-1.5 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        title="Cancel"
+                        title={t("Cancel")}
                       >
                         <Ban size={16} />
                       </button>
@@ -498,7 +502,7 @@ const ClientDetail = () => {
                           }
                         }}
                         className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                        title="Delete"
+                        title={t("Delete")}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -508,7 +512,7 @@ const ClientDetail = () => {
               </div>
             )}
             <Link to="/calendar" className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 mt-3 font-medium">
-              Open full calendar <ChevronRight size={14} />
+              {t("Open full calendar")} <ChevronRight size={14} />
             </Link>
           </div>
 
@@ -518,7 +522,7 @@ const ClientDetail = () => {
               <FileText className="text-emerald-600" size={20} /> Quotes ({(quotes || []).length})
             </h3>
             {(!quotes || quotes.length === 0) ? (
-              <p className="text-sm text-slate-400">No quotes for this client yet.</p>
+              <p className="text-sm text-slate-400">{t("No quotes for this client yet.")}</p>
             ) : (
               <div className="space-y-2">
                 {quotes
@@ -536,32 +540,32 @@ const ClientDetail = () => {
                           onChange={(e) => updateQuoteMutation.mutate({ quoteId: q.id, data: { ...q, status: e.target.value } })}
                           className={`text-xs font-bold rounded-full px-2 py-1 border-0 outline-none ${statusStyle(q.status)}`}
                         >
-                          <option value="Draft">Draft</option>
-                          <option value="Sent">Sent</option>
-                          <option value="Accepted">Accepted</option>
+                          <option value="Draft">{t("Draft")}</option>
+                          <option value="Sent">{t("Sent")}</option>
+                          <option value="Accepted">{t("Accepted")}</option>
                         </select>
                         <button
                           onClick={() => setPreview(quoteDoc(q, client, () => markQuoteSent(q, queryClient, q.program_id)))}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
-                          title="Preview"
+                          title={t("Preview")}
                         >
                           <Eye size={16} />
                         </button>
                         <button
                           onClick={() => downloadDocumentPdf("quote", q.id, q.number)}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
-                          title="Download PDF"
+                          title={t("Download PDF")}
                         >
                           <Download size={16} />
                         </button>
                         <button
                           onClick={() => {
-                            if (window.confirm(`Delete quote #${q.id}? This can't be undone.`)) {
+                            if (window.confirm(deleteConfirm(`quote ${q.number || `#${q.id}`}`, "Its lines go with it."))) {
                               deleteQuoteMutation.mutate(q.id);
                             }
                           }}
                           className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                          title="Delete" data-admin-only
+                          title={t("Delete")} data-admin-only
                         >
                           <Trash2 size={16} />
                         </button>
@@ -571,7 +575,7 @@ const ClientDetail = () => {
               </div>
             )}
             <Link to="/programs" className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 mt-3 font-medium">
-              Full item detail & new quotes <ChevronRight size={14} />
+              {t("Full item detail & new quotes")} <ChevronRight size={14} />
             </Link>
           </div>
 
@@ -581,7 +585,7 @@ const ClientDetail = () => {
               <ShoppingCart className="text-emerald-600" size={20} /> Orders ({(orders || []).length})
             </h3>
             {(!orders || orders.length === 0) ? (
-              <p className="text-sm text-slate-400">No orders for this client yet.</p>
+              <p className="text-sm text-slate-400">{t("No orders for this client yet.")}</p>
             ) : (
               <div className="space-y-2">
                 {orders
@@ -601,18 +605,18 @@ const ClientDetail = () => {
                           onChange={(e) => updateOrderMutation.mutate({ orderId: o.id, data: { ...o, status: e.target.value } })}
                           className={`text-xs font-bold rounded-full px-2 py-1 border-0 outline-none ${statusStyle(o.status)}`}
                         >
-                          <option value="Pending">Pending</option>
-                          <option value="Paid">Paid</option>
-                          <option value="Shipped">Shipped</option>
+                          <option value="Pending">{t("Pending")}</option>
+                          <option value="Paid">{t("Paid")}</option>
+                          <option value="Shipped">{t("Shipped")}</option>
                         </select>
                         <button
                           onClick={() => {
-                            if (window.confirm(`Delete order #${o.id}? This can't be undone.`)) {
+                            if (window.confirm(deleteConfirm(`order #${o.id}`))) {
                               deleteOrderMutation.mutate(o.id);
                             }
                           }}
                           className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                          title="Delete" data-admin-only
+                          title={t("Delete")} data-admin-only
                         >
                           <Trash2 size={16} />
                         </button>
@@ -622,7 +626,7 @@ const ClientDetail = () => {
               </div>
             )}
             <Link to="/orders" className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 mt-3 font-medium">
-              Manage all orders <ChevronRight size={14} />
+              {t("Manage all orders")} <ChevronRight size={14} />
             </Link>
           </div>
 
@@ -632,7 +636,7 @@ const ClientDetail = () => {
               <FileText className="text-emerald-600" size={20} /> Invoices ({(invoices || []).length})
             </h3>
             {(!invoices || invoices.length === 0) ? (
-              <p className="text-sm text-slate-400">No invoices for this client yet.</p>
+              <p className="text-sm text-slate-400">{t("No invoices for this client yet.")}</p>
             ) : (
               <div className="space-y-2">
                 {invoices
@@ -650,32 +654,32 @@ const ClientDetail = () => {
                           onChange={(e) => updateInvoiceMutation.mutate({ invoiceId: inv.id, data: { ...inv, status: e.target.value } })}
                           className={`text-xs font-bold rounded-full px-2 py-1 border-0 outline-none ${statusStyle(inv.status)}`}
                         >
-                          <option value="unpaid">Unpaid</option>
-                          <option value="paid">Paid</option>
-                          <option value="cancelled">Cancelled</option>
+                          <option value="unpaid">{t("Unpaid")}</option>
+                          <option value="paid">{t("Paid")}</option>
+                          <option value="cancelled">{t("Cancelled")}</option>
                         </select>
                         <button
                           onClick={() => setPreview(invoiceDoc(inv, client))}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
-                          title="Preview"
+                          title={t("Preview")}
                         >
                           <Eye size={16} />
                         </button>
                         <button
                           onClick={() => downloadDocumentPdf("invoice", inv.id, inv.number)}
                           className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
-                          title="Download PDF"
+                          title={t("Download PDF")}
                         >
                           <Download size={16} />
                         </button>
                         <button
                           onClick={() => {
-                            if (window.confirm(`Delete invoice #${inv.id}? This can't be undone.`)) {
+                            if (window.confirm(deleteConfirm(`invoice ${inv.number || `#${inv.id}`}`, "Its lines, payments and credit notes go with it."))) {
                               deleteInvoiceMutation.mutate(inv.id);
                             }
                           }}
                           className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
-                          title="Delete" data-admin-only
+                          title={t("Delete")} data-admin-only
                         >
                           <Trash2 size={16} />
                         </button>
@@ -685,17 +689,17 @@ const ClientDetail = () => {
               </div>
             )}
             <Link to="/invoices" className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 mt-3 font-medium">
-              Create a new invoice <ChevronRight size={14} />
+              {t("Create a new invoice")} <ChevronRight size={14} />
             </Link>
           </div>
         </div>
       </div>
 
-      <Modal isOpen={isEditClientOpen} onClose={() => setIsEditClientOpen(false)} title="Edit Client">
+      <Modal isOpen={isEditClientOpen} onClose={() => setIsEditClientOpen(false)} title={t("Edit Client")}>
         {clientForm && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Full Name")}</label>
               <input
                 type="text"
                 value={clientForm.name}
@@ -704,7 +708,7 @@ const ClientDetail = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Farm / Business Name</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Farm / Business Name")}</label>
               <input
                 type="text"
                 value={clientForm.farm_name}
@@ -714,7 +718,7 @@ const ClientDetail = () => {
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("Email Address")}</label>
                 <input
                   type="email"
                   value={clientForm.email}
@@ -723,7 +727,7 @@ const ClientDetail = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Cell / WhatsApp Number</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("Cell / WhatsApp Number")}</label>
                 <input
                   type="tel"
                   value={clientForm.phone}
@@ -734,7 +738,7 @@ const ClientDetail = () => {
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Physical Address</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("Physical Address")}</label>
                 <textarea
                   value={clientForm.address}
                   onChange={(e) => setClientForm({ ...clientForm, address: e.target.value })}
@@ -743,7 +747,7 @@ const ClientDetail = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Postal Address</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("Postal Address")}</label>
                 <textarea
                   value={clientForm.postal_address}
                   onChange={(e) => setClientForm({ ...clientForm, postal_address: e.target.value })}
@@ -753,11 +757,11 @@ const ClientDetail = () => {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Customer VAT Number</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Customer VAT Number")}</label>
               <input
                 value={clientForm.vat_number}
                 onChange={(e) => setClientForm({ ...clientForm, vat_number: e.target.value })}
-                placeholder="Printed on invoices if the client has one"
+                placeholder={t("Printed on invoices if the client has one")}
                 className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               />
             </div>
@@ -776,7 +780,7 @@ const ClientDetail = () => {
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Date")}</label>
               <input
                 type="date"
                 value={newAppointment.date}
@@ -785,7 +789,7 @@ const ClientDetail = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Time</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Time")}</label>
               <input
                 type="time"
                 value={newAppointment.time}
@@ -795,26 +799,26 @@ const ClientDetail = () => {
             </div>
           </div>
           {clientAnimals.length > 0 && <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Animal (Optional)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t("Animal (Optional)")}</label>
             <select
               value={newAppointment.animal_id}
               onChange={(e) => setNewAppointment({ ...newAppointment, animal_id: e.target.value })}
               className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
             >
-              <option value="">Whole herd / general visit</option>
+              <option value="">{t("Whole herd / general visit")}</option>
               {clientAnimals.map((a) => (
                 <option key={a.id} value={a.id}>{a.name} ({a.species})</option>
               ))}
             </select>
           </div>}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Reason for Visit</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t("Reason for Visit")}</label>
             <textarea
               value={newAppointment.reason}
               onChange={(e) => setNewAppointment({ ...newAppointment, reason: e.target.value })}
               className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               rows={3}
-              placeholder="e.g. Monthly vaccination"
+              placeholder={t("e.g. Monthly vaccination")}
             />
           </div>
           <button

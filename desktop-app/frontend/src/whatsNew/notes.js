@@ -3,6 +3,26 @@
 // people will notice. (Never put the business's program steps, products or doses here: the repository is public.)
 export const NOTES = [
   {
+    version: "1.0.19",
+    title: "Easier every day",
+    sections: [
+      {
+        heading: "New",
+        items: [
+          "The whole app can be shown in Afrikaans (Settings, General, Language), with bigger text and a high-contrast option for easier reading.",
+          "Mark an invoice as paid in one click, turn a quote into an invoice, or repeat an earlier invoice.",
+          "Add a new client right from the invoice or quote form, and your recent picks come first.",
+          "Delete something by mistake? An Undo button appears straight away. Half-finished invoices and quotes are saved as drafts.",
+          "Photos on a client's page, and call and WhatsApp buttons next to client names.",
+          "Import files are checked first, so you see what will happen before anything is saved.",
+          "You can change the wording of the messages sent to clients (Settings, Messages).",
+          "A Getting started checklist on the dashboard, a backup warning if backups are old, and a weekly summary notification.",
+          "On a phone there is now a bottom bar for the main screens.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.18",
     title: "Faster, and easier to keep in touch with clients",
     sections: [

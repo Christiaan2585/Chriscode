@@ -1,3 +1,4 @@
+import { t } from "../utils/i18n";
 import React, { useEffect, useRef, useState } from 'react';
 import { Lock, LogIn, ShieldCheck, UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -67,7 +68,7 @@ function GoogleButton() {
 function Divider() {
   return (
     <div className="flex items-center gap-3 my-5 text-xs text-slate-400">
-      <div className="flex-1 h-px bg-slate-200" /> or <div className="flex-1 h-px bg-slate-200" />
+      <div className="flex-1 h-px bg-slate-200" /> {t("or")} <div className="flex-1 h-px bg-slate-200" />
     </div>
   );
 }
@@ -96,23 +97,23 @@ function SetupScreen() {
         <div className={CARD}>
         <div className="flex items-center gap-2 mb-1 text-emerald-800">
           <UserPlus size={22} />
-          <h1 className="text-xl font-bold">Welcome to Sandveld Vee Dienste</h1>
+          <h1 className="text-xl font-bold">{t("Welcome to Sandveld Vee Dienste")}</h1>
         </div>
-        <p className="text-sm text-slate-500 mb-5">This is a new install - create the first (admin) account to get started.</p>
+        <p className="text-sm text-slate-500 mb-5">{t("This is a new install - create the first (admin) account to get started.")}</p>
         <ErrorBanner error={error} />
         <GoogleButton />
         {googleEnabled && <Divider />}
         <form className="space-y-3" onSubmit={submit}>
           <div>
-            <label className="text-xs font-medium text-slate-600">Full name</label>
+            <label className="text-xs font-medium text-slate-600">{t("Full name")}</label>
             <input className={INPUT} required value={form.name} onChange={(e) => { clearError(); setForm({ ...form, name: e.target.value }); }} />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600">Email</label>
+            <label className="text-xs font-medium text-slate-600">{t("Email")}</label>
             <input type="email" className={INPUT} required value={form.email} onChange={(e) => { clearError(); setForm({ ...form, email: e.target.value }); }} />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600">Password</label>
+            <label className="text-xs font-medium text-slate-600">{t("Password")}</label>
             <input type="password" className={INPUT} required minLength={10} autoComplete="new-password" value={form.password} onChange={(e) => { clearError(); setForm({ ...form, password: e.target.value }); }} />
             <PasswordHint password={form.password} email={form.email} name={form.name} />
           </div>
@@ -150,7 +151,7 @@ function LoginScreen() {
         <div className={CARD}>
         <div className="flex items-center gap-2 mb-1 text-emerald-800">
           <LogIn size={22} />
-          <h1 className="text-xl font-bold">Sign in</h1>
+          <h1 className="text-xl font-bold">{t("Sign in")}</h1>
         </div>
         <p className="text-sm text-slate-500 mb-5">Sandveld Vee Dienste</p>
         <ErrorBanner error={error} />
@@ -158,19 +159,19 @@ function LoginScreen() {
         {googleEnabled && <Divider />}
         <form className="space-y-3" onSubmit={submit}>
           <div>
-            <label className="text-xs font-medium text-slate-600">Email</label>
+            <label className="text-xs font-medium text-slate-600">{t("Email")}</label>
             <input type="email" className={INPUT} required value={form.email} onChange={(e) => { clearError(); setForm({ ...form, email: e.target.value }); }} />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600">Password</label>
+            <label className="text-xs font-medium text-slate-600">{t("Password")}</label>
             <input type="password" className={INPUT} required value={form.password} onChange={(e) => { clearError(); setForm({ ...form, password: e.target.value }); }} />
           </div>
           {twoStepRequired && (
             <div>
-              <label className="text-xs font-medium text-slate-600">Code from your authenticator app</label>
-              <input className={`${INPUT} tracking-widest`} required autoFocus autoComplete="one-time-code" inputMode="text" placeholder="6 digits (or a recovery code)"
+              <label className="text-xs font-medium text-slate-600">{t("Code from your authenticator app")}</label>
+              <input className={`${INPUT} tracking-widest`} required autoFocus autoComplete="one-time-code" inputMode="text" placeholder={t("6 digits (or a recovery code)")}
                 value={form.code} onChange={(e) => { clearError(); setForm({ ...form, code: e.target.value }); }} />
-              <p className="mt-1 text-xs text-slate-500">Open the app on your phone and type the 6 digits it shows. Lost your phone? Use one of your recovery codes.</p>
+              <p className="mt-1 text-xs text-slate-500">{t("Open the app on your phone and type the 6 digits it shows. Lost your phone? Use one of your recovery codes.")}</p>
             </div>
           )}
           <button type="submit" className={BUTTON} disabled={busy}>
@@ -178,7 +179,7 @@ function LoginScreen() {
           </button>
           {twoStepRequired && (
             <button type="button" className="w-full text-xs text-slate-500 hover:underline" onClick={() => { cancelTwoStep(); setForm({ ...form, code: '' }); }}>
-              Back
+              {t("Back")}
             </button>
           )}
         </form>
@@ -316,7 +317,7 @@ function SetupPinScreen() {
         <div className={CARD}>
         <div className="flex items-center gap-2 mb-1 text-emerald-800">
           <ShieldCheck size={22} />
-          <h1 className="text-xl font-bold">Set up a 5-digit PIN</h1>
+          <h1 className="text-xl font-bold">{t("Set up a 5-digit PIN")}</h1>
         </div>
         <p className="text-sm text-slate-500 mb-1">
           Hi {user?.name?.split(' ')[0]}. This PIN is what you'll use to quickly get back into the app on this
@@ -327,7 +328,7 @@ function SetupPinScreen() {
         <PinDots length={5} filled={pin.length} />
         {inputEl}
         <Keypad onDigit={append} onBackspace={backspace} />
-        {busy && <p className="text-center text-xs text-slate-400 mt-2">Saving...</p>}
+        {busy && <p className="text-center text-xs text-slate-400 mt-2">{t("Saving...")}</p>}
         </div>
       </div>
     </div>
@@ -363,25 +364,25 @@ function UnlockScreen() {
           <div className="flex items-center gap-2 text-slate-800 font-semibold">
             <Lock size={16} /> Welcome back, {rememberedUser?.name?.split(' ')[0] || 'there'}
           </div>
-          <p className="text-xs text-slate-400 mt-1">Enter your 5-digit PIN to continue</p>
+          <p className="text-xs text-slate-400 mt-1">{t("Enter your 5-digit PIN to continue")}</p>
         </div>
         {offlineNote && (
           <p className="mb-3 rounded-lg bg-[#fef3c7] px-3 py-2 text-center text-xs font-medium text-[#78350f]">
-            The office PC can't be reached. Your PIN opens the saved copy of the office data.
+            {t("The office PC can't be reached. Your PIN opens the saved copy of the office data.")}
           </p>
         )}
         <ErrorBanner error={lockMsg || error} />
         <PinDots length={5} filled={pin.length} />
         {inputEl}
         <Keypad onDigit={append} onBackspace={backspace} />
-        {busy && <p className="text-center text-xs text-slate-400 mt-2">Checking...</p>}
+        {busy && <p className="text-center text-xs text-slate-400 mt-2">{t("Checking...")}</p>}
         <PoweredBy className="mt-5" />
         <button
           type="button"
           className="w-full text-center text-xs text-slate-400 hover:text-slate-600 mt-6"
           onClick={() => { clearError(); forgetDevice(); }}
         >
-          Not you? Sign in as someone else
+          {t("Not you? Sign in as someone else")}
         </button>
       </div>
       </div>
@@ -421,27 +422,27 @@ function ChangePasswordScreen() {
         <div className={CARD}>
           <div className="flex items-center gap-2 mb-1 text-emerald-800">
             <ShieldCheck size={22} />
-            <h1 className="text-xl font-bold">Choose your own password</h1>
+            <h1 className="text-xl font-bold">{t("Choose your own password")}</h1>
           </div>
           <p className="text-sm text-slate-500 mb-5">{user?.name}, you signed in with a temporary password. Choose one only you know.</p>
           <ErrorBanner error={message} />
           <form className="space-y-3" onSubmit={submit}>
             <div>
-              <label className="text-xs font-medium text-slate-600">Temporary password</label>
+              <label className="text-xs font-medium text-slate-600">{t("Temporary password")}</label>
               <input type="password" className={INPUT} required autoComplete="current-password" value={form.current} onChange={(e) => setForm({ ...form, current: e.target.value })} />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-600">New password</label>
+              <label className="text-xs font-medium text-slate-600">{t("New password")}</label>
               <input type="password" className={INPUT} required minLength={10} autoComplete="new-password" value={form.next} onChange={(e) => setForm({ ...form, next: e.target.value })} />
               <PasswordHint password={form.next} email={user?.email} name={user?.name} />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-600">New password again</label>
+              <label className="text-xs font-medium text-slate-600">{t("New password again")}</label>
               <input type="password" className={INPUT} required autoComplete="new-password" value={form.again} onChange={(e) => setForm({ ...form, again: e.target.value })} />
             </div>
             <button type="submit" className={BUTTON} disabled={busy}>{busy ? 'Saving...' : 'Save my password'}</button>
           </form>
-          <button type="button" className="mt-4 w-full text-xs text-slate-500 hover:underline" onClick={forgetDevice}>Sign out</button>
+          <button type="button" className="mt-4 w-full text-xs text-slate-500 hover:underline" onClick={forgetDevice}>{t("Sign out")}</button>
         </div>
       </div>
     </div>
@@ -462,7 +463,7 @@ export default function AuthGate({ children }) {
   if (screen === 'loading') {
     return (
       <div className={SHELL}>
-        <p className="text-sm text-slate-400">Loading...</p>
+        <p className="text-sm text-slate-400">{t("Loading...")}</p>
       </div>
     );
   }

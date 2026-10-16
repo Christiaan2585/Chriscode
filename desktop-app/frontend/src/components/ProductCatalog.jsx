@@ -1,3 +1,4 @@
+import { t } from "../utils/i18n";
 import React, { useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Camera, Edit, Eye, EyeOff, Package, Trash2 } from "lucide-react";
@@ -95,11 +96,11 @@ const ProductCard = ({ product, thumb, onOpenPicture, onEdit, onDelete, priceLab
       {selection && <SelectBox selection={selection} id={product.id} label={`Select ${product.name}`} className="absolute left-2 top-2 z-10 h-6! w-6! bg-white sm:h-4! sm:w-4!" />}
       <CardPicture product={product} src={thumb} onOpen={onOpenPicture} />
       <div className="flex-1 space-y-1.5 p-3 text-sm">
-        <InlineEdit value={product.name} onSave={save("name")} label="Name" required className="text-base font-semibold text-slate-800 sm:text-sm" />
+        <InlineEdit value={product.name} onSave={save("name")} label={t("Name")} required className="text-base font-semibold text-slate-800 sm:text-sm" />
         <div className="flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
-          <InlineEdit value={product.code} onSave={save("code")} label="Code" placeholder="Add code" />
+          <InlineEdit value={product.code} onSave={save("code")} label={t("Code")} placeholder="Add code" />
           <span aria-hidden="true">·</span>
-          <InlineEdit value={product.packaging} onSave={save("packaging")} label="Packaging" placeholder="Add packaging" />
+          <InlineEdit value={product.packaging} onSave={save("packaging")} label={t("Packaging")} placeholder="Add packaging" />
         </div>
         <InlineEdit value={product.description} onSave={save("description")} label="Description" multiline
           placeholder="Add a description" className="text-slate-600" />
@@ -116,7 +117,7 @@ const ProductCard = ({ product, thumb, onOpenPicture, onEdit, onDelete, priceLab
               <span className="text-xs text-slate-500">excl. VAT</span>
             </div>
           </div>
-          <InlineEdit value={product.category} onSave={save("category")} label="Category" placeholder="No category"
+          <InlineEdit value={product.category} onSave={save("category")} label={t("Category")} placeholder="No category"
             listId="product-categories" className="text-xs text-slate-500" />
         </div>
         {hidden && <p className="text-xs font-medium text-slate-500">Hidden from the catalogue and pickers</p>}
@@ -128,9 +129,9 @@ const ProductCard = ({ product, thumb, onOpenPicture, onEdit, onDelete, priceLab
             aria-label={`${hidden ? "Show" : "Hide"} ${product.name}`} className="p-2.5 text-slate-400 hover:text-emerald-600 sm:p-1.5">
             {hidden ? <Eye size={16} /> : <EyeOff size={16} />}
           </button>
-          <button type="button" onClick={() => onEdit(product)} title="All details" aria-label={`Edit all details of ${product.name}`}
+          <button type="button" onClick={() => onEdit(product)} title={t("All details")} aria-label={`Edit all details of ${product.name}`}
             className="p-2.5 text-slate-400 hover:text-emerald-600 sm:p-1.5"><Edit size={16} /></button>
-          <button type="button" onClick={() => onDelete(product)} title="Delete" data-admin-only aria-label={`Delete ${product.name}`}
+          <button type="button" onClick={() => onDelete(product)} title={t("Delete")} data-admin-only aria-label={`Delete ${product.name}`}
             className="p-2.5 text-slate-400 hover:text-red-600 sm:p-1.5"><Trash2 size={16} /></button>
         </div>
       </footer>
@@ -149,7 +150,7 @@ const ProductCatalog = ({ products, thumbnails, onOpenPicture, onEdit, onDelete,
     return [...map.entries()];
   }, [products]);
 
-  if (!groups.length) return <p className="p-12 text-center text-slate-400">No products match.</p>;
+  if (!groups.length) return <p className="p-12 text-center text-slate-400">{t("No products match.")}</p>;
   return (
     <div className="space-y-8 p-3 sm:p-4">
       {groups.map(([name, items]) => (

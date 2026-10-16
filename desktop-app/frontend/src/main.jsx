@@ -4,11 +4,15 @@ import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { applyAppearance } from './utils/theme'
+import { applyDisplay } from './utils/display'
+import { currentLanguage } from './utils/i18n'
 import { getPairing } from './utils/pairing'
 import { setDeviceConnection } from './api/client'
 
 // Before the first render, so screens never flash the wrong theme.
 applyAppearance()
+applyDisplay() // text size and high contrast
+document.documentElement.lang = currentLanguage
 
 // Error boundaries only catch errors thrown while React is rendering.
 // Errors thrown inside event handlers, timers, or unhandled promise

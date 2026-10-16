@@ -232,7 +232,7 @@ def _parse_date(value) -> Optional[datetime]:
 
 
 @router.post("/import")
-async def import_programs(file: UploadFile = File(...), session: Session = Depends(get_session)):
+async def import_programs(file: UploadFile = File(...), dry_run: bool = False, session: Session = Depends(get_session)):
     """Import herding programs and their animal-type headcounts from a
     spreadsheet, one row per animal type (e.g. one row "12 Goats", another
     "5 Sheep" - both under the same Client + Program Name - become a single
@@ -347,14 +347,19 @@ async def import_programs(file: UploadFile = File(...), session: Session = Depen
         except Exception as exc:
             errors.append({"row": excel_row_num, "error": str(exc)})
 
-    session.commit()
-    return {
+    result = {  # worked out before a check rolls everything back
         "created": created_programs,
         "updated": sum(1 for group, before in groups_touched.values() if group.group_size != before),
         "skipped_blank": skipped,
         "columns_matched": column_map,
         "errors": errors,
+        "dry_run": dry_run,
     }
+    if dry_run:  # a check: say what would happen, change nothing
+        session.rollback()
+    else:
+        session.commit()
+    return result
 
 
 # --- The master herding program (everyone reads it, only admins change it) ---

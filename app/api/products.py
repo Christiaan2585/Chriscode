@@ -230,7 +230,7 @@ def _category_from_header(row) -> str:
 
 
 @router.post("/import")
-async def import_products(file: UploadFile = File(...), session: Session = Depends(get_session)):
+async def import_products(file: UploadFile = File(...), dry_run: bool = False, session: Session = Depends(get_session)):
     """Import products from a supplier price-list Excel file (e.g. pryslyse.xlsx).
 
     The sheet is expected to have columns, in order:
@@ -333,11 +333,15 @@ async def import_products(file: UploadFile = File(...), session: Session = Depen
         except Exception as exc:
             errors.append({"row": excel_row_num, "name": str(name_cell), "error": str(exc)})
 
-    session.commit()
+    if dry_run:  # a check: say what would happen, change nothing
+        session.rollback()
+    else:
+        session.commit()
     return {
         "created": created,
         "updated": updated,
         "skipped_blank": skipped,
         "errors": errors,
         "total_rows_processed": created + updated,
+        "dry_run": dry_run,
     }

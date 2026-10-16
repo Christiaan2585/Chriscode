@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
+from app.core import message_templates
 from app.core.db import get_session
 from app.core.documents import document_totals, line_amounts, next_number
 from app.core.security import require_admin
@@ -154,6 +155,7 @@ def sales_rep_for(session: Session, document) -> tuple:
 def _with_next_numbers(session: Session, settings: BusinessSettings) -> dict:
     return {
         **settings.model_dump(),
+        "message_templates": message_templates.load(settings.message_templates),
         "missing": missing_details(settings),
         "required_fields": REQUIRED_FIELDS,
         "next_invoice_number": next_document_number(session, Invoice),
@@ -165,6 +167,25 @@ def _with_next_numbers(session: Session, settings: BusinessSettings) -> dict:
 @router.get("/")
 def read_business(session: Session = Depends(get_session)):
     return _with_next_numbers(session, get_business(session))
+
+
+class MessageTemplatesIn(BaseModel):
+    templates: dict
+
+
+@router.put("/messages", dependencies=[Depends(require_admin)])
+def save_message_templates(body: MessageTemplatesIn, session: Session = Depends(get_session)):
+    """Replaces the business's own wording for messages to clients (a separate route, so a normal edit of the business
+    details can never wipe it)."""
+    try:
+        cleaned = message_templates.clean(body.templates)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    settings = get_business(session)
+    settings.message_templates = message_templates.dump(cleaned) if cleaned else None
+    session.add(settings)
+    session.commit()
+    return cleaned
 
 
 @router.put("/", dependencies=[Depends(require_admin)])

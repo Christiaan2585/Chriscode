@@ -1,3 +1,4 @@
+import { t } from "../utils/i18n";
 import React, { Suspense, useState } from "react";
 import { Outlet, NavLink, useLocation } from "react-router-dom";
 import { LayoutDashboard, Users, ClipboardList, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, CloudSun, Truck, BarChart3, Menu, X } from "lucide-react";
@@ -14,22 +15,34 @@ import SyncStatus from "../components/SyncStatus";
 import AutoLock from "../components/AutoLock";
 import Reminders from "../components/Reminders";
 import WhatsNew from "../components/WhatsNew";
+import MessageTemplatesLoader from "../components/MessageTemplatesLoader";
 import { AndroidUpdatePrompt } from "../components/AndroidUpdate";
 import { isNative } from "../utils/pairing";
 
 const NAV = [
-  { to: "/", label: "Dashboard", Icon: LayoutDashboard, end: true },
-  { to: "/clients", label: "Clients", Icon: Users },
-  { to: "/calendar", label: "System Calendar", Icon: Calendar },
-  { to: "/weather", label: "Weather", Icon: CloudSun },
-  { to: "/programs", label: "Programs & Quotes", Icon: ClipboardList },
-  { to: "/orders", label: "Orders", Icon: ShoppingCart },
-  { to: "/products", label: "Products", Icon: Package },
-  { to: "/calculator", label: "Product Calc", Icon: Calculator },
-  { to: "/invoices", label: "Invoices", Icon: FileText },
-  { to: "/purchase-orders", label: "Purchase Orders", Icon: Truck },
-  { to: "/reports", label: "Reports", Icon: BarChart3 },
+  { to: "/", label: t("Dashboard"), Icon: LayoutDashboard, end: true },
+  { to: "/clients", label: t("Clients"), Icon: Users },
+  { to: "/calendar", label: t("System Calendar"), Icon: Calendar },
+  { to: "/weather", label: t("Weather"), Icon: CloudSun },
+  { to: "/programs", label: t("Programs & Quotes"), Icon: ClipboardList },
+  { to: "/orders", label: t("Orders"), Icon: ShoppingCart },
+  { to: "/products", label: t("Products"), Icon: Package },
+  { to: "/calculator", label: t("Product Calc"), Icon: Calculator },
+  { to: "/invoices", label: t("Invoices"), Icon: FileText },
+  { to: "/purchase-orders", label: t("Purchase Orders"), Icon: Truck },
+  { to: "/reports", label: t("Reports"), Icon: BarChart3 },
 ];
+
+// The five things a phone needs in one tap, along the bottom (the sidebar is the "More" button on small screens).
+const BOTTOM_NAV = [
+  { to: "/", label: t("Home"), Icon: LayoutDashboard, end: true },
+  { to: "/clients", label: t("Clients"), Icon: Users },
+  { to: "/programs", label: t("Quotes"), Icon: ClipboardList },
+  { to: "/invoices", label: t("Invoices"), Icon: FileText },
+];
+
+const bottomClass = ({ isActive }) =>
+  `flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[0.7rem] font-medium ${isActive ? "text-emerald-600" : "text-slate-500"}`;
 
 const navClass = ({ isActive }) =>
   `flex items-center gap-3 p-3 rounded-lg transition-colors ${isActive ? "nav-active bg-emerald-800" : "hover:bg-emerald-800"}`;
@@ -52,6 +65,7 @@ const AppLayout = () => {
       <AutoLock />
       <Reminders />
       <WhatsNew />
+      <MessageTemplatesLoader />
       {isNative() && <AndroidUpdatePrompt />}
       <OfflineSupport />
       {navOpen && (
@@ -68,15 +82,15 @@ const AppLayout = () => {
               className="ml-auto rounded-lg p-1 text-emerald-200 hover:bg-emerald-800 md:hidden"><X size={20} /></button>
           </div>
           {user && (
-            <p className="mt-3 text-sm leading-snug text-emerald-200" title="The sales rep printed on your quotes and invoices">
-              <span className="block text-[11px] font-medium uppercase tracking-wider text-emerald-300/70">Sales rep</span>
+            <p className="mt-3 text-sm leading-snug text-emerald-200" title={t("The sales rep printed on your quotes and invoices")}>
+              <span className="block text-[11px] font-medium uppercase tracking-wider text-emerald-300/70">{t("Sales rep")}</span>
               <span className="block truncate font-semibold text-white">{user.name}</span>
               {user.phone && <span className="block truncate">{user.phone}</span>}
             </p>
           )}
         </div>
         <OutboxBadge />
-        <p className="nav-label px-7 mt-2 text-xs font-medium uppercase tracking-wider text-emerald-300/70">Menu</p>
+        <p className="nav-label px-7 mt-2 text-xs font-medium uppercase tracking-wider text-emerald-300/70">{t("Menu")}</p>
         <nav className="flex-1 min-h-0 overflow-y-auto px-4 space-y-1 mt-2">
           {NAV.map(({ to, label, Icon, end }) => (
             <NavLink key={to} to={to} end={end} className={navClass}>
@@ -87,9 +101,9 @@ const AppLayout = () => {
         <PoweredBy onDark className="px-4 pb-3" />
         <div className="p-4 border-t border-emerald-800 space-y-1">
           <NavLink to="/settings" className={navClass}>
-            <Settings size={20} /> Settings
+            <Settings size={20} /> {t("Settings")}
             {setup.count > 0 && (
-              <span title="Something needs your attention in Settings" aria-label={`${setup.count} ${setup.count === 1 ? "thing needs" : "things need"} attention in Settings`}
+              <span title={t("Something needs your attention in Settings")} aria-label={`${setup.count} ${setup.count === 1 ? "thing needs" : "things need"} attention in Settings`}
                 className="ml-auto rounded-full bg-amber-400 px-2 py-0.5 text-xs font-bold text-amber-950">{setup.count}</span>
             )}
           </NavLink>
@@ -101,7 +115,7 @@ const AppLayout = () => {
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between gap-3 px-4 md:gap-6 md:px-8">
           <button type="button" aria-label="Open the menu" aria-expanded={navOpen} onClick={() => setNavOpen(true)}
             className="-ml-1 rounded-lg p-2 text-slate-600 hover:bg-slate-100 md:hidden"><Menu size={22} /></button>
-          <h1 className="hidden sm:block text-lg font-semibold text-slate-700 shrink-0 whitespace-nowrap">Management Portal</h1>
+          <h1 className="hidden sm:block text-lg font-semibold text-slate-700 shrink-0 whitespace-nowrap">{t("Management Portal")}</h1>
           <GlobalSearch />
           <div className="hidden lg:flex flex-1 justify-center min-w-0 overflow-hidden">
             <GrazingHeaderStrip />
@@ -112,10 +126,19 @@ const AppLayout = () => {
           <ThemeToggle />
         </header>
         <div className="flex-1 overflow-auto p-4 md:p-8">
-          <Suspense fallback={<div role="status" className="p-8 text-sm text-slate-500">Loading…</div>}>
+          <Suspense fallback={<div role="status" className="p-8 text-sm text-slate-500">{t("Loading…")}</div>}>
             <Outlet />
           </Suspense>
         </div>
+        <nav aria-label="Main" className="app-bottom-nav flex shrink-0 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
+          {BOTTOM_NAV.map(({ to, label, Icon, end }) => (
+            <NavLink key={to} to={to} end={end} className={bottomClass}><Icon size={22} />{label}</NavLink>
+          ))}
+          <button type="button" onClick={() => setNavOpen(true)} aria-label="More: open the full menu" className="relative flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[0.7rem] font-medium text-slate-500">
+            <Menu size={22} />{t("More")}
+            {setup.count > 0 && <span className="absolute right-1/4 top-1.5 h-2.5 w-2.5 rounded-full bg-amber-400" aria-label={t("Something needs your attention in Settings")} />}
+          </button>
+        </nav>
       </main>
     </div>
   );

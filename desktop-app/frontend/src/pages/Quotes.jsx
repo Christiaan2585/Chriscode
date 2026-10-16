@@ -1,4 +1,10 @@
+import { t } from "../utils/i18n";
+import ContactLinks from "../components/ContactLinks";
+import { deleteConfirm } from "../utils/confirmText";
 import ShowMore from "../components/ShowMore";
+import DraftBanner from "../components/DraftBanner";
+import { clearDraft, loadDraft } from "../utils/stored";
+import { useAutosaveDraft } from "../utils/useDraft";
 import SentNote from "../components/SentNote";
 import { useSends } from "../utils/useSends";
 import { usePaged } from "../utils/usePaged";
@@ -8,12 +14,13 @@ import { useSelection } from "../utils/useSelection";
 import { useOpenNew } from "../utils/useOpenNew";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Plus, Search, FileText, Trash2, Edit, Save, X, Download, Eye, FileInput, ClipboardList } from "lucide-react";
+import { Plus, Search, FileText, Trash2, Edit, Save, X, Download, Eye, FileInput, ClipboardList, FilePlus2 } from "lucide-react";
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
 import { isOffline, queueQuoteCreate } from "../utils/outbox";
 import { useToast } from "../context/ToastContext";
 import Modal from "../components/Modal";
+import ClientPicker from "../components/ClientPicker";
 import SearchableSelect from "../components/SearchableSelect";
 import DocumentPreview from "../components/DocumentPreview";
 import OrderFormImport from "../components/OrderFormImport";
@@ -42,6 +49,7 @@ const Quotes = () => {
   const [removedItemIds, setRemovedItemIds] = useState([]);
   // Items added in this session that don't exist on the server yet.
   const [newItems, setNewItems] = useState([]);
+  const [restored, setRestored] = useState(false); // the new-quote form was brought back from a saved draft
   const [newItem, setNewItem] = useState(emptyLine);
 
   const { data: quotes, isLoading } = useQuery({
@@ -105,16 +113,27 @@ const Quotes = () => {
     setRemovedItemIds([]);
     setNewItems([]);
     setNewItem(emptyLine);
+    setRestored(false);
   };
 
   const openAddModal = () => {
     setEditingId(null);
-    setQuote(emptyQuote);
     setExistingItems([]);
     setRemovedItemIds([]);
-    setNewItems([]);
+    const draft = loadDraft("quote"); // an unfinished new quote from before (a lock, a closed window)
+    setQuote(draft?.quote || emptyQuote);
+    setNewItems(draft?.newItems || []);
+    setRestored(Boolean(draft));
     setIsModalOpen(true);
   };
+
+  const discardDraft = () => {
+    clearDraft("quote");
+    setQuote(emptyQuote);
+    setNewItems([]);
+    setRestored(false);
+  };
+  useAutosaveDraft("quote", isModalOpen && !editingId, { quote, newItems }, Boolean(quote.client_id || newItems.length || quote.notes || quote.reference));
 
   const openEditModal = async (q) => {
     setEditingId(q.id);
@@ -194,9 +213,19 @@ const Quotes = () => {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["quotes"] });
+      clearDraft("quote");
       closeModal();
       if (result?.queued) showToast("Quote saved - it'll be created once this phone reaches the office PC.", "success");
     },
+  });
+
+  const makeInvoice = useMutation({
+    mutationFn: async (id) => (await apiClient.post(`/invoices/from-quote/${id}`, null, { silent: true })).data,
+    onSuccess: (invoice, id) => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      showToast(`Invoice ${invoice.number} made from ${quotes?.find((q) => q.id === id)?.number || "the quote"}.`, "success", 10000, { label: t("Open invoices"), onClick: () => navigate("/invoices") });
+    },
+    onError: (err) => showToast(err?.response?.data?.detail?.toString?.() || "Couldn't make the invoice."),
   });
 
   const deleteQuoteMutation = useMutation({
@@ -233,14 +262,14 @@ const Quotes = () => {
 
   useOpenNew(() => openAddModal()); // from the dashboard's quick actions (?new=1)
 
-  if (isLoading) return <div className="p-8 text-center">Loading quotes...</div>;
+  if (isLoading) return <div className="p-8 text-center">{t("Loading quotes...")}</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-slate-800">Programs &amp; Quotes</h2>
-          <p className="text-slate-500">Every client's herding program is also their quote - plus ordinary quotes.</p>
+          <h2 className="text-3xl font-bold text-slate-800">{t("Programs & Quotes")}</h2>
+          <p className="text-slate-500">{t("Every client's herding program is also their quote - plus ordinary quotes.")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -248,26 +277,26 @@ const Quotes = () => {
             onClick={() => setImportingOrder(true)}
             className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:border-emerald-300 hover:text-emerald-600 transition-colors shadow-sm"
           >
-            <FileInput size={20} /> Import order form
+            <FileInput size={20} /> {t("Import order form")}
           </button>
           <Link
             to="/programs/master"
             className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:border-emerald-300 hover:text-emerald-600 transition-colors shadow-sm"
           >
-            <ClipboardList size={20} /> Master program
+            <ClipboardList size={20} /> {t("Master program")}
           </Link>
           <button
             type="button"
             onClick={() => setNewProgram(true)}
             className="flex items-center gap-2 bg-white border border-emerald-300 text-emerald-700 px-4 py-2 rounded-lg hover:bg-emerald-50 transition-colors shadow-sm"
           >
-            <Plus size={20} /> New herding program
+            <Plus size={20} /> {t("New herding program")}
           </button>
           <button
             onClick={openAddModal}
             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
           >
-            <Plus size={20} /> Create Quote
+            <Plus size={20} /> {t("Create Quote")}
           </button>
         </div>
       </div>
@@ -280,7 +309,7 @@ const Quotes = () => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search quotes by client, status or #..."
+              placeholder={t("Search quotes by client, status or #...")}
               className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
@@ -295,12 +324,12 @@ const Quotes = () => {
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
             <tr>
               <SelectAllTh selection={selection} />
-              <th className="px-6 py-3 font-medium">Quote</th>
-              <th className="px-6 py-3 font-medium">Date</th>
-              <th className="px-6 py-3 font-medium">Client</th>
-              <th className="px-6 py-3 font-medium">Total Amount</th>
-              <th className="px-6 py-3 font-medium">Status</th>
-              <th className="px-6 py-3 font-medium text-right">Actions</th>
+              <th className="px-6 py-3 font-medium">{t("Quote")}</th>
+              <th className="px-6 py-3 font-medium">{t("Date")}</th>
+              <th className="px-6 py-3 font-medium">{t("Client")}</th>
+              <th className="px-6 py-3 font-medium">{t("Total Amount")}</th>
+              <th className="px-6 py-3 font-medium">{t("Status")}</th>
+              <th className="px-6 py-3 font-medium text-right">{t("Actions")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -311,56 +340,67 @@ const Quotes = () => {
                   <DocumentHover kind="quote" doc={q} clientName={clientName(q.client_id)}>{q.number || `#${q.id}`}</DocumentHover>
                   <SentNote entry={sentQuotes?.[String(q.id)]} />
                   {q.program_id && (
-                    <Link to={`/programs/${q.program_id}`} title="This quote is a herding program - open it"
+                    <Link to={`/programs/${q.program_id}`} title={t("This quote is a herding program - open it")}
                       className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100">
-                      <ClipboardList size={12} /> Herding program
+                      <ClipboardList size={12} /> {t("Herding program")}
                     </Link>
                   )}
                 </td>
-                <td data-label="Date" className="px-6 py-4 text-slate-600">{new Date(q.date).toLocaleDateString()}</td>
-                <td data-label="Client" className="px-6 py-4 text-slate-600">
+                <td data-label={t("Date")} className="px-6 py-4 text-slate-600">{new Date(q.date).toLocaleDateString()}</td>
+                <td data-label={t("Client")} className="px-6 py-4 text-slate-600">
                   <ClientHover client={clients?.find((c) => c.id === q.client_id)}>{clientName(q.client_id)}</ClientHover>
+                  <ContactLinks client={clients?.find((c) => c.id === q.client_id)} />
                 </td>
-                <td data-label="Total" className="px-6 py-4 font-medium text-slate-800">R {q.total_amount.toLocaleString()}</td>
-                <td data-label="Status" className="px-6 py-4">
+                <td data-label={t("Total")} className="px-6 py-4 font-medium text-slate-800">R {q.total_amount.toLocaleString()}</td>
+                <td data-label={t("Status")} className="px-6 py-4">
                   <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                     q.status === 'Accepted' ? 'bg-emerald-100 text-emerald-700' :
                     q.status === 'Sent' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'
                   }`}>
-                    {q.status}
+                    {t(q.status)}
                   </span>
                 </td>
                 <td data-actions className="px-6 py-4 text-right flex justify-end gap-2">
                   <button
                     onClick={() => setPreview(quoteDoc(q, clients?.find((c) => c.id === q.client_id), () => markQuoteSent(q, queryClient, q.program_id)))}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
-                    title="Preview"
+                    title={t("Preview")}
                   >
                     <Eye size={18} />
                   </button>
+                  {!q.program_id && q.total_amount > 0 && (
+                    <button
+                      onClick={() => { if (window.confirm(`Make an invoice from ${q.number || `#${q.id}`}? A new invoice is made for this client with the same lines. The quote stays as it is.`)) makeInvoice.mutate(q.id); }}
+                      className="p-2 text-emerald-600 hover:text-emerald-700 transition-colors"
+                      title={t("Make an invoice from this quote")}
+                      aria-label={t("Make an invoice from this quote")}
+                    >
+                      <FilePlus2 size={18} />
+                    </button>
+                  )}
                   <button
                     onClick={() => downloadDocumentPdf("quote", q.id, q.number)}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
-                    title="Download PDF"
+                    title={t("Download PDF")}
                   >
                     <Download size={18} />
                   </button>
-                  <button onClick={() => openEditModal(q)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors" title="Edit">
+                  <button onClick={() => openEditModal(q)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors" title={t("Edit")}>
                     <Edit size={18} />
                   </button>
                   {q.program_id ? (
-                    <button onClick={() => navigate(`/programs/${q.program_id}`)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors" title="Open the herding program">
+                    <button onClick={() => navigate(`/programs/${q.program_id}`)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors" title={t("Open the herding program")}>
                       <ClipboardList size={18} />
                     </button>
                   ) : (
                   <button
                     onClick={() => {
-                      if (window.confirm(`Delete quote #${q.id}? This can't be undone.`)) {
+                      if (window.confirm(deleteConfirm(`quote ${q.number || `#${q.id}`}`, "Its lines go with it."))) {
                         deleteQuoteMutation.mutate(q.id);
                       }
                     }}
                     className="p-2 text-slate-400 hover:text-red-600 transition-colors"
-                    title="Delete" data-admin-only
+                    title={t("Delete")} data-admin-only
                   >
                     <Trash2 size={18} />
                   </button>
@@ -383,55 +423,51 @@ const Quotes = () => {
 
       <Modal isOpen={isModalOpen} onClose={closeModal} size="lg" title={editingId ? `Edit Quote ${quotes?.find((q) => q.id === editingId)?.number || `#${editingId}`}` : "Quote Builder"}>
         <div className="space-y-6">
+          {restored && !editingId && <DraftBanner what="quote" onDiscard={discardDraft} />}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Client</label>
-              <SearchableSelect
-                value={quote.client_id}
-                onChange={(v) => setQuote({ ...quote, client_id: v })}
-                options={(clients || []).map((c) => ({ value: c.id, label: c.name, sublabel: c.farm_name }))}
-                placeholder="Select a client…"
-                searchPlaceholder="Search clients…"
-              />
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Client")}</label>
+              <ClientPicker value={quote.client_id} onChange={(v) => setQuote({ ...quote, client_id: v })} clients={clients} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Status")}</label>
               <select
                 value={quote.status}
                 onChange={e => setQuote({...quote, status: e.target.value})}
                 className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               >
-                <option value="Draft">Draft</option>
-                <option value="Sent">Sent</option>
-                <option value="Accepted">Accepted</option>
+                <option value="Draft">{t("Draft")}</option>
+                <option value="Sent">{t("Sent")}</option>
+                <option value="Accepted">{t("Accepted")}</option>
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Reference</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Reference")}</label>
               <input value={quote.reference} onChange={(e) => setQuote({ ...quote, reference: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Valid until</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Valid until")}</label>
               <input type="date" value={quote.expiry_date} onChange={(e) => setQuote({ ...quote, expiry_date: e.target.value })} className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
-              {!quote.expiry_date && <p className="mt-1 text-xs text-slate-500">Blank = quote validity from Settings</p>}
+              {!quote.expiry_date && <p className="mt-1 text-xs text-slate-500">{t("Blank = quote validity from Settings")}</p>}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t("Notes")}</label>
             <textarea value={quote.notes} onChange={(e) => setQuote({ ...quote, notes: e.target.value })} rows={2} className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
           </div>
 
           <div className="space-y-4">
             <h4 className="font-semibold text-slate-800 flex items-center gap-2">
-              <FileText size={18} /> Quote Items
+              <FileText size={18} /> {t("Quote Items")}
             </h4>
             <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_4.5rem_2.75rem]">
               <div className="col-span-3 sm:col-span-1">
 <SearchableSelect
+                recentKey="product"
                 value={newItem.product_id}
                 onChange={(v) => {
                   const product = products?.find(p => p.id === Number(v));
@@ -442,40 +478,40 @@ const Quotes = () => {
                   });
                 }}
                 options={pickerProducts(products, newItem.product_id).map((p) => ({ value: p.id, label: p.name }))}
-                placeholder="Select product…"
+                placeholder={t("Select product…")}
                 searchPlaceholder="Search products…"
               />
               </div>
-              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Qty</span><input
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">{t("Qty")}</span><input
                 type="number"
-                placeholder="Qty"
+                placeholder={t("Qty")}
                 value={newItem.quantity}
                 onChange={e => setNewItem({...newItem, quantity: Number(e.target.value)})}
                 className="w-full p-2 border border-slate-200 rounded-lg text-sm"
               /></div>
-              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Price</span><input
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">{t("Price")}</span><input
                 type="number"
-                placeholder="Price"
+                placeholder={t("Price")}
                 value={newItem.unit_price}
                 onChange={e => setNewItem({...newItem, unit_price: Number(e.target.value)})}
                 className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-                aria-label="Unit price"
+                aria-label={t("Unit price")}
               /></div>
-              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Discount %</span><input
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">{t("Discount %")}</span><input
                 type="number"
                 min="0"
                 max="100"
                 step="0.01"
-                placeholder="Disc %"
+                placeholder={t("Disc %")}
                 value={newItem.discount_percent}
                 onChange={e => setNewItem({...newItem, discount_percent: e.target.value})}
                 className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-                aria-label="Discount percent"
+                aria-label={t("Discount percent")}
               /></div>
               <button
                 onClick={addItem}
-                aria-label="Add line"
-                title="Add line"
+                aria-label={t("Add line")}
+                title={t("Add line")}
                 className="col-span-3 min-h-11 bg-emerald-600 text-white rounded-lg p-2 hover:bg-emerald-700 transition-colors sm:col-span-1 sm:min-h-0"
               >
                 <Plus size={18} className="mx-auto" />
@@ -496,7 +532,7 @@ const Quotes = () => {
                       <span className="font-bold">R {lineTotal(item.quantity, item.unit_price, item.discount_percent).toLocaleString()}</span>
                       {isRemoved ? (
                         <button onClick={() => restoreExistingItem(item.id)} className="text-emerald-500 hover:text-emerald-700 text-xs font-medium">
-                          Undo
+                          {t("Undo")}
                         </button>
                       ) : (
                         <button onClick={() => removeExistingItem(item.id)} className="text-red-400 hover:text-red-600">
@@ -519,7 +555,7 @@ const Quotes = () => {
                 </div>
               ))}
               {existingItems.length === 0 && newItems.length === 0 && (
-                <p className="text-sm text-slate-400 text-center py-2">No line items added yet.</p>
+                <p className="text-sm text-slate-400 text-center py-2">{t("No line items added yet.")}</p>
               )}
             </div>
           </div>

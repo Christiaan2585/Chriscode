@@ -1,3 +1,5 @@
+import { t } from "../utils/i18n";
+import { deleteConfirm } from "../utils/confirmText";
 import ShowMore from "../components/ShowMore";
 import { usePaged } from "../utils/usePaged";
 import React, { useMemo, useState } from "react";
@@ -65,7 +67,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
             <SelectAllTh selection={selection} />
             {["Product", "Code", "Category", "Pack Size", "Packaging"].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}
             {["Stock", "Reorder at", "Cost", "Excl VAT", "Incl VAT"].map((h) => <th key={h} className="px-4 py-3 font-medium text-right">{h}</th>)}
-            <th className="px-4 py-3 font-medium text-right">Actions</th>
+            <th className="px-4 py-3 font-medium text-right">{t("Actions")}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -76,31 +78,31 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
                 <div className="flex items-center gap-3">
                   <ProductThumb product={p} src={thumbnails[p.id]} onOpen={onOpenPicture} />
                   <div className="min-w-0">
-                    <InlineEdit value={p.name} onSave={save(p.id, "name")} label="Name" required className="font-medium text-slate-700" />
+                    <InlineEdit value={p.name} onSave={save(p.id, "name")} label={t("Name")} required className="font-medium text-slate-700" />
                     <div className="flex gap-1">
-                      {!isInStock(p) && <span className="rounded bg-red-100 px-1.5 text-xs font-semibold text-red-700">Out of stock</span>}
-                      {!isActive(p) && <span className="rounded bg-slate-100 px-1.5 text-xs font-semibold text-slate-600">Hidden</span>}
+                      {!isInStock(p) && <span className="rounded bg-red-100 px-1.5 text-xs font-semibold text-red-700">{t("Out of stock")}</span>}
+                      {!isActive(p) && <span className="rounded bg-slate-100 px-1.5 text-xs font-semibold text-slate-600">{t("Hidden")}</span>}
                     </div>
                   </div>
                 </div>
               </td>
-              <td data-label="Code" className={`${cell} text-slate-500`}><InlineEdit value={p.code} onSave={save(p.id, "code")} label="Code" placeholder="—" /></td>
-              <td data-label="Category" className={`${cell} text-slate-500`}><InlineEdit value={p.category} onSave={save(p.id, "category")} label="Category" placeholder="—" listId="product-categories" /></td>
-              <td data-label="Pack size" className={`${cell} text-slate-500`}><InlineEdit value={p.pack_size} onSave={save(p.id, "pack_size")} label="Pack size" type="number" placeholder="—" /></td>
-              <td data-label="Packaging" className={`${cell} text-slate-500`}><InlineEdit value={p.packaging} onSave={save(p.id, "packaging")} label="Packaging" placeholder="—" /></td>
-              <td data-label="Stock" className={`${cell} text-right ${p.stock_quantity != null && p.reorder_level != null && p.stock_quantity <= p.reorder_level ? "font-semibold text-red-700" : "text-slate-600"}`}>
-                <InlineEdit value={p.stock_quantity} onSave={saveCount(p.id)} label="Stock on the shelf (a count)" type="number" placeholder="Count" />
+              <td data-label={t("Code")} className={`${cell} text-slate-500`}><InlineEdit value={p.code} onSave={save(p.id, "code")} label={t("Code")} placeholder="—" /></td>
+              <td data-label={t("Category")} className={`${cell} text-slate-500`}><InlineEdit value={p.category} onSave={save(p.id, "category")} label={t("Category")} placeholder="—" listId="product-categories" /></td>
+              <td data-label={t("Pack size")} className={`${cell} text-slate-500`}><InlineEdit value={p.pack_size} onSave={save(p.id, "pack_size")} label={t("Pack size")} type="number" placeholder="—" /></td>
+              <td data-label={t("Packaging")} className={`${cell} text-slate-500`}><InlineEdit value={p.packaging} onSave={save(p.id, "packaging")} label={t("Packaging")} placeholder="—" /></td>
+              <td data-label={t("Stock")} className={`${cell} text-right ${p.stock_quantity != null && p.reorder_level != null && p.stock_quantity <= p.reorder_level ? "font-semibold text-red-700" : "text-slate-600"}`}>
+                <InlineEdit value={p.stock_quantity} onSave={saveCount(p.id)} label={t("Stock on the shelf (a count)")} type="number" placeholder={t("Count")} />
               </td>
-              <td data-label="Reorder at" className={`${cell} text-right text-slate-500`}><InlineEdit value={p.reorder_level} onSave={save(p.id, "reorder_level")} label="Reorder level" type="number" placeholder="—" /></td>
-              <td data-label="Cost" className={`${cell} text-right text-slate-600`}><InlineEdit value={p.cost} onSave={saveCost(p.id)} label="Cost" type="number" format={money} placeholder="—" /></td>
-              <td data-label="Price excl VAT" className={`${cell} text-right text-slate-600`}><InlineEdit value={p.price_excl_vat} onSave={save(p.id, "price_excl_vat")} label="Selling price excl VAT" type="number" format={money} placeholder="—" /></td>
-              <td data-label="Price incl VAT" data-key className={`${cell} text-right font-semibold text-slate-800`}><InlineEdit value={p.price} onSave={save(p.id, "price")} label="Selling price incl VAT" type="number" required format={money} /></td>
+              <td data-label={t("Reorder at")} className={`${cell} text-right text-slate-500`}><InlineEdit value={p.reorder_level} onSave={save(p.id, "reorder_level")} label={t("Reorder level")} type="number" placeholder="—" /></td>
+              <td data-label={t("Cost")} className={`${cell} text-right text-slate-600`}><InlineEdit value={p.cost} onSave={saveCost(p.id)} label={t("Cost")} type="number" format={money} placeholder="—" /></td>
+              <td data-label={t("Price excl VAT")} className={`${cell} text-right text-slate-600`}><InlineEdit value={p.price_excl_vat} onSave={save(p.id, "price_excl_vat")} label={t("Selling price excl VAT")} type="number" format={money} placeholder="—" /></td>
+              <td data-label={t("Price incl VAT")} data-key className={`${cell} text-right font-semibold text-slate-800`}><InlineEdit value={p.price} onSave={save(p.id, "price")} label={t("Selling price incl VAT")} type="number" required format={money} /></td>
               <td data-actions className={`${cell} text-right`}>
                 <div className="flex justify-end gap-1">
-                  <button onClick={() => onEdit(p)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors" title="All details" aria-label={`Edit all details of ${p.name}`}>
+                  <button onClick={() => onEdit(p)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors" title={t("All details")} aria-label={`Edit all details of ${p.name}`}>
                     <Edit size={18} />
                   </button>
-                  <button onClick={() => onDelete(p)} className="p-2 text-slate-400 hover:text-red-600 transition-colors" title="Delete" data-admin-only aria-label={`Delete ${p.name}`}>
+                  <button onClick={() => onDelete(p)} className="p-2 text-slate-400 hover:text-red-600 transition-colors" title={t("Delete")} data-admin-only aria-label={`Delete ${p.name}`}>
                     <Trash2 size={18} />
                   </button>
                 </div>
@@ -108,7 +110,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
             </tr>
           ))}
           {products.length === 0 && (
-            <tr><td colSpan={12} className="px-6 py-12 text-center text-slate-400">No products match.</td></tr>
+            <tr><td colSpan={12} className="px-6 py-12 text-center text-slate-400">{t("No products match.")}</td></tr>
           )}
         </tbody>
       </table>
@@ -226,7 +228,7 @@ const Products = () => {
   const handleSave = () => saveMutation.mutate({ id: editingId, data: buildPayload() });
 
   const handleDelete = (product) => {
-    if (window.confirm(`Delete "${product.name}"? This can't be undone.\n\nTip: "Hide" keeps it off the catalogue without deleting it.`)) {
+    if (window.confirm(`${deleteConfirm(`"${product.name}"`, "Its picture goes with it.")}\n\nTip: "Hide" keeps it off the catalogue without deleting it.`)) {
       deleteMutation.mutate(product.id);
     }
   };
@@ -260,13 +262,13 @@ const Products = () => {
       url: category === "All" ? "/products/catalogue.pdf" : `/products/catalogue.pdf?category=${encodeURIComponent(category)}`,
     });
 
-  if (isLoading) return <div className="p-8 text-center">Loading products...</div>;
+  if (isLoading) return <div className="p-8 text-center">{t("Loading products...")}</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-slate-800">Products</h2>
+          <h2 className="text-3xl font-bold text-slate-800">{t("Products")}</h2>
           <p className="text-slate-500">
             {products?.length || 0} products{hiddenCount ? `, ${hiddenCount} hidden` : ""} - tap any detail to change it
           </p>
@@ -282,12 +284,12 @@ const Products = () => {
           )) : (
             <button onClick={openCatalogue}
               className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-slate-700 shadow-sm hover:border-emerald-400">
-              <FileDown size={18} /> PDF catalogue
+              <FileDown size={18} /> {t("PDF catalogue")}
             </button>
           )}
           <button onClick={openAddModal}
             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm">
-            <Plus size={20} /> Add Product
+            <Plus size={20} /> {t("Add Product")}
           </button>
         </div>
       </div>
@@ -298,10 +300,10 @@ const Products = () => {
           <div className="relative flex-1 min-w-48">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, code or description..." aria-label="Search products"
+              placeholder={t("Search by name, code or description...")} aria-label={t("Search products")}
               className="w-full pl-10 pr-4 py-3 md:py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
-          <div className="-mx-1 flex w-full gap-2 overflow-x-auto px-1 pb-1 md:hidden" role="group" aria-label="Category">
+          <div className="-mx-1 flex w-full gap-2 overflow-x-auto px-1 pb-1 md:hidden" role="group" aria-label={t("Category")}>
             {categoryFilter.map((c) => (
               <button key={c} type="button" onClick={() => setCategory(c)} aria-pressed={category === c}
                 className={`shrink-0 rounded-full border px-4 py-2 text-sm font-medium ${category === c ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-200 bg-white text-slate-600"}`}>
@@ -309,18 +311,18 @@ const Products = () => {
               </button>
             ))}
           </div>
-          <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category"
+          <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label={t("Category")}
             className="hidden p-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 md:block">
             {categoryFilter.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
           <label className="flex items-center gap-2 text-sm text-slate-600">
             <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} className="h-4 w-4 accent-emerald-600" />
-            Show hidden
+            {t("Show hidden")}
           </label>
           </>)}
-          <div className={`flex overflow-hidden rounded-lg border border-slate-200 ${showBook ? "ml-auto" : ""}`} role="group" aria-label="View">
-            <ViewButton active={view === "catalog"} onClick={() => chooseView("catalog")} Icon={LayoutGrid}>Catalog</ViewButton>
-            <ViewButton active={view === "table"} onClick={() => chooseView("table")} Icon={Rows3}>Table</ViewButton>
+          <div className={`flex overflow-hidden rounded-lg border border-slate-200 ${showBook ? "ml-auto" : ""}`} role="group" aria-label={t("View")}>
+            <ViewButton active={view === "catalog"} onClick={() => chooseView("catalog")} Icon={LayoutGrid}>{t("Catalog")}</ViewButton>
+            <ViewButton active={view === "table"} onClick={() => chooseView("table")} Icon={Rows3}>{t("Table")}</ViewButton>
           </div>
         </div>
 
@@ -358,48 +360,48 @@ const Products = () => {
       <Modal isOpen={isModalOpen} onClose={closeModal} title={editingId ? "Edit Product" : "Add Product"}>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Product Name</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t("Product Name")}</label>
             <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass} />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Code</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Code")}</label>
               <input type="text" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className={inputClass} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Category")}</label>
               <input type="text" value={form.category} list="product-categories" onChange={(e) => setForm({ ...form, category: e.target.value })}
                 placeholder="e.g. Entstowwe / Vaccines" className={inputClass} />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Description (shown in the catalogue)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t("Description (shown in the catalogue)")}</label>
             <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder="What it's for, dosage notes, withdrawal period..." className={inputClass} />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Pack Size (ml/gr)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Pack Size (ml/gr)")}</label>
               <input type="number" value={form.pack_size} onChange={(e) => setForm({ ...form, pack_size: e.target.value })} className={inputClass} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Packaging</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Packaging")}</label>
               <input type="text" value={form.packaging} onChange={(e) => setForm({ ...form, packaging: e.target.value })}
                 placeholder="e.g. 6 x 500 ml" className={inputClass} />
             </div>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Cost (excl VAT)</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{t("Cost (excl VAT)")}</label>
               <input type="number" value={form.cost} onChange={(e) => handleCostChange(e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-sm" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Selling excl VAT</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{t("Selling excl VAT")}</label>
               <input type="number" value={form.price_excl_vat} onChange={(e) => setForm({ ...form, price_excl_vat: e.target.value })}
                 className="w-full p-2 border border-slate-200 rounded-lg text-sm" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Selling incl VAT</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{t("Selling incl VAT")}</label>
               <input type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })}
                 className="w-full p-2 border border-slate-200 rounded-lg text-sm" />
             </div>
@@ -411,15 +413,15 @@ const Products = () => {
           <div className="flex flex-wrap gap-6">
             <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <input type="checkbox" checked={form.in_stock} onChange={(e) => setForm({ ...form, in_stock: e.target.checked })} className="h-4 w-4 accent-emerald-600" />
-              In stock
+              {t("In stock")}
             </label>
             <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="h-4 w-4 accent-emerald-600" />
-              Show in the catalogue and product lists
+              {t("Show in the catalogue and product lists")}
             </label>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Dosage (for the Product Calculator)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t("Dosage (for the Product Calculator)")}</label>
             <input type="number" value={form.dosage} onChange={(e) => setForm({ ...form, dosage: Number(e.target.value) })} className={inputClass} />
           </div>
           <button disabled={!form.name || !form.price || saveMutation.isPending} onClick={handleSave}

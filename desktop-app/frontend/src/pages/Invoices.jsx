@@ -1,4 +1,12 @@
+import { t } from "../utils/i18n";
+import ContactLinks from "../components/ContactLinks";
+import { deleteConfirm } from "../utils/confirmText";
 import ShowMore from "../components/ShowMore";
+import MarkPaidDialog from "../components/MarkPaidDialog";
+import { useToast } from "../context/ToastContext";
+import DraftBanner from "../components/DraftBanner";
+import { clearDraft, loadDraft } from "../utils/stored";
+import { useAutosaveDraft } from "../utils/useDraft";
 import SentNote from "../components/SentNote";
 import { useSends } from "../utils/useSends";
 import { usePaged } from "../utils/usePaged";
@@ -7,10 +15,11 @@ import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
 import { useSelection } from "../utils/useSelection";
 import { useOpenNew } from "../utils/useOpenNew";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, FileText, Trash2, Download, X, Edit, Eye, Wallet, BellRing } from "lucide-react";
+import { Plus, Search, FileText, Trash2, Download, X, Edit, Eye, Wallet, BellRing, CheckCircle2, Copy } from "lucide-react";
 import apiClient from "../api/client";
 import { clientService } from "../api/services";
 import Modal from "../components/Modal";
+import ClientPicker from "../components/ClientPicker";
 import SearchableSelect from "../components/SearchableSelect";
 import DocumentPreview from "../components/DocumentPreview";
 import InvoicePayments from "../components/InvoicePayments";
@@ -32,6 +41,14 @@ const Invoices = () => {
   const [editingId, setEditingId] = useState(null);
   const [invoice, setInvoice] = useState(emptyInvoice);
   const [items, setItems] = useState([]);
+  const [restored, setRestored] = useState(false); // the new-invoice form was brought back from a saved draft
+  const [markingPaid, setMarkingPaid] = useState(null); // { invoice, balance }
+  const { showToast } = useToast();
+  const repeat = useMutation({
+    mutationFn: async (id) => (await apiClient.post(`/invoices/${id}/duplicate`, null, { silent: true })).data,
+    onSuccess: (copy) => { queryClient.invalidateQueries({ queryKey: ["invoices"] }); showToast(`Repeated as ${copy.number}. Edit it to change the date, lines or reference.`, "success", 8000); },
+    onError: (err) => showToast(err?.response?.data?.detail?.toString?.() || "Couldn't repeat that invoice."),
+  });
   const [existingItems, setExistingItems] = useState([]);
   const [removedItemIds, setRemovedItemIds] = useState([]);
   const [newItem, setNewItem] = useState(emptyLine);
@@ -83,16 +100,27 @@ const Invoices = () => {
     setItems([]);
     setExistingItems([]);
     setRemovedItemIds([]);
+    setRestored(false);
   };
 
   const openAddModal = () => {
     setEditingId(null);
-    setInvoice(emptyInvoice);
-    setItems([]);
     setExistingItems([]);
     setRemovedItemIds([]);
+    const draft = loadDraft("invoice"); // an unfinished new invoice from before (a lock, a closed window)
+    setInvoice(draft?.invoice || emptyInvoice);
+    setItems(draft?.items || []);
+    setRestored(Boolean(draft));
     setIsModalOpen(true);
   };
+
+  const discardDraft = () => {
+    clearDraft("invoice");
+    setInvoice(emptyInvoice);
+    setItems([]);
+    setRestored(false);
+  };
+  useAutosaveDraft("invoice", isModalOpen && !editingId, { invoice, items }, Boolean(invoice.client_id || items.length || invoice.notes || invoice.reference));
 
   const openEditModal = async (inv) => {
     setEditingId(inv.id);
@@ -173,6 +201,7 @@ const Invoices = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      clearDraft("invoice");
       closeModal();
     },
   });
@@ -231,20 +260,20 @@ const Invoices = () => {
 
   useOpenNew(() => openAddModal()); // from the dashboard's quick actions (?new=1)
 
-  if (isLoading) return <div className="p-8 text-center">Loading invoices...</div>;
+  if (isLoading) return <div className="p-8 text-center">{t("Loading invoices...")}</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-slate-800">Invoices</h2>
-          <p className="text-slate-500">Bill clients and generate PDF invoices</p>
+          <h2 className="text-3xl font-bold text-slate-800">{t("Invoices")}</h2>
+          <p className="text-slate-500">{t("Bill clients and generate PDF invoices")}</p>
         </div>
         <button
           onClick={openAddModal}
           className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
         >
-          <Plus size={20} /> New Invoice
+          <Plus size={20} /> {t("New Invoice")}
         </button>
       </div>
 
@@ -256,7 +285,7 @@ const Invoices = () => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search invoices by client, status or #..."
+              placeholder={t("Search invoices by client, status or #...")}
               className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
@@ -271,13 +300,13 @@ const Invoices = () => {
           <thead className="bg-slate-50 text-slate-500 text-sm uppercase">
             <tr>
               <SelectAllTh selection={selection} />
-              <th className="px-6 py-3 font-medium">Invoice</th>
-              <th className="px-6 py-3 font-medium">Date</th>
-              <th className="px-6 py-3 font-medium">Client</th>
-              <th className="px-6 py-3 font-medium">Total Amount</th>
-              <th className="px-6 py-3 font-medium">Owed</th>
-              <th className="px-6 py-3 font-medium">Status</th>
-              <th className="px-6 py-3 font-medium text-right">Actions</th>
+              <th className="px-6 py-3 font-medium">{t("Invoice")}</th>
+              <th className="px-6 py-3 font-medium">{t("Date")}</th>
+              <th className="px-6 py-3 font-medium">{t("Client")}</th>
+              <th className="px-6 py-3 font-medium">{t("Total Amount")}</th>
+              <th className="px-6 py-3 font-medium">{t("Owed")}</th>
+              <th className="px-6 py-3 font-medium">{t("Status")}</th>
+              <th className="px-6 py-3 font-medium text-right">{t("Actions")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -289,15 +318,16 @@ const Invoices = () => {
                   <SentNote entry={sentInvoices?.[String(inv.id)]} />
                   <SentNote entry={sentReminders?.[String(inv.id)]} kind="reminder" />
                 </td>
-                <td data-label="Date" className="px-6 py-4 text-slate-600">{new Date(inv.date).toLocaleDateString()}</td>
-                <td data-label="Client" className="px-6 py-4 text-slate-600">
+                <td data-label={t("Date")} className="px-6 py-4 text-slate-600">{new Date(inv.date).toLocaleDateString()}</td>
+                <td data-label={t("Client")} className="px-6 py-4 text-slate-600">
                   <ClientHover client={clients?.find((c) => c.id === inv.client_id)}>{clientName(inv.client_id)}</ClientHover>
+                  <ContactLinks client={clients?.find((c) => c.id === inv.client_id)} />
                 </td>
-                <td data-label="Total" className="px-6 py-4 font-medium text-slate-800">R {inv.total_amount.toLocaleString()}</td>
-                <td data-label="Owed" className="px-6 py-4 text-slate-700">
+                <td data-label={t("Total")} className="px-6 py-4 font-medium text-slate-800">R {inv.total_amount.toLocaleString()}</td>
+                <td data-label={t("Owed")} className="px-6 py-4 text-slate-700">
                   {inv.status === "cancelled" ? "-" : balances?.[inv.id] ? (balances[inv.id].balance > 0 ? `R ${balances[inv.id].balance.toLocaleString()}` : "Nothing") : "..."}
                 </td>
-                <td data-label="Status" className="px-6 py-4">
+                <td data-label={t("Status")} className="px-6 py-4">
                   <span
                     className={`px-2 py-1 rounded-full text-xs font-bold ${
                       inv.status === "paid"
@@ -307,14 +337,14 @@ const Invoices = () => {
                         : "bg-amber-100 text-amber-700"
                     }`}
                   >
-                    {inv.status}
+                    {t(inv.status)}
                   </span>
                 </td>
                 <td data-actions className="px-6 py-4 text-right flex justify-end gap-2">
                   <button
                     onClick={() => setPreview(invoiceDoc(inv, clients?.find((c) => c.id === inv.client_id)))}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
-                    title="Preview"
+                    title={t("Preview")}
                   >
                     <Eye size={18} />
                   </button>
@@ -322,41 +352,59 @@ const Invoices = () => {
                     <button
                       onClick={() => setPreview(reminderDoc(inv, clients?.find((c) => c.id === inv.client_id), { amountText: money(balances[inv.id].balance), dueDate: inv.due_date }))}
                       className="p-2 text-amber-500 hover:text-amber-600 transition-colors"
-                      title="Send a payment reminder"
-                      aria-label="Send a payment reminder"
+                      title={t("Send a payment reminder")}
+                      aria-label={t("Send a payment reminder")}
                     >
                       <BellRing size={18} />
+                    </button>
+                  )}
+                  {inv.status === "unpaid" && balances?.[inv.id]?.balance > 0 && (
+                    <button
+                      onClick={() => setMarkingPaid({ invoice: inv, balance: balances[inv.id].balance })}
+                      className="p-2 text-emerald-600 hover:text-emerald-700 transition-colors"
+                      title={t("Mark as paid")}
+                      aria-label={t("Mark as paid")}
+                    >
+                      <CheckCircle2 size={18} />
                     </button>
                   )}
                   <button
                     onClick={() => setPaying(inv)}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
-                    title="Payments and credit notes"
+                    title={t("Payments and credit notes")}
                   >
                     <Wallet size={18} />
                   </button>
                   <button
+                    onClick={() => { if (window.confirm(`Repeat ${inv.number || `#${inv.id}`}? A new invoice with the same client and lines is made, with nothing paid.`)) repeat.mutate(inv.id); }}
+                    className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
+                    title={t("Repeat this invoice")}
+                    aria-label={t("Repeat this invoice")}
+                  >
+                    <Copy size={18} />
+                  </button>
+                  <button
                     onClick={() => downloadDocumentPdf("invoice", inv.id, inv.number)}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
-                    title="Download PDF"
+                    title={t("Download PDF")}
                   >
                     <Download size={18} />
                   </button>
                   <button
                     onClick={() => openEditModal(inv)}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
-                    title="Edit"
+                    title={t("Edit")}
                   >
                     <Edit size={18} />
                   </button>
                   <button
                     onClick={() => {
-                      if (window.confirm(`Delete invoice ${inv.number || `#${inv.id}`}? This can't be undone.`)) {
+                      if (window.confirm(deleteConfirm(`invoice ${inv.number || `#${inv.id}`}`, "Its lines, payments and credit notes go with it."))) {
                         deleteInvoiceMutation.mutate(inv.id);
                       }
                     }}
                     className="p-2 text-slate-400 hover:text-red-600 transition-colors"
-                    title="Delete invoice" data-admin-only
+                    title={t("Delete invoice")} data-admin-only
                   >
                     <Trash2 size={18} />
                   </button>
@@ -378,55 +426,50 @@ const Invoices = () => {
 
       <Modal isOpen={isModalOpen} onClose={closeModal} size="lg" title={editingId ? `Edit Invoice ${invoices?.find((i) => i.id === editingId)?.number || `#${editingId}`}` : "New Invoice"}>
         <div className="space-y-6">
+          {restored && !editingId && <DraftBanner what="invoice" onDiscard={discardDraft} />}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Client</label>
-              <SearchableSelect
-                value={invoice.client_id}
-                onChange={(v) => setInvoice({ ...invoice, client_id: v })}
-                options={(clients || []).map((c) => ({ value: c.id, label: c.name, sublabel: c.farm_name }))}
-                placeholder="Select a client…"
-                searchPlaceholder="Search clients…"
-              />
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Client")}</label>
+              <ClientPicker value={invoice.client_id} onChange={(v) => setInvoice({ ...invoice, client_id: v })} clients={clients} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Status")}</label>
               <select
                 value={invoice.status}
                 onChange={(e) => setInvoice({ ...invoice, status: e.target.value })}
                 className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               >
-                <option value="unpaid">Unpaid</option>
-                <option value="paid">Paid</option>
-                <option value="cancelled">Cancelled</option>
+                <option value="unpaid">{t("Unpaid")}</option>
+                <option value="paid">{t("Paid")}</option>
+                <option value="cancelled">{t("Cancelled")}</option>
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Reference</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Reference")}</label>
               <input
                 value={invoice.reference}
                 onChange={(e) => setInvoice({ ...invoice, reference: e.target.value })}
-                placeholder="e.g. client's order number"
+                placeholder={t("e.g. client's order number")}
                 className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Due date</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("Due date")}</label>
               <input
                 type="date"
                 value={invoice.due_date}
                 onChange={(e) => setInvoice({ ...invoice, due_date: e.target.value })}
                 className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               />
-              {!invoice.due_date && <p className="mt-1 text-xs text-slate-500">Blank = payment terms from Settings</p>}
+              {!invoice.due_date && <p className="mt-1 text-xs text-slate-500">{t("Blank = payment terms from Settings")}</p>}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t("Notes")}</label>
             <textarea
               value={invoice.notes}
               onChange={(e) => setInvoice({ ...invoice, notes: e.target.value })}
@@ -437,10 +480,10 @@ const Invoices = () => {
 
           <div className="space-y-4">
             <h4 className="font-semibold text-slate-800 flex items-center gap-2">
-              <FileText size={18} /> Line Items
+              <FileText size={18} /> {t("Line Items")}
             </h4>
             <p className="text-xs text-slate-500">
-              Leave Price blank to use the product's list price. Disc % takes a discount off that line.
+              {t("Leave Price blank to use the product's list price. Disc % takes a discount off that line.")}
             </p>
 
             {editingId && existingItems.length > 0 && (
@@ -457,7 +500,7 @@ const Invoices = () => {
                       <span>{productName(item.product_id)} — {lineNote(item)} (R {item.subtotal.toLocaleString()})</span>
                       {isRemoved ? (
                         <button onClick={() => undoRemoveExistingItem(item.id)} className="text-emerald-500 hover:text-emerald-700 not-italic no-underline text-xs font-medium">
-                          Undo
+                          {t("Undo")}
                         </button>
                       ) : (
                         <button onClick={() => removeExistingItem(item.id)} className="text-red-400 hover:text-red-600">
@@ -473,46 +516,47 @@ const Invoices = () => {
             <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 sm:grid-cols-[minmax(0,1fr)_4.5rem_6rem_4.5rem_2.75rem]">
               <div className="col-span-3 sm:col-span-1">
 <SearchableSelect
+                recentKey="product"
                 value={newItem.product_id}
                 onChange={(v) => setNewItem({ ...newItem, product_id: v })}
                 options={pickerProducts(products, newItem.product_id).map((p) => ({ value: p.id, label: p.name }))}
-                placeholder="Select product…"
+                placeholder={t("Select product…")}
                 searchPlaceholder="Search products…"
               />
               </div>
-              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Qty</span><input
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">{t("Qty")}</span><input
                 type="number"
-                placeholder="Qty"
+                placeholder={t("Qty")}
                 value={newItem.quantity}
                 onChange={(e) => setNewItem({ ...newItem, quantity: Number(e.target.value) })}
                 className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-                aria-label="Quantity"
+                aria-label={t("Quantity")}
               /></div>
-              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Price</span><input
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">{t("Price")}</span><input
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Price"
+                placeholder={t("Price")}
                 value={newItem.unit_price}
                 onChange={(e) => setNewItem({ ...newItem, unit_price: e.target.value })}
                 className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-                aria-label="Unit price (blank for list price)"
+                aria-label={t("Unit price (blank for list price)")}
               /></div>
-              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">Discount %</span><input
+              <div className="min-w-0"><span className="mb-0.5 block text-[0.7rem] font-semibold uppercase tracking-wide text-slate-400 sm:hidden">{t("Discount %")}</span><input
                 type="number"
                 min="0"
                 max="100"
                 step="0.01"
-                placeholder="Disc %"
+                placeholder={t("Disc %")}
                 value={newItem.discount_percent}
                 onChange={(e) => setNewItem({ ...newItem, discount_percent: e.target.value })}
                 className="w-full p-2 border border-slate-200 rounded-lg text-sm"
-                aria-label="Discount percent"
+                aria-label={t("Discount percent")}
               /></div>
               <button
                 onClick={addItem}
-                aria-label="Add line"
-                title="Add line"
+                aria-label={t("Add line")}
+                title={t("Add line")}
                 className="col-span-3 min-h-11 bg-emerald-600 text-white rounded-lg p-2 hover:bg-emerald-700 transition-colors sm:col-span-1 sm:min-h-0"
               >
                 <Plus size={18} className="mx-auto" />
@@ -535,7 +579,7 @@ const Invoices = () => {
                 </div>
               ))}
               {items.length === 0 && existingItems.length === 0 && (
-                <p className="text-sm text-slate-400 text-center py-2">No line items added yet.</p>
+                <p className="text-sm text-slate-400 text-center py-2">{t("No line items added yet.")}</p>
               )}
             </div>
           </div>
@@ -556,6 +600,7 @@ const Invoices = () => {
         </div>
       </Modal>
 
+      {markingPaid && <MarkPaidDialog invoice={markingPaid.invoice} balance={markingPaid.balance} onClose={() => setMarkingPaid(null)} />}
       {paying && <InvoicePayments invoice={invoices?.find((i) => i.id === paying.id) || paying} onClose={() => setPaying(null)} onPreview={setPreview} />}
       {/* after the payments window, so a credit note opened from it shows on top */}
       <DocumentPreview doc={preview} onClose={() => setPreview(null)} />

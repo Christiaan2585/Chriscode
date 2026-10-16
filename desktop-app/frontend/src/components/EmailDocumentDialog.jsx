@@ -1,3 +1,4 @@
+import { t } from "../utils/i18n";
 import React, { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import apiClient from "../api/client";
@@ -27,19 +28,19 @@ const EmailDocumentDialog = ({ blob, filename, send, onClose, onDone }) => {
   });
 
   return (
-    <Modal isOpen onClose={onClose} title="Send by email" size="md">
+    <Modal isOpen onClose={onClose} title={t("Send by email")} size="md">
       {done ? (
         <div className="space-y-4 text-sm">
           <p role="status" className="text-emerald-700">Sent to {to.trim()}.</p>
-          <button type="button" onClick={onClose} className="rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700">Close</button>
+          <button type="button" onClick={onClose} className="rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700">{t("Close")}</button>
         </div>
       ) : (
         <form className="space-y-3 text-sm" onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}>
-          <label className="block"><span className="text-xs text-slate-500">To</span>
+          <label className="block"><span className="text-xs text-slate-500">{t("To")}</span>
             <input className={field} type="email" required value={to} onChange={(e) => setTo(e.target.value)} /></label>
-          <label className="block"><span className="text-xs text-slate-500">Subject</span>
+          <label className="block"><span className="text-xs text-slate-500">{t("Subject")}</span>
             <input className={field} required maxLength={200} value={subject} onChange={(e) => setSubject(e.target.value)} /></label>
-          <label className="block"><span className="text-xs text-slate-500">Message</span>
+          <label className="block"><span className="text-xs text-slate-500">{t("Message")}</span>
             <textarea className={field} rows={5} value={message} onChange={(e) => setMessage(e.target.value)} /></label>
           <p className="text-xs text-slate-500">Attached: {filename}</p>
           {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700">{error}</p>}

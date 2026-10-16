@@ -1,11 +1,13 @@
+import { t } from "../../utils/i18n";
 import React from "react";
 import {
   Calculator, Calendar, CloudSun, Database, FileText, History, Info, Landmark, Mail, Package, Scale, Settings as GearIcon,
-  ShieldCheck, ShoppingCart, Smartphone, Trash2, Truck, UserRound, Users, ClipboardList,
+  ShieldCheck, ShoppingCart, Smartphone, Trash2, Truck, UserRound, Users, ClipboardList, MessageSquareText,
 } from "lucide-react";
 import apiClient from "../../api/client";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../context/AuthContext";
+import { useSetupNeeds } from "../../utils/useSetupNeeds";
 import { isNative } from "../../utils/pairing";
 import MyDetails from "../MyDetails";
 import BusinessSettings from "../BusinessSettings";
@@ -20,6 +22,7 @@ import AutoLockSetting from "./AutoLockSetting";
 import RemindersSetting from "./RemindersSetting";
 import RecycleBin from "./RecycleBin";
 import EmailSettings from "./EmailSettings";
+import MessageWording from "./MessageWording";
 import BackupSettings from "./BackupSettings";
 import {
   CalculatorPanel, CalendarPanel, ClientsPanel, InvoicesPanel, OrdersPanel, ProductsPanel, PurchaseOrdersPanel,
@@ -37,16 +40,16 @@ const GeneralPanel = () => {
   const { data: version, isLoading } = useVersion();
   return (
     <>
-      <SettingsCard icon={Info} title="About">
+      <SettingsCard icon={Info} title={t("About")}>
         {isLoading ? (
           <p className="text-sm text-slate-400">Checking version...</p>
         ) : version ? (
           <div className="text-sm text-slate-600 space-y-1">
-            <p><span className="font-medium">Name:</span> {version.app_name}</p>
-            <p><span className="font-medium">Version:</span> {version.version}</p>
-            {version.last_updated && <p><span className="font-medium">Last updated:</span> {version.last_updated}</p>}
+            <p><span className="font-medium">{t("Name:")}</span> {version.app_name}</p>
+            <p><span className="font-medium">{t("Version:")}</span> {version.version}</p>
+            {version.last_updated && <p><span className="font-medium">{t("Last updated:")}</span> {version.last_updated}</p>}
             <button type="button" onClick={() => window.dispatchEvent(new Event(OPEN_WHATS_NEW))}
-              className="mt-1 font-medium text-emerald-700 hover:underline">See what's new in this version</button>
+              className="mt-1 font-medium text-emerald-700 hover:underline">{t("See what's new in this version")}</button>
           </div>
         ) : (
           <p className="text-sm text-red-500">Couldn't reach the backend to check the version.</p>
@@ -79,8 +82,8 @@ const SecurityPanel = () => (
 const CompanyPanel = () => {
   const { user } = useAuth();
   return (
-    <SettingsCard icon={Landmark} title="Company details">
-      <p className="text-sm text-slate-500">Printed on every invoice, quote and purchase order.</p>
+    <SettingsCard icon={Landmark} title={t("Company details")}>
+      <p className="text-sm text-slate-500">{t("Printed on every invoice, quote and purchase order.")}</p>
       <BusinessSettings canEdit={Boolean(user?.is_admin)} bare parts={["company"]} />
     </SettingsCard>
   );
@@ -97,7 +100,14 @@ const BackupsPanel = () => {
 const useCompanyBadge = () => {
   const { data } = useQuery({ queryKey: ["business"], queryFn: async () => (await apiClient.get("/business/")).data });
   const missing = data?.missing?.length || 0;
-  return missing ? `${missing} missing` : null;
+  return missing ? t("{n} missing", { n: missing }) : null;
+};
+
+// What the Data & Backups row shows when it has been days since the last backup (an admin only).
+const useBackupBadge = () => {
+  const { user } = useAuth();
+  const { backupStale, backup } = useSetupNeeds(user);
+  return backupStale ? backup.text : null;
 };
 
 // The Settings list, in order. `color` is the rounded icon tile, like iOS.
@@ -107,42 +117,43 @@ export const GROUPS = [
     id: "general",
     title: null,
     items: [
-      { id: "general", label: "General", subtitle: "About, updates, appearance", Icon: GearIcon, color: "bg-slate-500", Panel: GeneralPanel },
-      { id: "security", label: "Security & Auto-Lock", subtitle: "PIN, auto-lock, staff accounts", Icon: ShieldCheck, color: "bg-red-500", Panel: SecurityPanel },
-      { id: "company", label: "Company details", subtitle: "Name, addresses, banking", Icon: Landmark, color: "bg-blue-500", Panel: CompanyPanel, useBadge: useCompanyBadge },
+      { id: "general", label: t("General"), subtitle: t("About, updates, appearance"), Icon: GearIcon, color: "bg-slate-500", Panel: GeneralPanel },
+      { id: "security", label: t("Security & Auto-Lock"), subtitle: t("PIN, auto-lock, staff accounts"), Icon: ShieldCheck, color: "bg-red-500", Panel: SecurityPanel },
+      { id: "company", label: t("Company details"), subtitle: t("Name, addresses, banking"), Icon: Landmark, color: "bg-blue-500", Panel: CompanyPanel, useBadge: useCompanyBadge },
     ],
   },
   {
     id: "departments",
-    title: "Departments",
+    title: t("Departments"),
     items: [
-      { id: "clients", label: "Clients", subtitle: "Import clients", Icon: Users, color: "bg-sky-500", Panel: ClientsPanel },
-      { id: "quotes", label: "Programs & Quotes", subtitle: "Quote validity, numbering, master program", Icon: ClipboardList, color: "bg-emerald-600", Panel: QuotesPanel },
-      { id: "products", label: "Products", subtitle: "Catalog view, import", Icon: Package, color: "bg-orange-500", Panel: ProductsPanel },
-      { id: "orders", label: "Orders", subtitle: "No settings yet", Icon: ShoppingCart, color: "bg-purple-500", Panel: OrdersPanel },
-      { id: "invoices", label: "Invoices", subtitle: "VAT, payment terms, numbering", Icon: FileText, color: "bg-rose-500", Panel: InvoicesPanel },
-      { id: "purchase-orders", label: "Purchase Orders", subtitle: "Numbering", Icon: Truck, color: "bg-teal-600", Panel: PurchaseOrdersPanel },
-      { id: "calendar", label: "Calendar", subtitle: "Master program on the calendar", Icon: Calendar, color: "bg-indigo-500", Panel: CalendarPanel },
-      { id: "weather", label: "Weather", subtitle: "Saved location", Icon: CloudSun, color: "bg-cyan-500", Panel: WeatherPanel },
-      { id: "calculator", label: "Product Calc", subtitle: "No settings yet", Icon: Calculator, color: "bg-slate-600", Panel: CalculatorPanel },
+      { id: "clients", label: t("Clients"), subtitle: t("Import clients"), Icon: Users, color: "bg-sky-500", Panel: ClientsPanel },
+      { id: "quotes", label: t("Programs & Quotes"), subtitle: t("Quote validity, numbering, master program"), Icon: ClipboardList, color: "bg-emerald-600", Panel: QuotesPanel },
+      { id: "products", label: t("Products"), subtitle: t("Catalog view, import"), Icon: Package, color: "bg-orange-500", Panel: ProductsPanel },
+      { id: "orders", label: t("Orders"), subtitle: t("No settings yet"), Icon: ShoppingCart, color: "bg-purple-500", Panel: OrdersPanel },
+      { id: "invoices", label: t("Invoices"), subtitle: t("VAT, payment terms, numbering"), Icon: FileText, color: "bg-rose-500", Panel: InvoicesPanel },
+      { id: "purchase-orders", label: t("Purchase Orders"), subtitle: t("Numbering"), Icon: Truck, color: "bg-teal-600", Panel: PurchaseOrdersPanel },
+      { id: "calendar", label: t("Calendar"), subtitle: t("Master program on the calendar"), Icon: Calendar, color: "bg-indigo-500", Panel: CalendarPanel },
+      { id: "weather", label: t("Weather"), subtitle: t("Saved location"), Icon: CloudSun, color: "bg-cyan-500", Panel: WeatherPanel },
+      { id: "calculator", label: t("Product Calc"), subtitle: t("No settings yet"), Icon: Calculator, color: "bg-slate-600", Panel: CalculatorPanel },
     ],
   },
   {
     id: "system",
-    title: "System",
+    title: t("System"),
     items: [
-      { id: "phones", label: "Phones", subtitle: "Pair staff phones", Icon: Smartphone, color: "bg-green-500", Panel: PhonesPanel, show: ({ user }) => isNative() || Boolean(user?.is_admin) },
-      { id: "activity", label: "Activity log", subtitle: "Who changed what", Icon: History, color: "bg-slate-600", Panel: ActivityLog, show: ({ user }) => Boolean(user?.is_admin) },
-      { id: "email", label: "Email", subtitle: "Send documents from the app", Icon: Mail, color: "bg-sky-500", Panel: EmailSettings, show: ({ user }) => Boolean(user?.is_admin) },
-      { id: "recycle-bin", label: "Recycle bin", subtitle: "Restore deleted records", Icon: Trash2, color: "bg-slate-500", Panel: RecycleBin, show: ({ user }) => Boolean(user?.is_admin) },
-      { id: "backups", label: "Data & Backups", subtitle: "Backups, restore, export", Icon: Database, color: "bg-amber-500", Panel: BackupsPanel },
-      { id: "legal", label: "Legal", subtitle: "Licence and privacy notice", Icon: Scale, color: "bg-slate-400", Panel: LegalSettings },
+      { id: "phones", label: t("Phones"), subtitle: t("Pair staff phones"), Icon: Smartphone, color: "bg-green-500", Panel: PhonesPanel, show: ({ user }) => isNative() || Boolean(user?.is_admin) },
+      { id: "activity", label: t("Activity log"), subtitle: t("Who changed what"), Icon: History, color: "bg-slate-600", Panel: ActivityLog, show: ({ user }) => Boolean(user?.is_admin) },
+      { id: "email", label: t("Email"), subtitle: t("Send documents from the app"), Icon: Mail, color: "bg-sky-500", Panel: EmailSettings, show: ({ user }) => Boolean(user?.is_admin) },
+      { id: "messages", label: t("Messages to clients"), subtitle: t("The wording of quotes, invoices, reminders"), Icon: MessageSquareText, color: "bg-teal-500", Panel: MessageWording, show: ({ user }) => Boolean(user?.is_admin) },
+      { id: "recycle-bin", label: t("Recycle bin"), subtitle: t("Restore deleted records"), Icon: Trash2, color: "bg-slate-500", Panel: RecycleBin, show: ({ user }) => Boolean(user?.is_admin) },
+      { id: "backups", label: t("Data & Backups"), subtitle: t("Backups, restore, export"), Icon: Database, color: "bg-amber-500", Panel: BackupsPanel, useBadge: useBackupBadge },
+      { id: "legal", label: t("Legal"), subtitle: t("Licence and privacy notice"), Icon: Scale, color: "bg-slate-400", Panel: LegalSettings },
     ],
   },
 ];
 
 // The profile card at the top of the list opens this one.
-export const PROFILE_ITEM = { id: "my-details", label: "My Details", Icon: UserRound, color: "bg-emerald-600", Panel: MyDetailsPanel };
+export const PROFILE_ITEM = { id: "my-details", label: t("My Details"), Icon: UserRound, color: "bg-emerald-600", Panel: MyDetailsPanel };
 
 export const visibleGroups = (ctx) =>
   GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => !item.show || item.show(ctx)) })).filter((g) => g.items.length);

@@ -3,6 +3,7 @@ import { nativeAdapter } from './nativeHttp';
 import { withOfflineCache } from '../offline/cachingAdapter';
 import { savedCopy } from '../offline/store';
 import { isReachable, setReachable } from '../offline/connectivity';
+import { isRecordDelete } from '../utils/undo';
 
 // What the phone uses for the office PC: the pinned native connection, with a saved copy of every
 // answer so the screens still have something to show when the PC cannot be reached.
@@ -77,6 +78,12 @@ export const isHoldingUnauthorized = () => holdUnauthorized;
 // that never actually existed anywhere, which is why every failed
 // save/update/delete across the whole app used to fail completely
 // silently (no error, no toast, modal just stays open).
+// Called once per record delete that worked (a client, invoice, quote...) so components/UndoDelete.jsx can offer "Undo".
+let notifyDeleted = null;
+export function setDeleteNotifier(handler) {
+  notifyDeleted = handler;
+}
+
 export function setErrorNotifier(handler) {
   notifyError = handler;
 }
@@ -89,7 +96,10 @@ apiClient.interceptors.request.use((config) => {
 });
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (notifyDeleted && isRecordDelete(response.config?.method, response.config?.url)) notifyDeleted();
+    return response;
+  },
   (error) => {
     // Calls marked `queueable` (see utils/outbox.js) are handled by the
     // caller itself when the PC is unreachable or the session needs a

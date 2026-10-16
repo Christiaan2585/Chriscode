@@ -51,13 +51,13 @@ export const ToastProvider = ({ children }) => {
   }, []);
 
   const showToast = useCallback(
-    (message, type = "error", durationMs = 6000) => {
+    (message, type = "error", durationMs = 6000, action = null) => {
       const key = `${type}:${message}`;
       const existingId = activeIds.current.get(key);
       const id = existingId ?? ++idCounter;
       if (existingId == null) {
         activeIds.current.set(key, id);
-        setToasts((prev) => [...prev, { id, message, type }]);
+        setToasts((prev) => [...prev, { id, message, type, action }]);
       }
       clearTimeout(timers.current[id]);
       timers.current[id] = setTimeout(() => dismiss(id), durationMs);
@@ -86,6 +86,10 @@ export const ToastProvider = ({ children }) => {
             >
               <Icon size={18} className="shrink-0 mt-0.5" />
               <p className="text-sm flex-1">{t.message}</p>
+              {t.action && (
+                <button type="button" onClick={() => { dismiss(t.id); t.action.onClick(); }}
+                  className="shrink-0 rounded-md border border-current px-2 py-0.5 text-sm font-semibold hover:bg-white/50">{t.action.label}</button>
+              )}
               <button
                 type="button"
                 onClick={() => dismiss(t.id)}

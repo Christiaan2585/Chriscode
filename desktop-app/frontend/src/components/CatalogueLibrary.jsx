@@ -82,7 +82,7 @@ const CatalogueLibrary = ({ canEdit }) => {
 
       {canEdit && (
         <div className="space-y-2 empty:hidden">
-          <BulkBar selection={selection} noun="catalogue" describe={(id) => books.find((b) => b.id === id)?.name || id}
+          <BulkBar selection={selection} noun="catalogue" inBin={false} describe={(id) => books.find((b) => b.id === id)?.name || id}
             deleteOne={(id) => apiClient.delete(`/catalogue/library/${id}`, { silent: true })} onDone={refresh} />
         </div>
       )}

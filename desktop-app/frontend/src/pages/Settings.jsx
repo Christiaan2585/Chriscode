@@ -1,3 +1,4 @@
+import { t } from "../utils/i18n";
 import React, { useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
@@ -46,8 +47,8 @@ const SettingsList = ({ ctx, current }) => {
     .filter((g) => g.items.length);
 
   return (
-    <nav aria-label="Settings" className="space-y-5">
-      <h2 className="text-3xl font-bold text-slate-800">Settings</h2>
+    <nav aria-label={t("Settings")} className="space-y-5">
+      <h2 className="text-3xl font-bold text-slate-800">{t("Settings")}</h2>
 
       <label className="relative block">
         <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
@@ -55,8 +56,8 @@ const SettingsList = ({ ctx, current }) => {
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search settings"
-          aria-label="Search settings"
+          placeholder={t("Search settings")}
+          aria-label={t("Search settings")}
           className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
         />
       </label>
@@ -73,12 +74,12 @@ const SettingsList = ({ ctx, current }) => {
           <span className="min-w-0 flex-1">
             <span className="block truncate text-base font-semibold">{user.name}</span>
             <span className={`block truncate text-xs ${current?.id === PROFILE_ITEM.id ? "text-white/80" : "text-slate-500"}`}>
-              {user.is_admin ? "Admin" : "Staff"} · My Details, photo and phone number
+              {user.is_admin ? t("Admin") : t("Staff")} · {t("My Details, photo and phone number")}
             </span>
           </span>
           {setup.own.length > 0 && (
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${current?.id === PROFILE_ITEM.id ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"}`}>
-              {setup.own.length} to add
+              {t("{n} to add", { n: setup.own.length })}
             </span>
           )}
           <ChevronRight size={16} className={current?.id === PROFILE_ITEM.id ? "text-white/70" : "text-slate-400"} aria-hidden="true" />
@@ -116,7 +117,7 @@ const Settings = () => {
     <div className="space-y-4">
       {!wide && (
         <Link to="/settings" className="inline-flex items-center gap-0.5 text-sm font-medium text-emerald-700 hover:underline">
-          <ChevronLeft size={18} aria-hidden="true" /> Settings
+          <ChevronLeft size={18} aria-hidden="true" /> {t("Settings")}
         </Link>
       )}
       <h2 className="text-2xl font-bold text-slate-800">{current.label}</h2>

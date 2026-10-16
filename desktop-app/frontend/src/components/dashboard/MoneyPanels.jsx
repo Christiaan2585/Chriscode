@@ -1,3 +1,4 @@
+import { t } from "../../utils/i18n";
 import React from "react";
 import { Link } from "react-router-dom";
 import { ClipboardList, Crown, Package } from "lucide-react";
@@ -21,17 +22,17 @@ const Bar = ({ label, value, of, color }) => (
 
 // What was agreed on accepted herding programs, how much of it is invoiced, how much of that is paid.
 export const ProgramMoney = ({ data }) => (
-  <Panel icon={<ClipboardList size={18} className="text-emerald-600" />} title="Herding programs">
+  <Panel icon={<ClipboardList size={18} className="text-emerald-600" />} title={t("Herding programs")}>
     {!data || data.quoted === 0 ? (
-      <p className="text-sm text-slate-400">No accepted program quotes yet. Once a client accepts, you'll see what's agreed, invoiced and paid here.</p>
+      <p className="text-sm text-slate-400">{t("No accepted program quotes yet. Once a client accepts, you'll see what's agreed, invoiced and paid here.")}</p>
     ) : (
       <div className="space-y-3">
-        <Bar label="Agreed (accepted quotes)" value={data.quoted} of={data.quoted} color="bg-emerald-500" />
-        <Bar label="Invoiced" value={data.invoiced} of={data.quoted} color="bg-sky-500" />
-        <Bar label="Paid" value={data.paid} of={data.quoted} color="bg-purple-500" />
+        <Bar label={t("Agreed (accepted quotes)")} value={data.quoted} of={data.quoted} color="bg-emerald-500" />
+        <Bar label={t("Invoiced")} value={data.invoiced} of={data.quoted} color="bg-sky-500" />
+        <Bar label={t("Paid")} value={data.paid} of={data.quoted} color="bg-purple-500" />
         <p className="pt-1 text-sm text-slate-600">
           <b>{money(data.still_to_invoice)}</b> still to invoice.{" "}
-          <Link to="/programs" className="text-emerald-700 hover:underline">Open programs</Link>
+          <Link to="/programs" className="text-emerald-700 hover:underline">{t("Open programs")}</Link>
         </p>
       </div>
     )}
@@ -57,13 +58,13 @@ const Ranking = ({ rows, empty, render }) =>
   ) : <p className="text-sm text-slate-400">{empty}</p>;
 
 export const TopClients = ({ rows }) => (
-  <Panel icon={<Crown size={18} className="text-amber-500" />} title="Top clients (12 months)">
+  <Panel icon={<Crown size={18} className="text-amber-500" />} title={t("Top clients (12 months)")}>
     <Ranking rows={rows} empty="No invoices in the last 12 months." render={(r) => <Link to={`/clients/${r.client_id}`} className="hover:underline">{r.name}</Link>} />
   </Panel>
 );
 
 export const TopProducts = ({ rows }) => (
-  <Panel icon={<Package size={18} className="text-orange-500" />} title="Best sellers (12 months)">
+  <Panel icon={<Package size={18} className="text-orange-500" />} title={t("Best sellers (12 months)")}>
     <Ranking rows={rows} empty="No products sold in the last 12 months."
       render={(r) => <><Link to="/products" className="hover:underline">{r.name}</Link> <span className="text-xs text-slate-400">× {r.quantity}</span></>} />
   </Panel>

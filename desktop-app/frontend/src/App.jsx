@@ -8,6 +8,7 @@ import { startReachabilityWatch } from "./offline/connectivity";
 import PairingScreen from "./components/PairingScreen";
 import { AuthProvider } from "./context/AuthContext";
 import { ToastProvider, ToastErrorBridge } from "./context/ToastContext";
+import UndoDelete from "./components/UndoDelete";
 import AuthGate from "./pages/AuthGate";
 import AppLayout from "./layout/AppLayout";
 
@@ -54,6 +55,7 @@ const App = ({ initiallyPaired = false }) => {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <ToastErrorBridge />
+        <UndoDelete />
         <AuthProvider>
           <AuthGate>
             <BrowserRouter>

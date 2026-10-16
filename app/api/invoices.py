@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 from app.core.db import get_session
 from app.core.dates import coerce_datetime
@@ -15,6 +15,8 @@ from app.models.client import Client
 from app.core.security import get_current_user, require_admin
 from app.models.user import User
 from app.api import sends
+from app.models.quote import Quote
+from app.models.quote_item import QuoteItem
 
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
 
@@ -37,6 +39,54 @@ def create_invoice(invoice: Invoice, session: Session = Depends(get_session), us
     session.commit()
     session.refresh(invoice)
     return invoice
+
+def _make_invoice(session: Session, user, client_id: int, lines, reference: Optional[str], notes: Optional[str]) -> Invoice:
+    """A new invoice with its own number and due date and a copy of `lines` (anything with product_id, quantity,
+    unit_price, discount_percent), priced by the same rules as a hand-made one. One commit, so it is all or nothing."""
+    invoice = Invoice(client_id=client_id, reference=reference, notes=notes)
+    invoice.date = datetime.utcnow()
+    invoice.due_date = default_due_date(session, invoice.date)
+    invoice.number = next_document_number(session, Invoice)
+    invoice.total_amount = 0.0
+    invoice.created_by = user.id if user else None
+    session.add(invoice)
+    session.flush()
+    for src in lines:
+        item = InvoiceItem(invoice_id=invoice.id, product_id=src.product_id, quantity=src.quantity,
+                           unit_price=src.unit_price, subtotal=0.0, discount_percent=src.discount_percent)
+        price_line(session, item)
+        session.add(item)
+    session.flush()
+    _recalculate_total(session, invoice)
+    session.commit()
+    session.refresh(invoice)
+    return invoice
+
+
+@router.post("/from-quote/{quote_id}", response_model=Invoice)
+def invoice_from_quote(quote_id: int, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    """One click: an invoice for the quote's client with the quote's lines. The quote is left as it is."""
+    quote = session.get(Quote, quote_id)
+    if quote is None:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    if quote.program_id:
+        raise HTTPException(status_code=409, detail="This is a herding program's quote - invoice each date from the program's page")
+    lines = session.exec(select(QuoteItem).where(QuoteItem.quote_id == quote_id)).all()
+    if not lines:
+        raise HTTPException(status_code=422, detail="This quote has no lines to invoice")
+    reference = f"From quote {quote.number or f'#{quote.id}'}" + (f" ({quote.reference})" if quote.reference else "")
+    return _make_invoice(session, user, quote.client_id, lines, reference, quote.notes)
+
+
+@router.post("/{invoice_id}/duplicate", response_model=Invoice)
+def duplicate_invoice(invoice_id: int, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    """Repeat an invoice: the same client and lines under a new number, today's date and nothing paid."""
+    original = session.get(Invoice, invoice_id)
+    if original is None:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    lines = session.exec(select(InvoiceItem).where(InvoiceItem.invoice_id == invoice_id)).all()
+    return _make_invoice(session, user, original.client_id, lines, f"Repeat of {original.number or f'#{original.id}'}", original.notes)
+
 
 @router.get("/", response_model=List[Invoice])
 def read_invoices(session: Session = Depends(get_session)):

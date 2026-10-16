@@ -1,3 +1,4 @@
+import { t } from "../utils/i18n";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BellRing, Mail, MessageCircle, Send } from "lucide-react";
@@ -54,17 +55,17 @@ const TreatmentReminderDialog = ({ client, onClose }) => {
   return (
     <Modal isOpen onClose={onClose} title={`Remind ${client.farm_name || client.name} of their program dates`} size="md">
       <div className="space-y-3 text-sm">
-        {isLoading ? <p className="text-slate-500">Looking at the program…</p>
+        {isLoading ? <p className="text-slate-500">{t("Looking at the program…")}</p>
           : !draft ? <p className="text-slate-600">There are no program dates for this client in the next {AHEAD_DAYS / 7} weeks.</p>
           : (
             <>
-              <label className="block"><span className="text-xs text-slate-500">Message (you can change it)</span>
+              <label className="block"><span className="text-xs text-slate-500">{t("Message (you can change it)")}</span>
                 <textarea className="w-full rounded-lg border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500" rows={8}
                   value={message} onChange={(e) => setEdited(e.target.value)} /></label>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className={button} disabled={!client.phone} onClick={() => open("whatsapp")} title={client.phone ? "Send on WhatsApp" : "This client has no phone number"}><MessageCircle size={16} /> WhatsApp</button>
-                {mail?.configured && <button type="button" className={button} disabled={!client.email} onClick={fromApp} title={client.email ? "Email it from the app" : "This client has no email address"}><Send size={16} /> Send from app</button>}
-                <button type="button" className={button} disabled={!client.email} onClick={() => open("email")} title={client.email ? "Send by email" : "This client has no email address"}><Mail size={16} /> Email</button>
+                {mail?.configured && <button type="button" className={button} disabled={!client.email} onClick={fromApp} title={client.email ? "Email it from the app" : "This client has no email address"}><Send size={16} /> {t("Send from app")}</button>}
+                <button type="button" className={button} disabled={!client.email} onClick={() => open("email")} title={client.email ? "Send by email" : "This client has no email address"}><Mail size={16} /> {t("Email")}</button>
               </div>
             </>
           )}
@@ -80,7 +81,7 @@ const TreatmentReminder = ({ client }) => {
     <>
       <button type="button" onClick={() => setOpen(true)}
         className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:border-emerald-300 hover:text-emerald-600 transition-colors shadow-sm text-sm font-medium">
-        <BellRing size={18} /> Remind of dates
+        <BellRing size={18} /> {t("Remind of dates")}
       </button>
       {open && <TreatmentReminderDialog client={client} onClose={() => setOpen(false)} />}
     </>

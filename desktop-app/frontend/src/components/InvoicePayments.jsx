@@ -1,3 +1,4 @@
+import { t } from "../utils/i18n";
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, Trash2 } from "lucide-react";
@@ -52,64 +53,64 @@ const InvoicePayments = ({ invoice, onClose, onPreview }) => {
         {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700">{error}</p>}
 
         <section>
-          <h3 className="mb-2 font-semibold text-slate-800">Payments received</h3>
+          <h3 className="mb-2 font-semibold text-slate-800">{t("Payments received")}</h3>
           {data?.payments?.length ? (
             <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
               {data.payments.map((p) => (
                 <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2">
                   <span>{shortDate(p.date)} - {p.method}{p.reference ? ` - ${p.reference}` : ""}</span>
                   <span className="flex items-center gap-2 font-medium">{money(p.amount)}
-                    <button type="button" data-admin-only title="Remove payment" className="p-1 text-slate-400 hover:text-red-600"
+                    <button type="button" data-admin-only title={t("Remove payment")} className="p-1 text-slate-400 hover:text-red-600"
                       onClick={() => window.confirm("Remove this payment?") && remove.mutate(`/payments/${p.id}`)}><Trash2 size={14} /></button>
                   </span>
                 </li>
               ))}
             </ul>
-          ) : <p className="text-slate-500">No payments yet.</p>}
+          ) : <p className="text-slate-500">{t("No payments yet.")}</p>}
           {!cancelled && owed > 0 && (
             <form className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-5" onSubmit={(e) => { e.preventDefault(); record.mutate(); }}>
-              <label className="sm:col-span-1"><span className="text-xs text-slate-500">Amount (R)</span>
+              <label className="sm:col-span-1"><span className="text-xs text-slate-500">{t("Amount (R)")}</span>
                 <input className={input} type="number" min="0.01" step="0.01" placeholder={owed.toFixed(2)} value={pay.amount} onChange={(e) => setPay({ ...pay, amount: e.target.value })} /></label>
-              <label><span className="text-xs text-slate-500">Date</span>
+              <label><span className="text-xs text-slate-500">{t("Date")}</span>
                 <input className={input} type="date" required value={pay.date} onChange={(e) => setPay({ ...pay, date: e.target.value })} /></label>
-              <label><span className="text-xs text-slate-500">How</span>
+              <label><span className="text-xs text-slate-500">{t("How")}</span>
                 <select className={input} value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })}>
                   {["EFT", "Cash", "Card", "Other"].map((m) => <option key={m}>{m}</option>)}
                 </select></label>
-              <label><span className="text-xs text-slate-500">Reference</span>
+              <label><span className="text-xs text-slate-500">{t("Reference")}</span>
                 <input className={input} maxLength={120} value={pay.reference} onChange={(e) => setPay({ ...pay, reference: e.target.value })} /></label>
               <button type="submit" disabled={record.isPending} className="self-end rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
-                Record payment
+                {t("Record payment")}
               </button>
             </form>
           )}
         </section>
 
         <section>
-          <h3 className="mb-2 font-semibold text-slate-800">Credit notes</h3>
+          <h3 className="mb-2 font-semibold text-slate-800">{t("Credit notes")}</h3>
           {data?.credit_notes?.length ? (
             <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
               {data.credit_notes.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-3 px-3 py-2">
                   <span><b>{c.number}</b> - {shortDate(c.date)} - {c.reason}</span>
                   <span className="flex items-center gap-2 font-medium">{money(c.amount)}
-                    <button type="button" title="Preview" className="p-1 text-slate-400 hover:text-emerald-600"
+                    <button type="button" title={t("Preview")} className="p-1 text-slate-400 hover:text-emerald-600"
                       onClick={() => onPreview({ kind: "credit-note", id: c.id, title: c.number })}><Eye size={14} /></button>
-                    <button type="button" data-admin-only title="Remove credit note" className="p-1 text-slate-400 hover:text-red-600"
+                    <button type="button" data-admin-only title={t("Remove credit note")} className="p-1 text-slate-400 hover:text-red-600"
                       onClick={() => window.confirm(`Remove credit note ${c.number}?`) && remove.mutate(`/credit-notes/${c.id}`)}><Trash2 size={14} /></button>
                   </span>
                 </li>
               ))}
             </ul>
-          ) : <p className="text-slate-500">No credit notes.</p>}
+          ) : <p className="text-slate-500">{t("No credit notes.")}</p>}
           {!cancelled && (
             <form className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-5" onSubmit={(e) => { e.preventDefault(); issue.mutate(); }}>
-              <label><span className="text-xs text-slate-500">Amount incl. VAT (R)</span>
+              <label><span className="text-xs text-slate-500">{t("Amount incl. VAT (R)")}</span>
                 <input className={input} type="number" min="0.01" step="0.01" required value={credit.amount} onChange={(e) => setCredit({ ...credit, amount: e.target.value })} /></label>
-              <label className="sm:col-span-3"><span className="text-xs text-slate-500">Reason</span>
+              <label className="sm:col-span-3"><span className="text-xs text-slate-500">{t("Reason")}</span>
                 <input className={input} required maxLength={500} placeholder="e.g. 2 bottles returned damaged" value={credit.reason} onChange={(e) => setCredit({ ...credit, reason: e.target.value })} /></label>
               <button type="submit" disabled={issue.isPending} className="self-end rounded-lg border border-slate-300 px-4 py-2 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-                Issue credit note
+                {t("Issue credit note")}
               </button>
             </form>
           )}
