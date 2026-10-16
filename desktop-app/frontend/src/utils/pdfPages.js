@@ -1,12 +1,11 @@
-import * as pdfjs from "pdfjs-dist/build/pdf.mjs";
-import * as pdfWorker from "pdfjs-dist/build/pdf.worker.mjs";
-
-// pdf.js runs its worker code in this thread (it finds it on globalThis.pdfjsWorker) instead of starting a Web
-// Worker, so the packaged app's strict CSP and file:// pages need nothing extra. A brochure page at a time is fast
-// enough that nobody notices.
-globalThis.pdfjsWorker = pdfWorker;
-
-export const openPdf = async (blob) => pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+// pdf.js is big, so it is only read the first time a brochure is opened. It runs its worker code in this thread (it
+// finds it on globalThis.pdfjsWorker) instead of starting a Web Worker, so the packaged app's strict CSP and file://
+// pages need nothing extra. A brochure page at a time is fast enough that nobody notices.
+export const openPdf = async (blob) => {
+  const [pdfjs, pdfWorker] = await Promise.all([import("pdfjs-dist/build/pdf.mjs"), import("pdfjs-dist/build/pdf.worker.mjs")]);
+  globalThis.pdfjsWorker = pdfWorker;
+  return pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+};
 
 // Draws page `number` (1-based) onto `canvas`, `width` pixels wide - wide enough to crop a product out of it later.
 export async function drawPage(doc, number, canvas, width = 1400) {

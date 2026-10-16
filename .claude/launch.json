@@ -10,7 +10,7 @@
     {
       "name": "frontend-test-backend",
       "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "set VITE_API_URL=http://localhost:8001&& npm --prefix desktop-app/frontend run dev"],
+      "runtimeArgs": ["/c", "set VITE_API_URL=http://127.0.0.1:8001&& npm --prefix desktop-app/frontend run dev"],
       "port": 5173
     }
   ]

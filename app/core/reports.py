@@ -5,8 +5,6 @@ from collections import defaultdict
 from datetime import date, datetime, time, timedelta
 from typing import Optional
 
-from openpyxl import Workbook
-from openpyxl.styles import Font
 from sqlmodel import Session, select
 
 from app.api.business import get_business, totals_for
@@ -120,6 +118,7 @@ def _plain(cell, value) -> None:
 
 
 def _sheet(wb, title, header, rows):
+    from openpyxl.styles import Font
     ws = wb.create_sheet(title)
     ws.append(header)
     for cell in ws[1]:
@@ -166,6 +165,7 @@ def accounting_workbook(session: Session, start: date, end: date) -> bytes:
     months = sorted(set(vat_out) | set(vat_back))
     vat_rows = [[m, _f(vat_out[m]), _f(vat_back[m]), _f(vat_out[m] - vat_back[m])] for m in months]
 
+    from openpyxl import Workbook  # only when the workbook is made (keeps start-up quick)
     wb = Workbook()
     wb.remove(wb.active)
     _sheet(wb, "Invoices", ["Number", "Date", "Due", "Client", "Excl VAT", "VAT", "Total", "Status", "Paid", "Credited", "Balance"], inv_rows)

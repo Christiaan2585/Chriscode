@@ -1,3 +1,5 @@
+import ShowMore from "../components/ShowMore";
+import { usePaged } from "../utils/usePaged";
 import React, { useState } from "react";
 import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
 import { useSelection } from "../utils/useSelection";
@@ -45,6 +47,7 @@ const Orders = () => {
       String(order.id).includes(q)
     );
   });
+  const paged = usePaged(filteredOrders);
   const selection = useSelection((filteredOrders).map((r) => r.id));
 
   const closeModal = () => {
@@ -184,7 +187,7 @@ const Orders = () => {
                 </td>
               </tr>
             )}
-            {filteredOrders.map(order => (
+            {paged.visible.map(order => (
               <tr key={order.id} className="hover:bg-slate-50 transition-colors">
                 <SelectTd selection={selection} id={order.id} label={`Select ${((id) => `Order #${id}`)(order.id)}`} />
                 <td data-primary className="px-6 py-4 text-slate-600 font-medium">#{order.id}</td>
@@ -218,6 +221,7 @@ const Orders = () => {
             ))}
           </tbody>
         </table>
+        <ShowMore paged={paged} />
         </div>
       </div>
 

@@ -97,7 +97,7 @@ function isBackendUp() {
   });
 }
 
-function waitForBackend(maxWaitMs = 20000, intervalMs = 400) {
+function waitForBackend(maxWaitMs = 20000, intervalMs = 150) {
   const startedAt = Date.now();
   return new Promise((resolve) => {
     const check = async () => {
@@ -266,6 +266,25 @@ function phonesEnabled() {
   }
 }
 
+// The window is already open while the backend starts; this only speaks up if it never does. Longer when
+// packaged: allows for spawnPackagedBackend's retries.
+async function reportIfBackendNeverComes() {
+  const backendReady = await waitForBackend(app.isPackaged ? 30000 : 20000);
+  if (backendReady) return;
+  const msg = `Backend did not respond on http://${BACKEND_HOST}:${BACKEND_PORT} within the timeout. ` +
+    'The app is open, but API calls will fail until the backend is reachable.';
+  console.error(msg);
+  logToBackendFile(msg);
+  if (app.isPackaged) {
+    dialog.showErrorBox(
+      'Sandveld Vee Dienste - backend not responding',
+      'The app is taking longer than expected to start, or the backend crashed on launch.\n\n' +
+      'The app will still open, but data will not load until the backend is reachable.\n\n' +
+      `A log file may have more detail at:\n${path.join(PACKAGED_DATA_DIR, 'backend.log')}`
+    );
+  }
+}
+
 async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -285,23 +304,10 @@ async function createWindow() {
   });
 
   await startBackend();
-  // Longer when packaged: allows for spawnPackagedBackend's retries.
-  const backendReady = await waitForBackend(app.isPackaged ? 30000 : 20000);
-  if (!backendReady) {
-    const msg = `Backend did not respond on http://${BACKEND_HOST}:${BACKEND_PORT} within the timeout. ` +
-      'Loading the UI anyway - API calls will fail until the backend is reachable.';
-    console.error(msg);
-    logToBackendFile(msg);
-    if (app.isPackaged) {
-      dialog.showErrorBox(
-        'Sandveld Vee Dienste - backend not responding',
-        'The app is taking longer than expected to start, or the backend crashed on launch.\n\n' +
-        'The app will still open, but data will not load until the backend is reachable.\n\n' +
-        `A log file may have more detail at:\n${path.join(PACKAGED_DATA_DIR, 'backend.log')}`
-      );
-    }
-  }
 
+  // Open the app now instead of waiting for the backend to be up: the page shows its own loading screen and keeps
+  // asking the backend until it answers (api/authService.js statusWhenStarting), so loading the interface and
+  // starting the backend happen together rather than one after the other.
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
@@ -310,6 +316,7 @@ async function createWindow() {
     const indexPath = path.join(__dirname, 'frontend', 'dist', 'index.html');
     mainWindow.loadFile(indexPath);
   }
+  reportIfBackendNeverComes();
 
   // Started by Windows at sign-in with "Start with Windows": stay in the tray, no window until someone opens it.
   mainWindow.once('ready-to-show', () => { if (!ready || !ready.startedHidden(process.argv)) mainWindow.show(); });

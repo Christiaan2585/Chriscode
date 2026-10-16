@@ -1,3 +1,5 @@
+import ShowMore from "../components/ShowMore";
+import { usePaged } from "../utils/usePaged";
 import React, { useState } from "react";
 import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
 import { useSelection } from "../utils/useSelection";
@@ -66,6 +68,7 @@ const Invoices = () => {
       inv.number?.toLowerCase().includes(q)
     );
   }).sort(newestFirst);
+  const paged = usePaged(filteredInvoices);
   const selection = useSelection((filteredInvoices).map((r) => r.id));
 
   const closeModal = () => {
@@ -273,7 +276,7 @@ const Invoices = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredInvoices.map((inv) => (
+            {paged.visible.map((inv) => (
               <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
                 <SelectTd selection={selection} id={inv.id} label={`Select ${((id) => invoices?.find((r) => r.id === id)?.number || `#${id}`)(inv.id)}`} />
                 <td data-primary className="px-6 py-4 text-slate-600 font-medium">
@@ -352,6 +355,7 @@ const Invoices = () => {
             )}
           </tbody>
         </table>
+        <ShowMore paged={paged} />
         </div>
       </div>
 

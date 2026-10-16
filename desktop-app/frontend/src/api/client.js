@@ -9,7 +9,9 @@ import { isReachable, setReachable } from '../offline/connectivity';
 const phoneAdapter = withOfflineCache(nativeAdapter, { store: savedCopy, onReachable: setReachable, preferSaved: () => !isReachable() });
 
 // VITE_API_URL: dev only, e.g. a test backend on another port while the installed app holds 8000.
-const LOCAL_BACKEND = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// 127.0.0.1, not "localhost": Windows tries the IPv6 address first, the backend only listens on IPv4, and every new
+// connection then waited 0.3-0.6 s before falling back (measured) - on every screen that loads several things.
+const LOCAL_BACKEND = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 const apiClient = axios.create({
   baseURL: LOCAL_BACKEND,

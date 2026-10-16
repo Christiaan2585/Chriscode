@@ -7,8 +7,10 @@ of the data an accountant or a future system can open without this app.
 import sqlite3
 from pathlib import Path
 
-from openpyxl import Workbook
-from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from openpyxl import Workbook
 
 # productimage / userphoto: binary pictures, meaningless in a spreadsheet cell.
 EXCLUDED_TABLES = frozenset({"user", "remembertoken", "productimage", "userphoto", "clientdocument", "trashitem", "mailsettings"})
@@ -18,11 +20,13 @@ def _clean(value):
     # Free-text fields (notes etc.) can hold control characters that
     # openpyxl refuses to write, which would abort the whole export.
     if isinstance(value, str):
+        from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
         return ILLEGAL_CHARACTERS_RE.sub("", value)
     return value
 
 
-def build_workbook(db_path: str, exclude=EXCLUDED_TABLES) -> Workbook:
+def build_workbook(db_path: str, exclude=EXCLUDED_TABLES) -> "Workbook":
+    from openpyxl import Workbook  # only when exporting (keeps start-up quick)
     wb = Workbook()
     wb.remove(wb.active)
     conn = sqlite3.connect(Path(db_path).resolve().as_uri() + "?mode=ro", uri=True)

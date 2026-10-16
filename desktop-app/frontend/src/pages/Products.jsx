@@ -1,3 +1,5 @@
+import ShowMore from "../components/ShowMore";
+import { usePaged } from "../utils/usePaged";
 import React, { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, Trash2, Plus, Edit, LayoutGrid, Rows3, FileDown } from "lucide-react";
@@ -53,6 +55,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
   // Cost keeps the standard markup in step, same as the full product form.
   const saveCost = (id) => (value) => patch.mutateAsync({ id, changes: { cost: value, ...recomputeFromCost(value) } });
   const cell = "px-4 py-3 text-sm align-top";
+  const paged = usePaged(products);
 
   return (
     <div className="overflow-x-auto">
@@ -66,7 +69,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {products.map((p) => (
+          {paged.visible.map((p) => (
             <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${isActive(p) ? "" : "opacity-60"}`}>
               <SelectTd selection={selection} id={p.id} label={`Select ${p.name}`} />
               <td data-primary className={cell}>
@@ -109,6 +112,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
           )}
         </tbody>
       </table>
+      <ShowMore paged={paged} />
     </div>
   );
 };

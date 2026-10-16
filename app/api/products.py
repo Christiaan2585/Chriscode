@@ -3,7 +3,6 @@ from sqlmodel import Session, select
 from typing import List, Optional
 import re
 import io
-from openpyxl import load_workbook
 from app.core.db import get_session
 from app.core.security import get_current_user, require_admin
 from app.core.uploads import read_capped
@@ -252,6 +251,7 @@ async def import_products(file: UploadFile = File(...), session: Session = Depen
         raise HTTPException(status_code=400, detail="File must be an Excel sheet (.xlsx or .xls)")
 
     contents = await read_capped(file)
+    from openpyxl import load_workbook  # only when a sheet is imported (keeps start-up quick)
     try:
         wb = load_workbook(io.BytesIO(contents), data_only=True)
         ws = wb.worksheets[0]

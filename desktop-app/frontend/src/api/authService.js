@@ -2,6 +2,21 @@ import apiClient from './client';
 
 export const authService = {
   status: async () => (await apiClient.get('/auth/status', { fast: true })).data,
+  // The desktop app opens its window while the backend is still starting up, so the first answers can be missing:
+  // keep asking quietly (no error pop-ups) for up to `waitMs`, then give up like a normal call. In a browser or on
+  // a phone (no desktop shell) it is a single try.
+  statusWhenStarting: async (waitMs = 30000) => {
+    const deadline = Date.now() + waitMs;
+    const patient = typeof window !== 'undefined' && Boolean(window.electronAPI);
+    for (;;) {
+      try {
+        return (await apiClient.get('/auth/status', { fast: true, queueable: patient || undefined })).data;
+      } catch (err) {
+        if (err?.response || !patient || Date.now() > deadline) throw err;
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+  },
   setupFirstAccount: async (data) => (await apiClient.post('/auth/setup', data)).data,
   login: async (email, password, code) =>
     (await apiClient.post('/auth/login', { email, password, code: code || null }, { silent: true })).data,

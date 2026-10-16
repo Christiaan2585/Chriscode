@@ -2,7 +2,6 @@ import csv
 import io
 
 from fastapi import HTTPException, UploadFile
-from openpyxl import load_workbook
 
 IMPORT_LIMIT_BYTES = 10 * 1024 * 1024  # a price list or client list is a few hundred KB; this leaves room
 # An .xlsx is a zip: 10 MB can unpack into millions of cells. Imports never need more than this.
@@ -40,6 +39,7 @@ def read_table(filename: str, data: bytes) -> tuple:
                 text = data.decode("cp1252")  # Excel's "CSV" on Windows
             rows = csv.reader(io.StringIO(text))
         elif name.endswith(".xlsx"):
+            from openpyxl import load_workbook  # only when a sheet is imported (keeps start-up quick)
             ws = load_workbook(io.BytesIO(data), read_only=True, data_only=True).worksheets[0]
             rows = ws.iter_rows(values_only=True, max_col=MAX_TABLE_COLUMNS)
         else:

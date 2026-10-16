@@ -1,3 +1,5 @@
+import ShowMore from "../components/ShowMore";
+import { usePaged } from "../utils/usePaged";
 import React, { useState, useEffect } from "react";
 import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
 import { useSelection } from "../utils/useSelection";
@@ -67,6 +69,7 @@ const Quotes = () => {
       q.number?.toLowerCase().includes(query)
     );
   }).sort(newestFirst);
+  const paged = usePaged(filteredQuotes);
   const selection = useSelection((filteredQuotes).map((r) => r.id));
 
   // Arriving from the Calculator's "Create Quote" button: open the builder
@@ -298,7 +301,7 @@ const Quotes = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredQuotes.map(q => (
+            {paged.visible.map(q => (
               <tr key={q.id} className="hover:bg-slate-50 transition-colors">
                 <SelectTd selection={selection} id={q.id} label={`Select ${((id) => quotes?.find((r) => r.id === id)?.number || `#${id}`)(q.id)}`} />
                 <td data-primary className="px-6 py-4 text-slate-600">
@@ -370,6 +373,7 @@ const Quotes = () => {
             )}
           </tbody>
         </table>
+        <ShowMore paged={paged} />
         </div>
       </div>
 

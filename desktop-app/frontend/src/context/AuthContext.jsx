@@ -109,7 +109,7 @@ export function AuthProvider({ children }) {
     (async () => {
       await loadRememberToken().catch(() => null); // before anything asks whether this device is remembered
       try {
-        const status = await authService.status();
+        const status = await authService.statusWhenStarting();
         setGoogleEnabled(status.google_enabled);
         setGoogleClientId(status.google_client_id);
         if (status.setup_required) {

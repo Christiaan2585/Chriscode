@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import { Outlet, NavLink, useLocation } from "react-router-dom";
 import { LayoutDashboard, Users, ClipboardList, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, CloudSun, Truck, BarChart3, Menu, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -112,7 +112,9 @@ const AppLayout = () => {
           <ThemeToggle />
         </header>
         <div className="flex-1 overflow-auto p-4 md:p-8">
-          <Outlet />
+          <Suspense fallback={<div role="status" className="p-8 text-sm text-slate-500">Loading…</div>}>
+            <Outlet />
+          </Suspense>
         </div>
       </main>
     </div>

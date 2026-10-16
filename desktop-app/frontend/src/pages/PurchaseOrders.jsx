@@ -1,3 +1,5 @@
+import ShowMore from "../components/ShowMore";
+import { usePaged } from "../utils/usePaged";
 import React, { useState } from "react";
 import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
 import { useSelection } from "../utils/useSelection";
@@ -128,6 +130,7 @@ const PurchaseOrders = () => {
       return !q || [o.number, o.reference, o.status, supplierName(o.supplier_id)].some((v) => v?.toLowerCase().includes(q));
     })
     .sort(newestFirst);
+  const paged = usePaged(filtered);
   const selection = useSelection((filtered).map((r) => r.id));
 
   const openNew = () => {
@@ -246,7 +249,7 @@ const PurchaseOrders = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filtered.map((o) => (
+            {paged.visible.map((o) => (
               <tr key={o.id} className="transition-colors hover:bg-slate-50">
                 <SelectTd selection={selection} id={o.id} label={`Select ${((id) => orders?.find((r) => r.id === id)?.number || `#${id}`)(o.id)}`} />
                 <td data-primary className="px-6 py-4 font-medium text-slate-600">{o.number || `#${o.id}`}</td>
@@ -274,6 +277,7 @@ const PurchaseOrders = () => {
             )}
           </tbody>
         </table>
+        <ShowMore paged={paged} />
         </div>
       </div>
       )}

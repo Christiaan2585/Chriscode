@@ -1,3 +1,5 @@
+import ShowMore from "../components/ShowMore";
+import { usePaged } from "../utils/usePaged";
 import React, { useState } from "react";
 import { BulkBar, SelectAllTh, SelectTd } from "../components/BulkSelect";
 import { useSelection } from "../utils/useSelection";
@@ -111,6 +113,7 @@ const Clients = () => {
   const towns = townsOf(clients || []);
   const narrowed = Boolean(search.trim() || town || minAnimals !== "" || maxAnimals !== "" || sort !== "name");
   const clearFilters = () => { setSearch(""); setTown(""); setMinAnimals(""); setMaxAnimals(""); setSort("name"); };
+  const paged = usePaged(filtered);
   const selection = useSelection((filtered).map((r) => r.id));
 
   useOpenNew(() => openAddModal()); // from the dashboard's quick actions (?new=1)
@@ -181,7 +184,7 @@ const Clients = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filtered.map(client => {
+            {paged.visible.map(client => {
               const telLink = toTelLink(client.phone);
               const waLink = toWhatsAppLink(client.phone);
               return (
@@ -265,6 +268,7 @@ const Clients = () => {
             )}
           </tbody>
         </table>
+        <ShowMore paged={paged} />
         </div>
       </div>
 

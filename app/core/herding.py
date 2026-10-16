@@ -10,7 +10,6 @@ import re
 from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 
-from openpyxl import load_workbook
 from sqlmodel import Session, select
 
 from app.models.business import BusinessSettings
@@ -467,6 +466,7 @@ def _date_rules(rows, refs):
 
 
 def parse_template_workbook(data: bytes) -> dict:
+    from openpyxl import load_workbook  # only when a sheet is imported (keeps start-up quick)
     try:
         wb = load_workbook(io.BytesIO(data))
     except Exception as exc:
@@ -696,6 +696,7 @@ def parse_cost_sheet(data: bytes, products) -> dict:
     """Blocks of product lines with their date rule, groups and doses.
     `products` are the app's products, matched by name (ignoring spaces
     and punctuation); unmatched names are listed, not guessed."""
+    from openpyxl import load_workbook
     try:
         ws = load_workbook(io.BytesIO(data)).worksheets[0]
     except Exception as exc:

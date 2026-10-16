@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { lazy, useEffect, useState } from "react";
 import { HashRouter as BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import apiClient from "./api/client";
@@ -10,23 +10,26 @@ import { AuthProvider } from "./context/AuthContext";
 import { ToastProvider, ToastErrorBridge } from "./context/ToastContext";
 import AuthGate from "./pages/AuthGate";
 import AppLayout from "./layout/AppLayout";
-import Dashboard from "./pages/Dashboard";
-import Clients from "./pages/Clients";
-import Animals from "./pages/Animals";
-import ClientDetail from "./pages/ClientDetail";
-import Products from "./pages/Products";
-import Calculator from "./pages/Calculator";
-import Herds from "./pages/Herds";
-import Calendar from "./pages/Calendar";
-import Quotes from "./pages/Quotes";
-import Orders from "./pages/Orders";
-import Invoices from "./pages/Invoices";
-import Settings from "./pages/Settings";
-import Programs from "./pages/Programs";
-import Weather from "./pages/Weather";
-import PurchaseOrders from "./pages/PurchaseOrders";
-import ProgramSheet from "./pages/ProgramSheet";
-import Reports from "./pages/Reports";
+
+// Each page is its own file that loads the first time it is opened, so the app starts without having to read
+// every screen (and the charts) first.
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Clients = lazy(() => import("./pages/Clients"));
+const Animals = lazy(() => import("./pages/Animals"));
+const ClientDetail = lazy(() => import("./pages/ClientDetail"));
+const Products = lazy(() => import("./pages/Products"));
+const Calculator = lazy(() => import("./pages/Calculator"));
+const Herds = lazy(() => import("./pages/Herds"));
+const Calendar = lazy(() => import("./pages/Calendar"));
+const Quotes = lazy(() => import("./pages/Quotes"));
+const Orders = lazy(() => import("./pages/Orders"));
+const Invoices = lazy(() => import("./pages/Invoices"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Programs = lazy(() => import("./pages/Programs"));
+const Weather = lazy(() => import("./pages/Weather"));
+const PurchaseOrders = lazy(() => import("./pages/PurchaseOrders"));
+const ProgramSheet = lazy(() => import("./pages/ProgramSheet"));
+const Reports = lazy(() => import("./pages/Reports"));
 
 // On a phone a read that finds the office PC out of reach is answered from the saved copy, so there is no point
 // asking again and again; the PC coming back refreshes everything (offline/sync.js).
