@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Outlet, NavLink, useLocation } from "react-router-dom";
 import { LayoutDashboard, Users, ClipboardList, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, CloudSun, Truck, BarChart3, Menu, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import SetupReminder from "../components/SetupReminder";
+import { useSetupNeeds } from "../utils/useSetupNeeds";
 import logo from "../assets/logo.png";
 import GrazingHeaderStrip from "../components/GrazingHeaderStrip";
 import GlobalSearch from "../components/GlobalSearch";
@@ -36,6 +36,7 @@ const navClass = ({ isActive }) =>
 
 const AppLayout = () => {
   const { user } = useAuth();
+  const setup = useSetupNeeds(user);
   // Phones and narrow windows: the sidebar slides in over the page from the
   // menu button and closes again on every page change.
   const [navOpen, setNavOpen] = useState(false);
@@ -87,6 +88,10 @@ const AppLayout = () => {
         <div className="p-4 border-t border-emerald-800 space-y-1">
           <NavLink to="/settings" className={navClass}>
             <Settings size={20} /> Settings
+            {setup.count > 0 && (
+              <span title="Something needs your attention in Settings" aria-label={`${setup.count} ${setup.count === 1 ? "thing needs" : "things need"} attention in Settings`}
+                className="ml-auto rounded-full bg-amber-400 px-2 py-0.5 text-xs font-bold text-amber-950">{setup.count}</span>
+            )}
           </NavLink>
         </div>
       </aside>
@@ -106,7 +111,6 @@ const AppLayout = () => {
           <OutboxBadge compact />
           <ThemeToggle />
         </header>
-        <SetupReminder user={user} />
         <div className="flex-1 overflow-auto p-4 md:p-8">
           <Outlet />
         </div>

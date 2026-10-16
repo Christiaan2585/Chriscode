@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import Avatar from "../components/Avatar";
 import { PROFILE_ITEM, findItem, visibleGroups } from "../components/settings/sections";
 import { useMediaQuery } from "../utils/useMediaQuery";
+import { useSetupNeeds } from "../utils/useSetupNeeds";
 
 // The tinted rounded square every row starts with, like the iPhone's Settings.
 const IconTile = ({ Icon, color }) => (
@@ -37,6 +38,7 @@ const Row = ({ item, selected }) => {
 
 const SettingsList = ({ ctx, current }) => {
   const { user } = useAuth();
+  const setup = useSetupNeeds(user);
   const [query, setQuery] = useState("");
   const needle = query.trim().toLowerCase();
   const groups = visibleGroups(ctx)
@@ -74,6 +76,11 @@ const SettingsList = ({ ctx, current }) => {
               {user.is_admin ? "Admin" : "Staff"} · My Details, photo and phone number
             </span>
           </span>
+          {setup.own.length > 0 && (
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${current?.id === PROFILE_ITEM.id ? "bg-white/20 text-white" : "bg-amber-100 text-amber-700"}`}>
+              {setup.own.length} to add
+            </span>
+          )}
           <ChevronRight size={16} className={current?.id === PROFILE_ITEM.id ? "text-white/70" : "text-slate-400"} aria-hidden="true" />
         </Link>
       )}
