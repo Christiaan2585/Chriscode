@@ -3,6 +3,19 @@
 // people will notice. (Never put the business's program steps, products or doses here: the repository is public.)
 export const NOTES = [
   {
+    version: "1.0.16",
+    title: "Send quotes and herding programs",
+    sections: [
+      {
+        heading: "New",
+        items: [
+          "Send a quote to a client by WhatsApp or email: open the quote's preview (Quotes page, the client's page or the herding program page) and use the WhatsApp, Email or Send from app buttons.",
+          "The same buttons are on a herding program's Program PDF and Costs PDF, so you can send the program or its costs straight to the farmer.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.15",
     title: "Connect from anywhere",
     sections: [
