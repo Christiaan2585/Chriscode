@@ -18,7 +18,7 @@ import {
   HeadCountFields, ProgramForm, StatusChip, StepDate, countsFrom, countsPayload, fileName, formFrom, linkButton,
   primary, programPayload, ruleLabel, secondary, useProducts, useSchedule,
 } from "../components/HerdingProgramPanel";
-import { saveBlob } from "../utils/documents";
+import { programSend, quoteDoc, saveBlob } from "../utils/documents";
 import { money, statusStyle } from "../utils/format";
 import { nameColorClass } from "../utils/nameColors";
 import { copyProgram } from "../utils/programClipboard";
@@ -329,11 +329,11 @@ const ProgramSheet = () => {
               </button>
               <button type="button" className={secondary} onClick={() => setPreview({
                 kind: "program-costs", id: programId, title: `${program.name} - costs`, url: `${base}/costs.pdf`,
-                filename: fileName(`Program costs - ${title}.pdf`), hint: "The costs laid out like the cost sheet, amounts excluding VAT.",
+                filename: fileName(`Program costs - ${title}.pdf`), hint: "The costs laid out like the cost sheet, amounts excluding VAT.", send: programSend(client, true),
               })}><Receipt size={16} /> Costs PDF</button>
               <button type="button" className={secondary} onClick={() => setPreview({
                 kind: "program", id: programId, title: program.name, url: `${base}/pdf`,
-                filename: fileName(`Herding program - ${title}.pdf`), hint: "The program's steps and notes for the farmer.",
+                filename: fileName(`Herding program - ${title}.pdf`), hint: "The program's steps and notes for the farmer.", send: programSend(client, false),
               })}><FileDown size={16} /> Program PDF</button>
               <button type="button" className={secondary} disabled={downloadSheet.isPending} onClick={() => downloadSheet.mutate()}>
                 <FileSpreadsheet size={16} /> {downloadSheet.isPending ? "Making…" : "Excel"}
@@ -390,7 +390,7 @@ const ProgramSheet = () => {
             <span className="ml-2 text-xs text-slate-500">({money(quote.total_exclusive)} excl)</span>
           </div>
           <div className="ml-auto flex flex-wrap gap-2">
-            <button type="button" className={secondary} onClick={() => setPreview({ kind: "quote", id: quote.id, title: quote.number })}>
+            <button type="button" className={secondary} onClick={() => setPreview(quoteDoc(quote, client))}>
               <FileText size={16} /> Quote PDF
             </button>
           </div>

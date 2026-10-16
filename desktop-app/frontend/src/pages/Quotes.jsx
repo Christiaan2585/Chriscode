@@ -15,7 +15,7 @@ import DocumentPreview from "../components/DocumentPreview";
 import OrderFormImport from "../components/OrderFormImport";
 import { NewProgramDialog } from "../components/HerdingProgramPanel";
 import { ClientHover, DocumentHover } from "../components/PreviewCards";
-import { downloadDocumentPdf, lineTotal } from "../utils/documents";
+import { downloadDocumentPdf, lineTotal, quoteDoc } from "../utils/documents";
 import { newestFirst } from "../utils/format";
 import { pickerProducts } from "../utils/products";
 
@@ -325,7 +325,7 @@ const Quotes = () => {
                 </td>
                 <td data-actions className="px-6 py-4 text-right flex justify-end gap-2">
                   <button
-                    onClick={() => setPreview({ kind: "quote", id: q.id, title: q.number })}
+                    onClick={() => setPreview(quoteDoc(q, clients?.find((c) => c.id === q.client_id)))}
                     className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
                     title="Preview"
                   >
