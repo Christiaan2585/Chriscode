@@ -3,6 +3,19 @@
 // people will notice. (Never put the business's program steps, products or doses here: the repository is public.)
 export const NOTES = [
   {
+    version: "1.0.17",
+    title: "Send invoices, and quotes that turn to Sent",
+    sections: [
+      {
+        heading: "New",
+        items: [
+          "Send an invoice to a client by WhatsApp or email: open the invoice's preview (Invoices page or the client's page) and use the WhatsApp, Email or Send from app buttons.",
+          "A Draft quote becomes Sent as soon as you send it to the client. A herding program's quote does the same.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.16",
     title: "Send quotes and herding programs",
     sections: [
