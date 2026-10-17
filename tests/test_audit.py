@@ -53,6 +53,34 @@ class DescribeTests(unittest.TestCase):
         self.check("POST", "/programs/3/copy", "Copied herding program", "herding program", "3")
         self.check("DELETE", "/devices/4", "Removed a phone", "phone", "4")
 
+    def test_photos_suppliers_and_bulk_emails_are_logged(self):
+        self.check("POST", "/photos/client/5", "Added a photo to client", "client", "5")
+        self.check("DELETE", "/photos/9", "Deleted a client photo", "client", "9")
+        self.check("POST", "/suppliers/", "Added supplier", "supplier")
+        self.check("PUT", "/suppliers/2", "Changed supplier", "supplier", "2")
+        self.check("DELETE", "/suppliers/2", "Deleted supplier", "supplier", "2")
+        self.check("POST", "/reports/statements/email", "Emailed month-end statements", "email")
+        self.check("POST", "/reports/reminders/email", "Emailed payment reminders", "email")
+
+    def test_every_change_the_app_can_make_is_logged_unless_listed_here(self):
+        """Found by a phone test: photos added from the phone never appeared in the log. This fails when a NEW route that
+        changes something has no wording (add it to _ENTITIES or _SPECIAL in app/core/audit.py)."""
+        import re
+        from app.main import app
+        on_purpose = {  # recorded by their own code with more detail, or too noisy / not a change to anyone's data
+            ("POST", "/auth/login"), ("POST", "/auth/pin/verify"), ("POST", "/auth/google/callback"), ("POST", "/auth/forget-device"),
+            ("POST", "/devices/pair"), ("POST", "/mail/test"), ("POST", "/sends/"),
+        }
+        missing = []
+        for path, operations in app.openapi()["paths"].items():
+            for method in operations:
+                method = method.upper()
+                if method not in ("POST", "PUT", "PATCH", "DELETE") or (method, path) in on_purpose:
+                    continue
+                if audit.describe(method, re.sub(r"\{[^}]+\}", "1", path)) is None:
+                    missing.append((method, path))
+        self.assertEqual(missing, [])
+
     def test_what_is_not_worth_logging_is_left_out(self):
         for method, path in (("GET", "/clients/"), ("GET", "/analytics/dashboard"), ("POST", "/auth/login"),
                              ("POST", "/auth/pin/verify"), ("GET", "/audit"), ("OPTIONS", "/clients/")):

@@ -23,7 +23,7 @@ _ENTITIES = {
     "notes": "note", "animals": "animal", "rams": "ram", "herds": "herd", "schedules": "schedule", "medical": "medical record",
     "weights": "weight record", "dosing": "dosing rule", "business": "company details", "catalogue": "catalogue",
     "devices": "phone", "backups": "backup", "exports": "export", "auth": "user",
-    "payments": "payment", "credit-notes": "credit note", "stock": "stock",
+    "payments": "payment", "credit-notes": "credit note", "stock": "stock", "suppliers": "supplier",
 }
 
 # (method, path pattern) -> (action, entity). Checked in order; the first match wins.
@@ -38,6 +38,10 @@ _SPECIAL = [
     ("POST", r"^/devices/relay/new-key$", "Made a new relay key for phones", "phone"),
     ("POST", r"^/mail/send$", "Emailed a document", "email"),
     ("PUT", r"^/mail/settings$", "Changed the email settings", "email"),
+    ("POST", r"^/photos/client/(\d+)$", "Added a photo to client", "client"),
+    ("DELETE", r"^/photos/(\d+)$", "Deleted a client photo", "client"),
+    ("POST", r"^/reports/statements/email$", "Emailed month-end statements", "email"),
+    ("POST", r"^/reports/reminders/email$", "Emailed payment reminders", "email"),
     ("PUT|DELETE", r"^/auth/google-config$", "Changed the Google sign-in settings", "sign-in"),
     ("POST", r"^/trash/(\d+)/restore$", "Restored from the recycle bin", "recycle bin"),
     ("DELETE", r"^/trash/(\d+)$", "Deleted for good from the recycle bin", "recycle bin"),

@@ -3,6 +3,18 @@
 // people will notice. (Never put the business's program steps, products or doses here: the repository is public.)
 export const NOTES = [
   {
+    version: "1.0.23",
+    title: "A fuller activity log",
+    sections: [
+      {
+        heading: "Fixed",
+        items: [
+          "The activity log now also records photos added to or removed from a client (including ones added from a phone), supplier changes, and the bulk statement and payment-reminder emails.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.22",
     title: "Starts on every PC, and a cleaner look",
     sections: [
