@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="shortcut_new_client">Nuwe kliënt</string>
+    <string name="shortcut_new_invoice">Nuwe faktuur</string>
+    <string name="shortcut_new_quote">Nuwe kwotasie</string>
+</resources>

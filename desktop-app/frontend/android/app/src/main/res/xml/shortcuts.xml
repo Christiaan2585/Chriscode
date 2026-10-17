@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the app icon: jump straight to a new client / invoice / quote. The links are handled by
+     utils/deepLink.js, which only accepts these pages. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="new_client" android:enabled="true" android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_new_client" android:shortcutLongLabel="@string/shortcut_new_client">
+        <intent android:action="android.intent.action.VIEW" android:data="sandveld://go/clients?new=1"
+            android:targetPackage="com.sandveldveedienste.app" android:targetClass="com.sandveldveedienste.app.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="new_invoice" android:enabled="true" android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_new_invoice" android:shortcutLongLabel="@string/shortcut_new_invoice">
+        <intent android:action="android.intent.action.VIEW" android:data="sandveld://go/invoices?new=1"
+            android:targetPackage="com.sandveldveedienste.app" android:targetClass="com.sandveldveedienste.app.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="new_quote" android:enabled="true" android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_new_quote" android:shortcutLongLabel="@string/shortcut_new_quote">
+        <intent android:action="android.intent.action.VIEW" android:data="sandveld://go/programs?new=1"
+            android:targetPackage="com.sandveldveedienste.app" android:targetClass="com.sandveldveedienste.app.MainActivity" />
+    </shortcut>
+</shortcuts>

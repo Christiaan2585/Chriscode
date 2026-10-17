@@ -31,6 +31,7 @@ const Weather = lazy(() => import("./pages/Weather"));
 const PurchaseOrders = lazy(() => import("./pages/PurchaseOrders"));
 const ProgramSheet = lazy(() => import("./pages/ProgramSheet"));
 const Reports = lazy(() => import("./pages/Reports"));
+const SetupGuide = lazy(() => import("./pages/SetupGuide"));
 
 // On a phone a read that finds the office PC out of reach is answered from the saved copy, so there is no point
 // asking again and again; the PC coming back refreshes everything (offline/sync.js).
@@ -78,6 +79,7 @@ const App = ({ initiallyPaired = false }) => {
                   <Route path="invoices" element={<Invoices />} />
                   <Route path="purchase-orders" element={<PurchaseOrders />} />
                   <Route path="reports" element={<Reports />} />
+                  <Route path="setup" element={<SetupGuide />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="settings/:section" element={<Settings />} />
                 </Route>

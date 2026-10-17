@@ -49,6 +49,7 @@ class UserOut(BaseModel):
     two_step_enabled: bool = False
     must_change_password: bool = False
     locked: bool = False  # too many wrong tries; an admin can unlock
+    limited: bool = False  # limited staff: no cost prices, no money reports
 
     @staticmethod
     def from_user(user: User, session: Session) -> "UserOut":
@@ -67,6 +68,7 @@ class UserOut(BaseModel):
             two_step_enabled=bool(user.totp_enabled),
             must_change_password=bool(user.must_change_password),
             locked=bool(user.login_locked_until and user.login_locked_until > datetime.utcnow()),
+            limited=bool(user.limited and not user.is_admin),
         )
 
 
@@ -112,6 +114,7 @@ class AddUserRequest(BaseModel):
     email: EmailStr
     password: str
     is_admin: bool = False
+    limited: bool = False
 
 
 def _on_phone(request: Optional[Request]) -> bool:
@@ -559,8 +562,28 @@ def add_user(payload: AddUserRequest, _: User = Depends(require_admin), session:
         email=payload.email.lower(),
         password_hash=hash_secret(payload.password),
         is_admin=payload.is_admin,
+        limited=payload.limited and not payload.is_admin,
         password_changed_at=datetime.utcnow(),
     )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return UserOut.from_user(user, session)
+
+
+class LimitedChange(BaseModel):
+    limited: bool
+
+
+@router.put("/users/{user_id}/limited", response_model=UserOut)
+def set_limited(user_id: int, body: LimitedChange, _: User = Depends(require_admin), session: Session = Depends(get_session)):
+    """Limited staff can't see cost prices or the money reports. An admin can't be limited."""
+    user = session.get(User, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.is_admin and body.limited:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="An admin always has full access")
+    user.limited = body.limited
     session.add(user)
     session.commit()
     session.refresh(user)

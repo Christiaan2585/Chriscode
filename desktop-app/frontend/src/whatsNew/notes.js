@@ -3,6 +3,27 @@
 // people will notice. (Never put the business's program steps, products or doses here: the repository is public.)
 export const NOTES = [
   {
+    version: "1.0.20",
+    title: "Quicker everyday work",
+    sections: [
+      {
+        heading: "New",
+        items: [
+          "A + New button in the top bar: make a client, quote, invoice, payment or visit from any screen.",
+          "A Help button (?) with a tip for the page you are on, a set-up guide that walks you through the settings, and a way to copy details when you ask for help.",
+          "Remind all overdue: send a payment reminder, with the invoice attached, to every overdue client in one go.",
+          "Paid in full with one tap (cash or EFT), and Record a payment from anywhere.",
+          "Warnings before you slip up: a client that looks like one you already have, selling more than the stock on the shelf, and a check before sending (no email address, an expired quote, an R0 invoice).",
+          "Log phone calls on a client's page, with who made the call and when.",
+          "Today on the dashboard: invoices made, money received, things sent, and what is still waiting. Admins also see who did what.",
+          "Limited staff: choose people who can do the daily work but cannot see cost prices or the money reports (Settings, Security).",
+          "Phone: photos taken with no signal are kept and added when the office PC can be reached, and long-pressing the app icon gives New client, New invoice and New quote.",
+          "Updates now install by themselves and the app reopens, with no installer screens.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.19",
     title: "Easier every day",
     sections: [

@@ -1,6 +1,6 @@
 import { t } from "../utils/i18n";
 import React, { Suspense, useState } from "react";
-import { Outlet, NavLink, useLocation } from "react-router-dom";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Users, ClipboardList, FileText, Settings, Calculator, Calendar, ShoppingCart, Package, CloudSun, Truck, BarChart3, Menu, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useSetupNeeds } from "../utils/useSetupNeeds";
@@ -8,6 +8,9 @@ import logo from "../assets/logo.png";
 import GrazingHeaderStrip from "../components/GrazingHeaderStrip";
 import GlobalSearch from "../components/GlobalSearch";
 import ThemeToggle from "../components/ThemeToggle";
+import QuickNew from "../components/QuickNew";
+import HelpButton from "../components/HelpButton";
+import { useDeepLinks } from "../utils/useDeepLinks";
 import PoweredBy from "../components/PoweredBy";
 import OutboxBadge from "../components/OutboxBadge";
 import OfflineSupport from "../components/OfflineSupport";
@@ -50,6 +53,7 @@ const navClass = ({ isActive }) =>
 const AppLayout = () => {
   const { user } = useAuth();
   const setup = useSetupNeeds(user);
+  useDeepLinks(useNavigate()); // the phone's home-screen shortcuts
   // Phones and narrow windows: the sidebar slides in over the page from the
   // menu button and closes again on every page change.
   const [navOpen, setNavOpen] = useState(false);
@@ -92,7 +96,7 @@ const AppLayout = () => {
         <OutboxBadge />
         <p className="nav-label px-7 mt-2 text-xs font-medium uppercase tracking-wider text-emerald-300/70">{t("Menu")}</p>
         <nav className="flex-1 min-h-0 overflow-y-auto px-4 space-y-1 mt-2">
-          {NAV.map(({ to, label, Icon, end }) => (
+          {NAV.filter(({ to }) => !(user?.limited && to === "/reports")).map(({ to, label, Icon, end }) => (
             <NavLink key={to} to={to} end={end} className={navClass}>
               <Icon size={20} /> {label}
             </NavLink>
@@ -123,6 +127,8 @@ const AppLayout = () => {
           <div className="flex-1 lg:hidden" />
           <SyncStatus />
           <OutboxBadge compact />
+          <QuickNew />
+          <HelpButton />
           <ThemeToggle />
         </header>
         <div className="flex-1 overflow-auto p-4 md:p-8">

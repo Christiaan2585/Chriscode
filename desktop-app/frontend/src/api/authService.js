@@ -31,6 +31,7 @@ export const authService = {
   listUsers: async () => (await apiClient.get('/auth/users')).data,
   addUser: async (data) => (await apiClient.post('/auth/users', data)).data,
   deactivateUser: async (id) => (await apiClient.delete(`/auth/users/${id}`)).data,
+  setLimited: async (id, limited) => (await apiClient.put(`/auth/users/${id}/limited`, { limited })).data,
   changePassword: async (current_password, new_password) =>
     (await apiClient.put('/auth/me/password', { current_password, new_password })).data,
   signOutEverywhere: async () => (await apiClient.post('/auth/sign-out-everywhere')).data,

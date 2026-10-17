@@ -3,6 +3,8 @@ import ContactLinks from "../components/ContactLinks";
 import { deleteConfirm } from "../utils/confirmText";
 import ShowMore from "../components/ShowMore";
 import MarkPaidDialog from "../components/MarkPaidDialog";
+import ReminderRun, { RemindAllButton } from "../components/ReminderRun";
+import StockWarning from "../components/StockWarning";
 import { useToast } from "../context/ToastContext";
 import DraftBanner from "../components/DraftBanner";
 import { clearDraft, loadDraft } from "../utils/stored";
@@ -38,6 +40,7 @@ const lineNote = (item) =>
 const Invoices = () => {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [remindingAll, setRemindingAll] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [invoice, setInvoice] = useState(emptyInvoice);
   const [items, setItems] = useState([]);
@@ -269,12 +272,15 @@ const Invoices = () => {
           <h2 className="text-3xl font-bold text-slate-800">{t("Invoices")}</h2>
           <p className="text-slate-500">{t("Bill clients and generate PDF invoices")}</p>
         </div>
-        <button
-          onClick={openAddModal}
-          className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
-        >
-          <Plus size={20} /> {t("New Invoice")}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <RemindAllButton onClick={() => setRemindingAll(true)} />
+          <button
+            onClick={openAddModal}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+          >
+            <Plus size={20} /> {t("New Invoice")}
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -584,6 +590,8 @@ const Invoices = () => {
             </div>
           </div>
 
+          <StockWarning lines={[...existingItems.filter((i) => !removedItemIds.includes(i.id)), ...items]} products={products} />
+
           <div className="pt-4 border-t border-slate-200 flex justify-end">
             <button
               disabled={!canSave || saveInvoiceMutation.isPending}
@@ -600,6 +608,7 @@ const Invoices = () => {
         </div>
       </Modal>
 
+      <ReminderRun isOpen={remindingAll} onClose={() => setRemindingAll(false)} />
       {markingPaid && <MarkPaidDialog invoice={markingPaid.invoice} balance={markingPaid.balance} onClose={() => setMarkingPaid(null)} />}
       {paying && <InvoicePayments invoice={invoices?.find((i) => i.id === paying.id) || paying} onClose={() => setPaying(null)} onPreview={setPreview} />}
       {/* after the payments window, so a credit note opened from it shows on top */}

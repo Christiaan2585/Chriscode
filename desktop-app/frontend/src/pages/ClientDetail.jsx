@@ -1,4 +1,4 @@
-import { t } from "../utils/i18n";
+import { dateLocale, t } from "../utils/i18n";
 import { deleteConfirm } from "../utils/confirmText";
 import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
@@ -24,6 +24,8 @@ import { downloadDocumentPdf, orderFormFor, invoiceDoc, quoteDoc, markQuoteSent,
 import { farmLabel, money, statusStyle } from "../utils/format";
 
 
+const CALL_QUICK = ["Phoned - no answer", "Phoned - will pay", "Phoned - wants a quote", "Phoned - order placed"];
+
 const ClientDetail = () => {
   const { id } = useParams();
   const queryClient = useQueryClient();
@@ -33,6 +35,7 @@ const ClientDetail = () => {
 
   const [noteContent, setNoteContent] = useState("");
   const [noteReminderDate, setNoteReminderDate] = useState("");
+  const [noteKind, setNoteKind] = useState(""); // "call" when logging a phone call
   const [isEditClientOpen, setIsEditClientOpen] = useState(false);
   const [clientForm, setClientForm] = useState(null);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
@@ -89,12 +92,14 @@ const ClientDetail = () => {
           client_id: Number(id),
           content: data.content,
           reminder_date: data.reminder_date || null,
+          kind: data.kind || null,
         })
       ).data,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notes", id] });
       setNoteContent("");
       setNoteReminderDate("");
+      setNoteKind("");
     },
   });
 
@@ -354,6 +359,10 @@ const ClientDetail = () => {
                 <div key={n.id} className="p-3 bg-amber-50 border border-amber-100 rounded-lg text-sm">
                   <div className="flex justify-between items-start gap-2">
                     <div>
+                      <p className="text-xs font-medium text-slate-500">
+                        {n.kind === "call" && <><Phone size={12} className="mr-1 inline" aria-hidden="true" />{t("Call")} · </>}
+                        {n.author ? `${n.author} · ` : ""}{n.created_at ? new Date(n.created_at).toLocaleDateString(dateLocale, { day: "numeric", month: "short" }) : ""}
+                      </p>
                       <p className="text-slate-700">{n.content}</p>
                       {n.reminder_date && (
                         <p className="text-xs text-amber-600 mt-1">
@@ -397,8 +406,16 @@ const ClientDetail = () => {
               )}
             </div>
             <div className="space-y-2 pt-3 border-t border-slate-100">
+              <div className="flex flex-wrap gap-1" role="group" aria-label={t("Log a call")}>
+                {CALL_QUICK.map((text) => (
+                  <button key={text} type="button" onClick={() => { setNoteKind("call"); setNoteContent(text); }}
+                    className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:border-emerald-400 hover:text-emerald-700">
+                    <Phone size={11} aria-hidden="true" /> {t(text)}
+                  </button>
+                ))}
+              </div>
               <textarea
-                placeholder={t("Add a note or reminder...")}
+                placeholder={noteKind === "call" ? t("What was said on the call?") : t("Add a note or reminder...")}
                 value={noteContent}
                 onChange={(e) => setNoteContent(e.target.value)}
                 className="w-full p-2 border border-slate-200 rounded-lg text-sm"
@@ -413,10 +430,10 @@ const ClientDetail = () => {
                 />
                 <button
                   disabled={!noteContent || addNoteMutation.isPending}
-                  onClick={() => addNoteMutation.mutate({ content: noteContent, reminder_date: noteReminderDate })}
+                  onClick={() => addNoteMutation.mutate({ content: noteContent, reminder_date: noteReminderDate, kind: noteKind })}
                   className="bg-emerald-600 text-white px-3 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
                 >
-                  {t("Add")}
+                  {noteKind === "call" ? t("Log call") : t("Add")}
                 </button>
               </div>
             </div>

@@ -1,16 +1,16 @@
 # Statements, aged debtors and the accountant's export (logic in app/core/reports.py).
 # Behind main.py's router-wide sign-in; the accountant's export is admin-only.
 from datetime import date, timedelta
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlmodel import Session
 
-from app.core import reports, statement_mail
+from app.core import reminder_mail, reports, statement_mail
 from app.core.db import get_session
-from app.core.security import require_admin
+from app.core.security import require_admin, require_full_access
 from app.models.client import Client
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
@@ -31,7 +31,7 @@ def _client_or_404(session: Session, client_id: int) -> Client:
     return client
 
 
-@router.get("/aged-debtors")
+@router.get("/aged-debtors", dependencies=[Depends(require_full_access)])
 def aged_debtors(session: Session = Depends(get_session)):
     return reports.aged_debtors(session, date.today())
 
@@ -63,6 +63,22 @@ class EmailStatements(BaseModel):
     client_ids: list[int] = Field(max_length=statement_mail.MAX_CLIENTS)
     start: Optional[date] = None
     end: Optional[date] = None
+
+
+class EmailReminders(BaseModel):
+    invoice_ids: List[int]
+
+
+@router.get("/reminders/overdue")
+def overdue_for_reminders(session: Session = Depends(get_session)):
+    """Every overdue, still-unpaid invoice with what is owed and the client's email address."""
+    return reminder_mail.overdue_invoices(session, date.today())
+
+
+@router.post("/reminders/email")
+def email_reminders(body: EmailReminders, session: Session = Depends(get_session)):
+    """Payment reminders by email for the chosen invoices (see app/core/reminder_mail.py)."""
+    return reminder_mail.email_reminders(session, body.invoice_ids, date.today())
 
 
 @router.post("/statements/email")

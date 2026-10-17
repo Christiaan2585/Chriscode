@@ -8,4 +8,6 @@ class ClientNote(SQLModel, table=True):
     content: str
     reminder_date: Optional[datetime] = None
     is_completed: bool = False
+    kind: Optional[str] = None  # "call" for a call-log entry, blank for an ordinary note
+    author: Optional[str] = None  # who wrote it (kept as text, so it still reads right after the account is gone)
     created_at: datetime = Field(default_factory=datetime.utcnow)

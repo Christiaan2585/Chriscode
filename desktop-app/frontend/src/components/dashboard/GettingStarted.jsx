@@ -56,6 +56,7 @@ const GettingStarted = () => {
           </li>
         ))}
       </ul>
+      <Link to="/setup" className="mt-4 inline-block text-sm font-medium text-emerald-700 hover:underline">{t("Walk me through it, one step at a time")}</Link>
     </section>
   );
 };

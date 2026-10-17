@@ -10,6 +10,8 @@ import { sendDocument, sendLink } from "../utils/sending";
 import { isNativeApp } from "../utils/nativeFiles";
 import { describeSend, sendKindOf } from "../utils/sends";
 import { useRecordSend, useSends } from "../utils/useSends";
+import { sendChecks } from "../utils/sendChecks";
+import { AlertTriangle } from "lucide-react";
 
 const sendButton =
   "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-emerald-400 disabled:opacity-50";
@@ -46,8 +48,20 @@ const SendButtons = ({ blob, filename, send, doc }) => {
   };
   const noPhone = !sendLink("whatsapp", send);
   const noEmail = !sendLink("email", send);
+  // "Check before sending": what is wrong with the document or the client's details, found before it goes.
+  const checks = [
+    ...sendChecks({ kind: doc.check?.kind, client: { email: send.email, phone: send.phone }, doc: doc.check, via: "email" }),
+    ...sendChecks({ kind: doc.check?.kind, client: { email: send.email, phone: send.phone }, via: "whatsapp" }),
+  ];
   return (
     <>
+      {checks.length > 0 && (
+        <ul role="status" aria-label={t("Check before sending")} className="basis-full space-y-0.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {checks.map((c) => (
+            <li key={c.text} className="flex items-start gap-2"><AlertTriangle size={14} className="mt-0.5 shrink-0" /> {c.text}</li>
+          ))}
+        </ul>
+      )}
       <button type="button" className={sendButton} disabled={!blob || busy || noPhone} onClick={() => go("whatsapp")}
         title={noPhone ? "This client has no phone number" : "Send on WhatsApp"}>
         <MessageCircle size={16} /> WhatsApp

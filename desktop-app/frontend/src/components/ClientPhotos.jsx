@@ -5,6 +5,8 @@ import { Camera, Trash2 } from "lucide-react";
 import apiClient from "../api/client";
 import Modal from "./Modal";
 import { shortDate } from "../utils/format";
+import { isNative } from "../utils/pairing";
+import { PHOTOS_SENT } from "../utils/outbox";
 
 const MAX_BYTES = 12 * 1024 * 1024;
 const field = "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500";
@@ -20,6 +22,17 @@ const ClientPhotos = ({ clientId }) => {
   const [caption, setCaption] = useState("");
   const [problem, setProblem] = useState("");
   const [viewing, setViewing] = useState(null); // { photo, url }
+  const [waiting, setWaiting] = useState(0); // photos kept on the phone until the office PC can be reached
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (!isNative()) return undefined;
+    const refresh = () => import("../offline/photos").then(({ photoQueue }) => photoQueue.count(clientId)).then(setWaiting, () => {});
+    const sent = () => { refresh(); setNotice(""); queryClient.invalidateQueries({ queryKey: key }); };
+    refresh();
+    window.addEventListener(PHOTOS_SENT, sent);
+    return () => window.removeEventListener(PHOTOS_SENT, sent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
 
   useEffect(() => () => { if (chosen?.url) URL.revokeObjectURL(chosen.url); }, [chosen]);
   useEffect(() => () => { if (viewing?.url) URL.revokeObjectURL(viewing.url); }, [viewing]);
@@ -29,9 +42,21 @@ const ClientPhotos = ({ clientId }) => {
       const form = new FormData();
       form.append("file", chosen.file);
       form.append("caption", caption);
-      return (await apiClient.post(`/photos/client/${clientId}`, form, { headers: { "Content-Type": "multipart/form-data" }, silent: true })).data;
+      try {
+        return (await apiClient.post(`/photos/client/${clientId}`, form, { headers: { "Content-Type": "multipart/form-data" }, silent: true, queueable: true })).data;
+      } catch (err) {
+        if (err?.response || !isNative()) throw err; // a real refusal (or the PC app itself): show it
+        // On the phone with no signal: keep the photo on the phone and send it when the office PC can be reached.
+        const { photoQueue } = await import("../offline/photos");
+        await photoQueue.add({ clientId, caption, name: chosen.file.name, type: chosen.file.type, bytes: await chosen.file.arrayBuffer() });
+        return { queued: true };
+      }
     },
-    onSuccess: () => { setChosen(null); setCaption(""); setProblem(""); queryClient.invalidateQueries({ queryKey: key }); },
+    onSuccess: (result) => {
+      setChosen(null); setCaption(""); setProblem("");
+      if (result?.queued) { setWaiting((n) => n + 1); setNotice(t("Saved on this phone. It will be added when the office PC can be reached.")); } else setNotice("");
+      queryClient.invalidateQueries({ queryKey: key });
+    },
     onError: (err) => setProblem(err?.response?.data?.detail?.toString?.() || "That didn't upload."),
   });
   const remove = useMutation({
@@ -67,6 +92,8 @@ const ClientPhotos = ({ clientId }) => {
         <input ref={picker} type="file" accept="image/*" className="hidden" onChange={(e) => { choose(e.target.files?.[0]); e.target.value = ""; }} />
       </div>
       {problem && !chosen && <p role="alert" className="mb-2 text-sm text-red-600">{problem}</p>}
+      {notice && <p role="status" className="mb-2 text-sm text-emerald-700">{notice}</p>}
+      {waiting > 0 && <p className="mb-2 text-sm text-amber-700">{t("{n} waiting to be added when the office PC can be reached.", { n: waiting })}</p>}
       {photos.length === 0 ? (
         <p className="text-sm text-slate-500">{t("No photos yet. Add one of an animal, a gate or a delivery and it stays with this client.")}</p>
       ) : (

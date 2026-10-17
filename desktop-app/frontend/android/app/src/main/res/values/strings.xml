@@ -4,4 +4,7 @@
     <string name="title_activity_main">Sandveld Vee Dienste</string>
     <string name="package_name">com.sandveldveedienste.app</string>
     <string name="custom_url_scheme">com.sandveldveedienste.app</string>
+    <string name="shortcut_new_client">New client</string>
+    <string name="shortcut_new_invoice">New invoice</string>
+    <string name="shortcut_new_quote">New quote</string>
 </resources>

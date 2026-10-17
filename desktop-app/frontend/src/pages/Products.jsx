@@ -45,6 +45,7 @@ const ViewButton = ({ active, onClick, Icon, children }) => (
 
 // Spreadsheet-style table: every cell is editable in place.
 const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, selection }) => {
+  const limited = Boolean(useAuth().user?.limited); // limited staff never see what a product costs
   const patch = useProductPatch();
   const queryClient = useQueryClient();
   // A count is its own action (it is written to the stock history), not a field edit.
@@ -66,7 +67,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
           <tr>
             <SelectAllTh selection={selection} />
             {["Product", "Code", "Category", "Pack Size", "Packaging"].map((h) => <th key={h} className="px-4 py-3 font-medium">{h}</th>)}
-            {["Stock", "Reorder at", "Cost", "Excl VAT", "Incl VAT"].map((h) => <th key={h} className="px-4 py-3 font-medium text-right">{h}</th>)}
+            {["Stock", "Reorder at", "Cost", "Excl VAT", "Incl VAT"].filter((h) => !(limited && h === "Cost")).map((h) => <th key={h} className="px-4 py-3 font-medium text-right">{h}</th>)}
             <th className="px-4 py-3 font-medium text-right">{t("Actions")}</th>
           </tr>
         </thead>
@@ -94,7 +95,7 @@ const ProductTable = ({ products, thumbnails, onOpenPicture, onEdit, onDelete, s
                 <InlineEdit value={p.stock_quantity} onSave={saveCount(p.id)} label={t("Stock on the shelf (a count)")} type="number" placeholder={t("Count")} />
               </td>
               <td data-label={t("Reorder at")} className={`${cell} text-right text-slate-500`}><InlineEdit value={p.reorder_level} onSave={save(p.id, "reorder_level")} label={t("Reorder level")} type="number" placeholder="—" /></td>
-              <td data-label={t("Cost")} className={`${cell} text-right text-slate-600`}><InlineEdit value={p.cost} onSave={saveCost(p.id)} label={t("Cost")} type="number" format={money} placeholder="—" /></td>
+              {!limited && <td data-label={t("Cost")} className={`${cell} text-right text-slate-600`}><InlineEdit value={p.cost} onSave={saveCost(p.id)} label={t("Cost")} type="number" format={money} placeholder="—" /></td>}
               <td data-label={t("Price excl VAT")} className={`${cell} text-right text-slate-600`}><InlineEdit value={p.price_excl_vat} onSave={save(p.id, "price_excl_vat")} label={t("Selling price excl VAT")} type="number" format={money} placeholder="—" /></td>
               <td data-label={t("Price incl VAT")} data-key className={`${cell} text-right font-semibold text-slate-800`}><InlineEdit value={p.price} onSave={save(p.id, "price")} label={t("Selling price incl VAT")} type="number" required format={money} /></td>
               <td data-actions className={`${cell} text-right`}>
@@ -391,10 +392,12 @@ const Products = () => {
             </div>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">{t("Cost (excl VAT)")}</label>
-              <input type="number" value={form.cost} onChange={(e) => handleCostChange(e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-sm" />
-            </div>
+            {!user?.limited && (
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">{t("Cost (excl VAT)")}</label>
+                <input type="number" value={form.cost} onChange={(e) => handleCostChange(e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-sm" />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">{t("Selling excl VAT")}</label>
               <input type="number" value={form.price_excl_vat} onChange={(e) => setForm({ ...form, price_excl_vat: e.target.value })}

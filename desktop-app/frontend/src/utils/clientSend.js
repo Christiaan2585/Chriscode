@@ -75,6 +75,7 @@ export const quoteDoc = (quote, client, onSent) => ({
   kind: "quote",
   id: quote.id,
   title: quote.number,
+  check: { kind: "quote", total_amount: quote.total_amount, expiry_date: quote.expiry_date, status: quote.status }, // for "check before sending"
   send: { ...contact(client), ...render(client, "quote", { number: quote.number || "" }), onSent },
 });
 
@@ -83,6 +84,7 @@ export const invoiceDoc = (invoice, client) => ({
   kind: "invoice",
   id: invoice.id,
   title: invoice.number,
+  check: { kind: "invoice", total_amount: invoice.total_amount, status: invoice.status },
   send: { ...contact(client), ...render(client, "invoice", { number: invoice.number || "" }) },
 });
 

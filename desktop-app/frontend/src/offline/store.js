@@ -49,6 +49,10 @@ export const secure = {
 
 const sealer = createSealer(secure);
 
+// Sealing for other things the phone must keep safe at rest (offline/photos.js): the same key, the same format.
+export const seal = (value) => sealer.seal(value);
+export const unseal = (stored) => sealer.open(stored);
+
 // The saved answers (cachingAdapter's `store`): sealed on the way in, opened on the way out.
 export const savedCopy = {
   get: async (key) => sealer.open(await run(RESPONSES, "readonly", (s) => s.get(key))),

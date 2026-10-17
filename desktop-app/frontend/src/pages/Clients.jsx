@@ -14,6 +14,7 @@ import { clientService } from "../api/services";
 import apiClient from "../api/client";
 import { toTelLink, toWhatsAppLink } from "../utils/contact";
 import Modal from "../components/Modal";
+import DuplicateWarning from "../components/DuplicateWarning";
 import { ClientHover } from "../components/PreviewCards";
 import { farmLabel } from "../utils/format";
 import { NO_TOWN, SORTS, filterAndSort, townsOf } from "../utils/clientList";
@@ -297,6 +298,7 @@ const Clients = () => {
               className="w-full p-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
             />
           </div>
+          <DuplicateWarning fields={form} excludeId={editingId || undefined} />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">{t("Email Address")}</label>

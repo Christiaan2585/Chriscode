@@ -13,7 +13,7 @@ import re
 from fastapi.responses import Response
 from app.core.db import get_session
 from app.core.uploads import read_capped, read_table
-from app.core import cascade, herding, trash
+from app.core import cascade, duplicates, herding, trash
 from pydantic import BaseModel
 from app.core.security import require_admin
 from app.models.animal import Animal
@@ -60,6 +60,13 @@ def create_client(client: Client, session: Session = Depends(get_session)):
     herding.ensure_standard_programs(session, client.id)  # every client starts with the standard herding program
     session.refresh(client)
     return client
+
+@router.get("/duplicates")
+def find_duplicates(name: Optional[str] = None, phone: Optional[str] = None, email: Optional[str] = None,
+                    farm_name: Optional[str] = None, exclude_id: Optional[int] = None, session: Session = Depends(get_session)):
+    """Clients already on file with the same phone, email, farm name or name - shown as a warning before saving."""
+    return duplicates.find(session, name, phone, email, farm_name, exclude_id)
+
 
 # --- The client's tax certificate: a PDF or picture kept on their page ---
 

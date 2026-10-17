@@ -1,6 +1,8 @@
 import { dateLocale, t } from "../utils/i18n";
 import React, { useRef, useState } from "react";
 import GettingStarted from "../components/dashboard/GettingStarted";
+import TodayCard from "../components/dashboard/TodayCard";
+import ActivityFeed from "../components/dashboard/ActivityFeed";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
@@ -65,6 +67,8 @@ const Dashboard = () => {
 
       <GettingStarted />
 
+      <TodayCard />
+
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard to="/clients" icon={<Users className="text-emerald-600" />} label={t("Total Clients")} value={value(clientsQuery.data?.length ?? 0)} />
         <StatCard icon={<TrendingUp className="text-purple-600" />} label={t("Total Revenue")} value={value(money(revenueQuery.data?.total_revenue))}
@@ -119,6 +123,8 @@ const Dashboard = () => {
         <TopClients rows={board?.top_clients} />
         <TopProducts rows={board?.top_products} />
       </div>
+
+      <ActivityFeed />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Visits appointments={appointmentsQuery.data} clients={clientsQuery.data} />

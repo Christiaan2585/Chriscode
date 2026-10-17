@@ -1,4 +1,5 @@
 import { t } from "../utils/i18n";
+import DuplicateWarning from "./DuplicateWarning";
 import React, { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import apiClient from "../api/client";
@@ -50,6 +51,7 @@ const ClientPicker = ({ value, onChange, clients }) => {
             <select className={field} value={draft.language} onChange={(e) => setDraft({ ...draft, language: e.target.value })}>
               <option value="">{t("English")}</option><option value="af">Afrikaans</option>
             </select></label>
+          <DuplicateWarning fields={draft} />
           <p className="text-xs text-slate-500">{t("You can add the farm, addresses and the rest later on the client's page.")}</p>
           {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700">{error}</p>}
           <button type="submit" disabled={create.isPending || !draft.name.trim()} className="rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700 disabled:opacity-50">

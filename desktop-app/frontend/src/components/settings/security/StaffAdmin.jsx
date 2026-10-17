@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, LogOut, ShieldOff, Trash2, Unlock, UserPlus, Users as UsersIcon } from "lucide-react";
+import { KeyRound, Lock, LogOut, ShieldOff, Trash2, Unlock, UserPlus, Users as UsersIcon } from "lucide-react";
 import { authService } from "../../../api/authService";
 import { useAuth } from "../../../context/AuthContext";
 import Avatar from "../../Avatar";
@@ -19,7 +19,7 @@ const Action = ({ title, onClick, children, danger }) => (
 const StaffAdmin = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [newUser, setNewUser] = useState({ name: "", email: "", password: "", is_admin: false });
+  const [newUser, setNewUser] = useState({ name: "", email: "", password: "", is_admin: false, limited: false });
   const [message, setMessage] = useState(null); // {ok, text}
   const [reset, setReset] = useState(null); // {user, password}
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["auth-users"] });
@@ -31,7 +31,7 @@ const StaffAdmin = () => {
     mutationFn: (payload) => authService.addUser(payload),
     onSuccess: () => {
       say(true, "Added. They will be asked to choose their own password when they first sign in.");
-      setNewUser({ name: "", email: "", password: "", is_admin: false });
+      setNewUser({ name: "", email: "", password: "", is_admin: false, limited: false });
       refresh();
     },
     onError: (e) => say(false, detailOf(e, "Could not add the user.")),
@@ -56,12 +56,19 @@ const StaffAdmin = () => {
               <span>
                 {u.name} <span className="text-slate-400">({u.email})</span>
                 {u.is_admin && <span className="ml-1 rounded bg-slate-100 px-1.5 text-xs">admin</span>}
+                {u.limited && <span className="ml-1 rounded bg-amber-100 px-1.5 text-xs text-amber-800" title="Can't see cost prices or the money reports">limited</span>}
                 {u.two_step_enabled && <span className="ml-1 rounded bg-emerald-100 px-1.5 text-xs text-emerald-700">2-step</span>}
                 {u.locked && <span className="ml-1 rounded bg-red-100 px-1.5 text-xs text-red-700">locked</span>}
               </span>
             </span>
             {u.id !== user.id && (
               <span className="flex items-center">
+                {!u.is_admin && (
+                  <Action title={u.limited ? `Give ${u.name} full staff access again` : `Limit ${u.name}: hide cost prices and the money reports`}
+                    onClick={act(u.limited ? "Full staff access restored." : "Limited: they no longer see cost prices or the money reports.", () => authService.setLimited(u.id, !u.limited))}>
+                    <Lock size={15} />
+                  </Action>
+                )}
                 {u.locked && <Action title={`Unlock ${u.name}`} onClick={act("Unlocked.", () => authService.unlockUser(u.id))}><Unlock size={15} /></Action>}
                 <Action title={`Set a new temporary password for ${u.name}`} onClick={() => setReset({ user: u, password: "" })}><KeyRound size={15} /></Action>
                 <Action title={`Sign ${u.name} out everywhere`} onClick={act("Signed out everywhere.", () => authService.signOutUser(u.id))}><LogOut size={15} /></Action>
@@ -85,7 +92,10 @@ const StaffAdmin = () => {
           <PasswordHint password={newUser.password} email={newUser.email} name={newUser.name} />
         </div>
         <label className="col-span-2 flex items-center gap-2 text-xs text-slate-500">
-          <input type="checkbox" checked={newUser.is_admin} onChange={(e) => setNewUser({ ...newUser, is_admin: e.target.checked })} /> Make this person an admin too
+          <input type="checkbox" checked={newUser.is_admin} onChange={(e) => setNewUser({ ...newUser, is_admin: e.target.checked, limited: e.target.checked ? false : newUser.limited })} /> Make this person an admin too
+        </label>
+        <label className="col-span-2 flex items-center gap-2 text-xs text-slate-500">
+          <input type="checkbox" disabled={newUser.is_admin} checked={newUser.limited} onChange={(e) => setNewUser({ ...newUser, limited: e.target.checked })} /> Limited: hide cost prices and the money reports from this person
         </label>
         <button type="submit" disabled={add.isPending} className={`${primary} col-span-2 flex items-center justify-center gap-2`}><UserPlus size={14} /> Add teammate</button>
       </form>

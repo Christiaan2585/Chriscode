@@ -44,7 +44,7 @@ class ProductPatchTests(unittest.TestCase):
         self.engine.dispose()
 
     def patch(self, **fields):
-        return products.patch_product(self.p.id, products.ProductPatch(**fields), session=self.s)
+        return products.patch_product(self.p.id, products.ProductPatch(**fields), session=self.s, user=User(name="Boss", email="b@example.com"))
 
     def test_one_field_at_a_time(self):
         out = self.patch(description="Pour-on dip for ticks")
@@ -69,7 +69,7 @@ class ProductPatchTests(unittest.TestCase):
 
     def test_unknown_product_404(self):
         with self.assertRaises(HTTPException) as ctx:
-            products.patch_product(9999, products.ProductPatch(name="x"), session=self.s)
+            products.patch_product(9999, products.ProductPatch(name="x"), session=self.s, user=User(name="Boss", email="b@example.com"))
         self.assertEqual(ctx.exception.status_code, 404)
 
 

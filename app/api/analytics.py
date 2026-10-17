@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import date, datetime
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select, func
 from typing import Dict
 from app.core.db import get_session
-from app.core import dashboard
+from app.core import dashboard, today as today_summary
 from app.models.client import Client
 from app.models.invoice import Invoice
 from app.models.quote import Quote
@@ -76,3 +76,8 @@ def get_dashboard(session: Session = Depends(get_session)):
     """Money owed, quotes waiting, the "needs attention" list, program money and
     the top clients and products - see app/core/dashboard.py."""
     return dashboard.build_dashboard(session)
+
+@router.get("/today")
+def get_today(session: Session = Depends(get_session)):
+    """What was done today (invoices, payments, sends, new clients) and what is still waiting."""
+    return today_summary.summary(session, date.today())

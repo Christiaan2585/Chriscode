@@ -21,19 +21,24 @@ from app.models.product import Product, ProductImage, StockMovement
 router = APIRouter(prefix="/products", tags=["Products"])
 
 
+def _for(user: User, product: Product) -> Product:
+    """Limited staff never see what a product costs the business; a copy, so the stored row is untouched."""
+    return product.model_copy(update={"cost": None}) if user.limited and not user.is_admin else product
+
+
 @router.post("/", response_model=Product)
-def create_product(product: Product, session: Session = Depends(get_session)):
+def create_product(product: Product, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
     product.id = None  # the database picks the number
     product.stock_quantity = None  # stock only changes through a count (POST /products/{id}/stock-count)
     session.add(product)
     session.commit()
     session.refresh(product)
-    return product
+    return _for(user, product)
 
 
 @router.get("/", response_model=List[Product])
-def read_products(session: Session = Depends(get_session)):
-    return session.exec(select(Product)).all()
+def read_products(session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    return [_for(user, p) for p in session.exec(select(Product)).all()]
 
 
 MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024  # phone photos are a few MB
@@ -156,11 +161,13 @@ def stock_history(product_id: int, session: Session = Depends(get_session)):
 
 
 @router.patch("/{product_id}", response_model=Product)
-def patch_product(product_id: int, changes: ProductPatch, session: Session = Depends(get_session)):
+def patch_product(product_id: int, changes: ProductPatch, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
     product = session.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     for key, value in changes.model_dump(exclude_unset=True).items():
+        if key == "cost" and user.limited and not user.is_admin:
+            continue  # limited staff can't see the cost, so they can't overwrite it blind
         if isinstance(value, str):
             value = value.strip() or None
         if key in ("name", "price") and value is None:
@@ -169,22 +176,23 @@ def patch_product(product_id: int, changes: ProductPatch, session: Session = Dep
     session.add(product)
     session.commit()
     session.refresh(product)
-    return product
+    return _for(user, product)
 
 
 @router.put("/{product_id}", response_model=Product)
-def update_product(product_id: int, product_data: Product, session: Session = Depends(get_session)):
+def update_product(product_id: int, product_data: Product, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
     db_product = session.get(Product, product_id)
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    for key, value in product_data.dict(exclude_unset=True, exclude={"id", "stock_quantity"}).items():
+    hidden = {"id", "stock_quantity"} | ({"cost"} if user.limited and not user.is_admin else set())
+    for key, value in product_data.dict(exclude_unset=True, exclude=hidden).items():
         setattr(db_product, key, value)
 
     session.add(db_product)
     session.commit()
     session.refresh(db_product)
-    return db_product
+    return _for(user, db_product)
 
 
 @router.delete("/{product_id}", dependencies=[Depends(require_admin)])

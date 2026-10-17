@@ -11,6 +11,10 @@
 // - "quote-create": POST /quotes/ then POST the items, so the quote's
 //   number is only ever assigned by the PC when the job actually runs.
 import apiClient from "../api/client";
+import { isNative } from "./pairing";
+
+/** Fired (window event) when queued photos have gone up, so a client page can refresh. */
+export const PHOTOS_SENT = "sandveld-photos-sent";
 
 const KEY = "sandveld_outbox_v1";
 const listeners = new Set();
@@ -112,7 +116,19 @@ export async function flushOutbox() {
 }
 
 export function startOutboxAutoFlush() {
-  const tryFlush = () => flushOutbox();
+  // Photos taken with no signal go up the same way (phone only; offline/photos.js is not even loaded on the PC).
+  const tryFlush = async () => {
+    await flushOutbox();
+    if (isNative()) {
+      try {
+        const { flushPhotos } = await import("../offline/photos");
+        const done = await flushPhotos();
+        if (done?.sent) window.dispatchEvent(new Event(PHOTOS_SENT));
+      } catch {
+        // storage unavailable: the next trigger tries again
+      }
+    }
+  };
   window.addEventListener("online", tryFlush);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") tryFlush();

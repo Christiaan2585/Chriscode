@@ -1,4 +1,5 @@
 import { t } from "../utils/i18n";
+import { useAuth } from "../context/AuthContext";
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -25,7 +26,7 @@ const Period = ({ value, onChange }) => (
 );
 
 // Who owes what and for how long (app/core/reports.py), statements per client, and the bookkeeper's Excel file.
-const Reports = () => {
+const ReportsPage = () => {
   const { data } = useQuery({ queryKey: ["aged-debtors"], queryFn: async () => (await apiClient.get("/reports/aged-debtors")).data });
   const { data: clients } = useQuery({ queryKey: ["clients"], queryFn: clientService.getAll });
   const [statementPeriod, setStatementPeriod] = useState({ start: daysAgo(90), end: daysAgo(0) });
@@ -136,6 +137,13 @@ const Reports = () => {
       <DocumentPreview doc={preview} onClose={() => setPreview(null)} />
     </div>
   );
+};
+
+const Reports = () => {
+  const { user } = useAuth();
+  return user?.limited
+    ? <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-amber-900">{t("The money reports aren't available on your account. Ask an admin if you need one.")}</p>
+    : <ReportsPage />;
 };
 
 export default Reports;
