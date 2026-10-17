@@ -38,6 +38,7 @@ _SPECIAL = [
     ("POST", r"^/devices/relay/new-key$", "Made a new relay key for phones", "phone"),
     ("POST", r"^/mail/send$", "Emailed a document", "email"),
     ("PUT", r"^/mail/settings$", "Changed the email settings", "email"),
+    ("PUT|DELETE", r"^/auth/google-config$", "Changed the Google sign-in settings", "sign-in"),
     ("POST", r"^/trash/(\d+)/restore$", "Restored from the recycle bin", "recycle bin"),
     ("DELETE", r"^/trash/(\d+)$", "Deleted for good from the recycle bin", "recycle bin"),
     ("GET", r"^/reports/accounting\.xlsx$", "Exported the accounts to Excel", "export"),

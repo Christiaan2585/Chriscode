@@ -7,6 +7,8 @@ signs in with email + password instead. Nothing else changes.
 
 This takes about 5 minutes and is free.
 
+> **Easier way (version 1.0.21 and later):** open **Settings -> Sign in with Google** in the app (admins, on the office PC). It has a button for each Google step, and you add the key by choosing the .json file Google gives you or pasting what it shows - no file editing and no restart. The steps below are still correct and explain what each Google screen is for.
+
 ## 1. Create a Google Cloud project (skip if you already have one)
 
 1. Go to [console.cloud.google.com](https://console.cloud.google.com/).

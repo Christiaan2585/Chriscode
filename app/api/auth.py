@@ -15,6 +15,7 @@ from sqlmodel import Session, select
 
 from app.core import audit, field_crypto, password_policy, totp
 from app.core.db import get_session
+from app.core import google_oauth
 from app.core.google_oauth import exchange_code_for_profile, get_google_client_id, is_google_login_enabled
 from app.core.security import (
     MAX_PIN_ATTEMPTS,
@@ -381,7 +382,7 @@ def google_callback(payload: GoogleCallbackRequest, request: Request = None, ses
     try:
         profile = exchange_code_for_profile(payload.code, payload.code_verifier, payload.redirect_uri, payload.nonce)
     except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=google_oauth.friendly_error(str(exc)))
 
     user = session.exec(select(User).where(User.google_sub == profile["sub"])).first()
     if user is None:
@@ -588,6 +589,39 @@ def set_limited(user_id: int, body: LimitedChange, _: User = Depends(require_adm
     session.commit()
     session.refresh(user)
     return UserOut.from_user(user, session)
+
+
+class GoogleConfigIn(BaseModel):
+    client_id: str
+    client_secret: str
+
+
+def _pc_only(request: Optional[Request]) -> None:
+    if _on_phone(request):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This can only be done on the office PC")
+
+
+@router.get("/google-config")
+def read_google_config(_: User = Depends(require_admin)):
+    """Whether "Sign in with Google" is set up (admins). The secret is never returned."""
+    return google_oauth.summary()
+
+
+@router.put("/google-config")
+def save_google_config(body: GoogleConfigIn, request: Request = None, _: User = Depends(require_admin)):
+    _pc_only(request)
+    try:
+        google_oauth.save_config(body.client_id, body.client_secret)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    return google_oauth.summary()
+
+
+@router.delete("/google-config")
+def delete_google_config(request: Request = None, _: User = Depends(require_admin)):
+    _pc_only(request)
+    google_oauth.clear_config()
+    return google_oauth.summary()
 
 
 @router.delete("/users/{user_id}")

@@ -3,6 +3,19 @@
 // people will notice. (Never put the business's program steps, products or doses here: the repository is public.)
 export const NOTES = [
   {
+    version: "1.0.21",
+    title: "Sign in with Google, made easy",
+    sections: [
+      {
+        heading: "New",
+        items: [
+          "Settings now has a Sign in with Google page for admins: three buttons open the right Google pages, then you choose the file Google gives you (or paste what it shows) and switch it on. No more editing files by hand, and no restart.",
+          "If Google sign-in fails, the message now says what to do about it.",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.20",
     title: "Quicker everyday work",
     sections: [

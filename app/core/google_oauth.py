@@ -1,8 +1,11 @@
 import json
 import os
+import re
 from typing import Optional
 
 import requests
+
+from app.core import field_crypto
 
 # Kept outside the app/ package (and gitignored) since it holds a real
 # external credential once filled in - see SETUP_GOOGLE_LOGIN.md at the
@@ -27,9 +30,72 @@ GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 def _read_config() -> dict:
     try:
         with open(_CONFIG_PATH, "r") as f:
-            return json.load(f)
+            config = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
+    try:
+        config["client_secret"] = field_crypto.decrypt(config.get("client_secret"))  # plain text from an older hand-made file reads as it is
+    except field_crypto.Unreadable:
+        config["client_secret"] = None  # saved on another PC: set it up again here
+    return config
+
+
+_CLIENT_ID = re.compile(r"^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$")
+
+
+def clean_client_id(value: Optional[str]) -> str:
+    value = (value or "").strip()
+    if not _CLIENT_ID.match(value):
+        raise ValueError("That doesn't look like a Google Client ID. It is a long number followed by .apps.googleusercontent.com")
+    return value
+
+
+def clean_client_secret(value: Optional[str]) -> str:
+    value = (value or "").strip()
+    if not 10 <= len(value) <= 200 or re.search(r"\s", value):
+        raise ValueError("That doesn't look like a Google Client secret. Copy it again without spaces (it often starts with GOCSPX-)")
+    return value
+
+
+def save_config(client_id: str, client_secret: str) -> None:
+    """Turns Google sign-in on. The secret is stored encrypted (it is never sent back to the screen); takes effect at once."""
+    config = {"client_id": clean_client_id(client_id), "client_secret": field_crypto.encrypt(clean_client_secret(client_secret))}
+    os.makedirs(os.path.dirname(_CONFIG_PATH), exist_ok=True)
+    partial = _CONFIG_PATH + ".partial"
+    with open(partial, "w", encoding="utf-8") as f:
+        json.dump(config, f)
+    os.replace(partial, _CONFIG_PATH)
+
+
+def friendly_error(message: str) -> str:
+    """Google's own wording ("invalid_client", a JSON blob) turned into what the person can do about it."""
+    text = (message or "").lower()
+    if "invalid_client" in text or "unauthorized_client" in text:
+        return "Google didn't accept the Client ID or secret saved in Settings. An admin can check them under Settings, Sign in with Google."
+    if "invalid_grant" in text or "expired" in text:
+        return "That Google sign-in expired or was already used. Please try again."
+    if "redirect_uri" in text:
+        return "Google refused the sign-in address. In Google Cloud the client must be of type Desktop app. An admin can set it up again under Settings, Sign in with Google."
+    if "not configured" in text:
+        return "Sign in with Google isn't set up yet. An admin can do that under Settings, Sign in with Google."
+    if "not verified" in text:
+        return "Google says this account's email address isn't verified, so it can't be used to sign in."
+    if "nonce" in text or "client mismatch" in text:
+        return "That Google sign-in failed a safety check. Please try again."
+    return "Google sign-in didn't work. Please try again, or sign in with your email and password."
+
+
+def clear_config() -> None:
+    try:
+        os.remove(_CONFIG_PATH)
+    except FileNotFoundError:
+        pass
+
+
+def summary() -> dict:
+    """What the Settings screen may know: whether it is on and which Client ID - never the secret."""
+    config = _read_config()
+    return {"enabled": is_google_login_enabled(), "client_id": config.get("client_id") or None, "has_secret": bool(config.get("client_secret"))}
 
 
 def get_google_client_id() -> Optional[str]:

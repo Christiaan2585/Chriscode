@@ -23,6 +23,7 @@ import RemindersSetting from "./RemindersSetting";
 import RecycleBin from "./RecycleBin";
 import EmailSettings from "./EmailSettings";
 import MessageWording from "./MessageWording";
+import GoogleSignInSettings from "./GoogleSignInSettings";
 import BackupSettings from "./BackupSettings";
 import {
   CalculatorPanel, CalendarPanel, ClientsPanel, InvoicesPanel, OrdersPanel, ProductsPanel, PurchaseOrdersPanel,
@@ -144,6 +145,7 @@ export const GROUPS = [
       { id: "phones", label: t("Phones"), subtitle: t("Pair staff phones"), Icon: Smartphone, color: "bg-green-500", Panel: PhonesPanel, show: ({ user }) => isNative() || Boolean(user?.is_admin) },
       { id: "activity", label: t("Activity log"), subtitle: t("Who changed what"), Icon: History, color: "bg-slate-600", Panel: ActivityLog, show: ({ user }) => Boolean(user?.is_admin) },
       { id: "email", label: t("Email"), subtitle: t("Send documents from the app"), Icon: Mail, color: "bg-sky-500", Panel: EmailSettings, show: ({ user }) => Boolean(user?.is_admin) },
+      { id: "google", label: t("Sign in with Google"), subtitle: t("One-click sign-in for staff with Gmail"), Icon: ShieldCheck, color: "bg-blue-600", Panel: GoogleSignInSettings, show: ({ user }) => Boolean(user?.is_admin) && !isNative() },
       { id: "messages", label: t("Messages to clients"), subtitle: t("The wording of quotes, invoices, reminders"), Icon: MessageSquareText, color: "bg-teal-500", Panel: MessageWording, show: ({ user }) => Boolean(user?.is_admin) },
       { id: "recycle-bin", label: t("Recycle bin"), subtitle: t("Restore deleted records"), Icon: Trash2, color: "bg-slate-500", Panel: RecycleBin, show: ({ user }) => Boolean(user?.is_admin) },
       { id: "backups", label: t("Data & Backups"), subtitle: t("Backups, restore, export"), Icon: Database, color: "bg-amber-500", Panel: BackupsPanel, useBadge: useBackupBadge },

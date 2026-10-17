@@ -223,6 +223,17 @@ export function AuthProvider({ children }) {
     await forgetDevice();
   };
 
+  // After an admin turns Google sign-in on or off in Settings: the sign-in screen follows at once, no restart.
+  const refreshGoogleStatus = useCallback(async () => {
+    try {
+      const status = await authService.status();
+      setGoogleEnabled(status.google_enabled);
+      setGoogleClientId(status.google_client_id);
+    } catch {
+      // the next start reads it again
+    }
+  }, []);
+
   const googleSignIn = withErrorHandling(async () => {
     if (!googleClientId) throw new Error('Google sign-in is not configured yet.');
     const { code, codeVerifier, redirectUri, nonce } = await signInWithGoogle(googleClientId);
@@ -343,6 +354,7 @@ export function AuthProvider({ children }) {
       setupFirstAccount,
       login,
       googleSignIn,
+      refreshGoogleStatus,
       setupPin,
       verifyPin,
       lock,
