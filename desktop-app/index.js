@@ -440,7 +440,7 @@ function setupAutoUpdater() {
       message: `Sandveld Vee Dienste ${info.version} has been downloaded.`,
       detail: 'Restart now to apply it, or it will install automatically the next time you close the app.',
     }).then((result) => {
-      if (result.response === 0) autoUpdater.quitAndInstall();
+      if (result.response === 0) autoUpdater.quitAndInstall(true, true);
     });
   });
 
@@ -476,7 +476,7 @@ ipcMain.handle('check-for-updates', async () => {
 });
 
 ipcMain.handle('quit-and-install', async () => {
-  if (updateStatus.state === 'downloaded') autoUpdater.quitAndInstall();
+  if (updateStatus.state === 'downloaded') autoUpdater.quitAndInstall(true, true);
 });
 
 ipcMain.handle('get-update-status', () => updateStatus);
