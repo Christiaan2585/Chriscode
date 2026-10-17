@@ -85,7 +85,7 @@ const AppearanceSettings = () => {
       </div>
       <div>
         <p className="mb-1 text-sm font-medium text-slate-700">{t("Colour scheme")}</p>
-        <p className="mb-3 text-sm text-slate-500">{t("Five looks taken from the farm. The choice is kept on this computer (or phone) only.")}</p>
+        <p className="mb-3 text-sm text-slate-500">{t("Six looks, from farm colours to a quiet graphite. The choice is kept on this computer (or phone) only.")}</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" role="radiogroup" aria-label={t("Colour scheme")}>
           {SCHEMES.map((s) => <Tile key={s.id} scheme={s} mode={mode} selected={scheme === s.id} />)}
         </div>

@@ -127,11 +127,11 @@ html.theme-dark {
 .theme-dark .border-emerald-200 { border-color: rgb(var(--acc-rgb, 16 185 129) / 0.35); }
 
 /* Sidebar: navy instead of green, with the current page as a pill. */
-.theme-dark .app-sidebar { background-color: var(--dk-sidebar); border-right: 1px solid var(--dk-line); }
+.theme-dark .app-sidebar { background-color: var(--sb-bg, var(--dk-sidebar)); border-right: 1px solid var(--dk-line); }
 .theme-dark .app-sidebar .border-emerald-800 { border-color: var(--dk-line); }
 .theme-dark .app-sidebar .hover\:bg-emerald-800:hover { background-color: rgb(255 255 255 / 0.05); }
 .theme-dark .app-sidebar .nav-label { color: #6b7590; }
-.theme-dark .app-sidebar .nav-active { background-color: rgb(var(--acc-rgb, 16 185 129) / 0.15); color: var(--acc-text, #34d399); }
+.theme-dark .app-sidebar .nav-active { background-color: rgb(var(--acc-rgb, 16 185 129) / 0.18); color: var(--acc-text-hi, #6ee7b7); }
 
 /* Recharts sets colours as SVG attributes and inline styles. */
 .theme-dark .recharts-cartesian-grid line { stroke: var(--dk-line); }
@@ -282,47 +282,45 @@ html.theme-dark {
 /* ---------------------------------------------------------------------
    The look (colour schemes, utils/colorSchemes.js + theme.js): every colour
    here comes from the accent (--acc-rgb, the emerald scale) or the neutrals
-   (the slate scale), so all schemes - light and dark - get it. A furrowed
-   field texture on the sidebar, softer cards, a lit primary button, a thin
-   accent line under the header and a faint wash of accent colour behind the
-   page. (Plain CSS: the packaged app's CSP blocks inline <style>.)
+   (the slate scale), so all schemes - light and dark - get it. Controlled and
+   flat: one deep sidebar tone with the accent only on the active page, plain
+   neutral surfaces, fine borders instead of heavy shadows, flat primary
+   buttons. (Plain CSS: the packaged app's CSP blocks inline <style>.)
    --------------------------------------------------------------------- */
 ::selection { background: rgb(var(--acc-rgb, 16 185 129) / 0.3); }
 * { scrollbar-width: thin; scrollbar-color: var(--color-slate-300) transparent; }
 :focus-visible { outline: 2px solid var(--color-emerald-500); outline-offset: 2px; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
 
-.app-sidebar {
-  background-image:
-    repeating-linear-gradient(112deg, transparent 0 15px, rgb(255 255 255 / 0.035) 15px 16px),
-    linear-gradient(180deg, var(--color-emerald-900), color-mix(in srgb, var(--color-emerald-900) 78%, #000));
+/* Sidebar: one flat, deep tone (--sb-bg, a quiet tint of the scheme's hue); the accent colour only marks the page you are on. */
+.app-sidebar { background: var(--sb-bg, var(--color-emerald-900)); border-right: 1px solid rgb(255 255 255 / 0.05); }
+.app-sidebar .hover\:bg-emerald-800:hover { background-color: rgb(255 255 255 / 0.06); }
+.app-sidebar .nav-active {
+  background-color: rgb(var(--acc-rgb, 16 185 129) / 0.18);
+  box-shadow: inset 3px 0 0 var(--color-emerald-400);
 }
-.theme-dark .app-sidebar {
-  background-image:
-    repeating-linear-gradient(112deg, transparent 0 15px, rgb(255 255 255 / 0.022) 15px 16px),
-    linear-gradient(180deg, var(--dk-sidebar), color-mix(in srgb, var(--dk-sidebar) 86%, #000));
-}
+.app-sidebar .border-emerald-800 { border-color: rgb(255 255 255 / 0.07); }
+.app-sidebar a, .app-sidebar button { transition: background-color 0.15s ease; }
 
-.app-bg {
-  background-image: radial-gradient(900px 380px at 100% -8%, rgb(var(--acc-rgb, 16 185 129) / 0.07), transparent 65%);
-}
-.theme-dark .app-bg {
-  background-image: radial-gradient(900px 380px at 100% -8%, rgb(var(--acc-rgb, 16 185 129) / 0.10), transparent 65%);
-}
+/* Page: a plain neutral surface - no tinted wash, no accent line under the header. */
+.app-bg { background-image: none; }
+main > header { box-shadow: none; }
 
-main > header { box-shadow: inset 0 -2px 0 rgb(var(--acc-rgb, 16 185 129) / 0.4); }
-
+/* Cards: a fine border does the work; the shadow is only a hint of depth. */
 .rounded-2xl.bg-white:not(.shadow-2xl), .rounded-xl.bg-white:not(.shadow-2xl) {
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 10px 22px -12px rgb(15 23 42 / 0.16);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
 }
 .theme-dark .rounded-2xl.bg-white:not(.shadow-2xl), .theme-dark .rounded-xl.bg-white:not(.shadow-2xl) {
-  box-shadow: 0 10px 26px -14px rgb(0 0 0 / 0.55);
+  box-shadow: none;
 }
 
+/* Primary buttons: flat accent, with a small shadow so they read as pressable. */
 button.bg-emerald-600, a.bg-emerald-600 {
-  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.11), rgb(0 0 0 / 0.07));
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2), inset 0 1px 0 rgb(255 255 255 / 0.14);
+  background-image: none;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
+button.bg-emerald-600:hover, a.bg-emerald-600:hover { box-shadow: 0 2px 6px rgb(0 0 0 / 0.18); }
 
 /* Delete buttons and the tick boxes that start a bulk delete are for admins only (the server enforces it; AuthContext sets the class). */
 .staff-user [data-admin-only] { display: none !important; }

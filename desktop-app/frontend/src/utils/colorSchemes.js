@@ -70,6 +70,11 @@ export const SCHEMES = [
     accent: { 50: "#f5f7ec", 100: "#e8eed3", 200: "#d2dcab", 300: "#b7c67b", 400: "#98a94f", 500: "#7a8c35", 600: "#5d6d26", 700: "#4b5821", 800: "#3d481f", 900: "#2c3518" },
     rgb: "122 140 53", hue: 70, sat: 8, darkHue: 70, accentText: "#b7c67b", accentTextHi: "#d2dcab",
   },
+  {
+    id: "graphite", name: "Graphite", blurb: "Quiet graphite and cool grey with one calm blue - the most restrained look.",
+    accent: { 50: "#f1f4fb", 100: "#e1e8f6", 200: "#c3d0ec", 300: "#9db1de", 400: "#7189c9", 500: "#5068b3", 600: "#3f539b", 700: "#344480", 800: "#2c3869", 900: "#232c52" },
+    rgb: "80 104 179", hue: 225, sat: 9, darkHue: 225, accentText: "#9db1de", accentTextHi: "#c3d0ec",
+  },
 ].map((scheme) => ({ ...scheme, swatch: scheme.swatch || scheme.accent }));
 
 const byId = (id) => SCHEMES.find((s) => s.id === id);
@@ -80,6 +85,8 @@ export function schemeVariables(id, mode) {
   const scheme = byId(id) || byId(DEFAULT_SCHEME);
   const vars = { "--acc-rgb": scheme.rgb };
   for (const step of STEPS) vars[`--color-emerald-${step}`] = scheme.accent[step];
+  // The sidebar is a deep, quiet tint of the scheme's hue (not the loud accent colour); the accent shows only where it is active.
+  vars["--sb-bg"] = hslToHex(scheme.darkHue, 22, mode === "dark" ? 11.5 : 13);
   if (mode === "dark") {
     const neutral = ramp(scheme.darkHue, 22, DARK_NEUTRAL);
     for (const step of STEPS) vars[`--color-slate-${step}`] = neutral[step];
@@ -110,5 +117,5 @@ export function previewColors(id, mode) {
   const v = schemeVariables(scheme.id, mode);
   return mode === "dark"
     ? { page: v["--dk-bg"], sidebar: v["--dk-sidebar"], card: v["--dk-card"], line: v["--dk-line"], text: v["--dk-text"], muted: v["--color-slate-500"], accent: v["--color-emerald-600"], accentText: v["--acc-text"] }
-    : { page: v["--color-slate-50"], sidebar: v["--color-emerald-900"], card: v["--color-white"], line: v["--color-slate-200"], text: v["--color-slate-800"], muted: v["--color-slate-500"], accent: v["--color-emerald-600"], accentText: v["--color-emerald-700"] };
+    : { page: v["--color-slate-50"], sidebar: v["--sb-bg"], card: v["--color-white"], line: v["--color-slate-200"], text: v["--color-slate-800"], muted: v["--color-slate-500"], accent: v["--color-emerald-600"], accentText: v["--color-emerald-700"] };
 }

@@ -6,6 +6,7 @@ const http = require('http');
 const crypto = require('crypto');
 const { spawn, execFile } = require('child_process');
 const localSecret = require('./local-secret');
+const shortcutIcons = require('./shortcut-icons');
 const secretStore = require('./secret-store');
 const readyMode = require('./ready-mode');
 const { autoUpdater } = require('electron-updater');
@@ -44,17 +45,18 @@ const PYTHON_BIN = process.platform === 'win32'
   ? path.join(PROJECT_ROOT, 'venv', 'Scripts', 'python.exe')
   : path.join(PROJECT_ROOT, 'venv', 'bin', 'python');
 
-// Packaged build (`npm run package` / the installed app): the Python backend
-// ships as a standalone PyInstaller executable bundled via electron-builder's
-// "extraResources" (see package.json) into <install dir>/resources/backend/.
-// That means the installed app needs no Python on the target PC at all, so it
-// runs on any Windows machine, not just the one it was built on.
+// Packaged build (`npm run package` / the installed app): the backend ships as a small copy of the Python runtime
+// (python.exe, signed by the Python Software Foundation, renamed sandveld-backend.exe) plus the app's own source,
+// bundled via electron-builder's "extraResources" (see package.json) into <install dir>/resources/backend/ and built by
+// scripts/build_backend_runtime.py. The installed app needs no Python on the target PC, and - unlike a PyInstaller exe,
+// which is a new unsigned program every build - Windows Smart App Control accepts it.
 const PACKAGED_BACKEND_EXE = path.join(
   process.resourcesPath || '',
   'backend',
   'sandveld-backend',
   process.platform === 'win32' ? 'sandveld-backend.exe' : 'sandveld-backend'
 );
+const PACKAGED_BACKEND_ENTRY = path.join(path.dirname(PACKAGED_BACKEND_EXE), 'backend_entry.py');
 
 // Writable, per-user, per-install data folder for the packaged app's live
 // database and Google OAuth config (Electron's standard userData path, e.g.
@@ -222,7 +224,7 @@ function spawnPackagedBackend(attempt) {
   const startedAt = Date.now();
   backendProcess = spawn(
     PACKAGED_BACKEND_EXE,
-    [],
+    ['-B', '-s', PACKAGED_BACKEND_ENTRY], // no bytecode writes into the install folder, no per-user packages
     {
       cwd: PACKAGED_DATA_DIR,
       windowsHide: true,
@@ -760,6 +762,15 @@ if (!app.requestSingleInstanceLock()) {
       hideWindow: () => { if (mainWindow) mainWindow.hide(); },
     });
     secretStore.install({ ipcMain, safeStorage, dir: app.getPath('userData') });
+    if (app.isPackaged && process.platform === 'win32') {
+      // The exe is the stock Electron one (see shortcut-icons.js): give our shortcuts the app's own icon.
+      const startMenu = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs');
+      const pinned = path.join(app.getPath('appData'), 'Microsoft', 'Internet Explorer', 'Quick Launch', 'User Pinned', 'TaskBar');
+      shortcutIcons.fixShortcutIcons({
+        shell, fs, path, execPath: process.execPath, iconPath: path.join(process.resourcesPath, 'icon.ico'),
+        folders: [app.getPath('desktop'), path.join(app.getPath('home'), 'Desktop'), startMenu, pinned], log: logToBackendFile,
+      });
+    }
     registerContentSecurityPolicy();
     localSecret.installHeader(session.defaultSession, LOCAL_SECRET, [`http://${BACKEND_HOST}:${BACKEND_PORT}/*`, `http://localhost:${BACKEND_PORT}/*`]);
     createWindow();

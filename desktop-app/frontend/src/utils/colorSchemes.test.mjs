@@ -5,9 +5,9 @@ import { DEFAULT_SCHEME, SCHEMES, contrast, schemeVariables, STEPS } from "./col
 const others = SCHEMES; // every scheme is held to the same readability rules, the original green included
 const hexOf = (vars, name) => vars[`--color-${name}`];
 
-test("there are five schemes - green first - each with a name and a few words about it", () => {
+test("there are six schemes - green first - each with a name and a few words about it", () => {
   assert.equal(SCHEMES[0].id, DEFAULT_SCHEME);
-  assert.equal(others.length, 5);
+  assert.equal(others.length, 6);
   assert.equal(new Set(SCHEMES.map((s) => s.id)).size, SCHEMES.length);
   for (const scheme of SCHEMES) {
     assert.ok(scheme.name.length > 3 && scheme.blurb.length > 10, scheme.id);
@@ -36,7 +36,11 @@ for (const scheme of others) {
     assert.ok(contrast(white, hexOf(v, "slate-50")) > 1.02 && contrast(white, hexOf(v, "slate-50")) < 1.15, "card slightly lighter than the page");
     assert.ok(contrast(white, hexOf(v, "emerald-600")) >= 4.5, "white text on the main button colour");
     assert.ok(contrast(hexOf(v, "emerald-700"), hexOf(v, "emerald-50")) >= 4.5, "accent text on a pale accent wash");
-    assert.ok(contrast(hexOf(v, "emerald-200"), hexOf(v, "emerald-900")) >= 4.5, "light text on the sidebar");
+    assert.ok(contrast(hexOf(v, "emerald-200"), hexOf(v, "emerald-900")) >= 4.5, "light text on the old accent sidebar");
+    assert.ok(contrast("#ffffff", v["--sb-bg"]) >= 12, "white text on the sidebar");
+    assert.ok(contrast(hexOf(v, "emerald-200"), v["--sb-bg"]) >= 7, "accent-tinted text on the sidebar");
+    assert.ok(contrast(hexOf(v, "emerald-300"), v["--sb-bg"]) >= 4.5, "small labels on the sidebar");
+    assert.ok(contrast(hexOf(v, "emerald-400"), v["--sb-bg"]) >= 3, "the active-page marker is visible on the sidebar");
     assert.ok(contrast(hexOf(v, "slate-500"), white) >= 4.5, "secondary text on a card");
     assert.ok(contrast(hexOf(v, "slate-600"), hexOf(v, "slate-50")) >= 5, "body text on the page");
     assert.ok(contrast(hexOf(v, "slate-800"), white) >= 10, "headings on a card");
@@ -59,6 +63,7 @@ for (const scheme of others) {
     assert.match(v["--acc-rgb"], /^\d+ \d+ \d+$/);
     // the card must be lighter than the page, and the line lighter than the card, or the layout flattens
     assert.ok(contrast(card, v["--dk-bg"]) > 1.02 && contrast(v["--dk-line"], card) > 1.1);
+    assert.ok(contrast("#ffffff", v["--sb-bg"]) >= 12 && contrast(hexOf(v, "emerald-400"), v["--sb-bg"]) >= 3, "sidebar text and marker");
   });
 
   test(`${scheme.name}: the two looks use the same names, so switching leaves nothing behind`, () => {

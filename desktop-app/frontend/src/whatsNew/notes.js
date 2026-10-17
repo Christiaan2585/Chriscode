@@ -3,6 +3,25 @@
 // people will notice. (Never put the business's program steps, products or doses here: the repository is public.)
 export const NOTES = [
   {
+    version: "1.0.22",
+    title: "Starts on every PC, and a cleaner look",
+    sections: [
+      {
+        heading: "Fixed",
+        items: [
+          "The app could open blank on PCs where Windows Smart App Control is on. It now starts there, and future updates won't hit that problem again.",
+        ],
+      },
+      {
+        heading: "New look",
+        items: [
+          "A cleaner, more modern look: a flat sidebar with the colour only on the page you are on, plain surfaces and flat buttons.",
+          "A new quiet Graphite colour scheme (Settings, General, Appearance).",
+        ],
+      },
+    ],
+  },
+  {
     version: "1.0.21",
     title: "Sign in with Google, made easy",
     sections: [

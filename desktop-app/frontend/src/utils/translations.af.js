@@ -372,7 +372,7 @@ export const AF = {
   "Light": "Lig",
   "Dark": "Donker",
   "Colour scheme": "Kleurskema",
-  "Five looks taken from the farm. The choice is kept on this computer (or phone) only.": "Vyf voorkomste uit die plaas. Die keuse word net op hierdie rekenaar (of foon) gehou.",
+  "Six looks, from farm colours to a quiet graphite. The choice is kept on this computer (or phone) only.": "Ses voorkomste, van plaaskleure tot rustige grafiet. Die keuse word net op hierdie rekenaar (of foon) gehou.",
   "Text size": "Teksgrootte",
   "Makes everything in the app bigger. Kept on this computer (or phone) only.": "Maak alles in die toep groter. Word net op hierdie rekenaar (of foon) gehou.",
   "High contrast": "Hoë kontras",
