@@ -4,7 +4,7 @@ from typing import List, Optional
 import re
 import io
 from app.core.db import get_session
-from app.core.security import get_current_user, require_admin
+from app.core.security import get_current_user, require_admin, require_full_access
 from app.core.uploads import read_capped
 from app.core import cascade, stock, trash
 from app.models.user import User
@@ -237,7 +237,7 @@ def _category_from_header(row) -> str:
     return category or "Uncategorised"
 
 
-@router.post("/import")
+@router.post("/import", dependencies=[Depends(require_full_access)])  # the file sets cost prices, which limited staff cannot see
 async def import_products(file: UploadFile = File(...), dry_run: bool = False, session: Session = Depends(get_session)):
     """Import products from a supplier price-list Excel file (e.g. pryslyse.xlsx).
 

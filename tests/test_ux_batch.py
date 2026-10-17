@@ -226,6 +226,14 @@ class LimitedStaffTests(Base):
         self.assertEqual(out.price_excl_vat, 60.0)
         self.assertEqual(self.s.get(Product, 1).cost, 40.0)
 
+    def test_the_price_list_import_and_aged_debtors_need_full_access(self):
+        from app.api import reports as reports_api
+        def gated(router, path, method):
+            route = next(r for r in router.routes if r.path.endswith(path) and method in r.methods)
+            return any(d.call is require_full_access for d in route.dependant.dependencies)
+        self.assertTrue(gated(products_api.router, "/import", "POST"))
+        self.assertTrue(gated(reports_api.router, "/aged-debtors", "GET"))
+
     def test_money_reports_are_refused_to_a_limited_user(self):
         with self.assertRaises(HTTPException) as ctx:
             require_full_access(User(name="Temp", email="t@example.com", limited=True))
